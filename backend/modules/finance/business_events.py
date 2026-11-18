@@ -27,6 +27,7 @@ from fastapi import APIRouter, Request, Response, status
 from sqlalchemy import JSON, DateTime, Integer, String, event, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
+from modules import inprocess
 from modules.finance import platform_connect
 from modules.finance.db import Base
 from modules.finance.platform_roles import NoteIn, _checked, _nowhere, sessions_for
@@ -148,7 +149,7 @@ def flush(db: Session, settings) -> int:
     for slug, items in by_company.items():
         body = {"company": slug, "events": [{"id": e.id, "kind": e.kind, "data": e.data, "occurredAt": e.occurred_at.isoformat()} for e in items]}
         try:
-            r = httpx.post(f"{url.rstrip('/')}/connect/events", json=body, headers={"X-Bishnoi-App-Key": key}, timeout=10)
+            r = inprocess.post("finance", f"{url.rstrip('/')}/connect/events", json=body, headers={"X-Bishnoi-App-Key": key}, timeout=10)
             answer = r.json() if r.status_code == 200 else None
             problem = None if answer else f"answered {r.status_code}"
         except (httpx.HTTPError, ValueError) as e:

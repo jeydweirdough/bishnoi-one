@@ -52,6 +52,8 @@ export type Application = {
   version: string | null;
   /** Has a connect key (Connections), and when it last asked for its links. */
   connected: boolean;
+  /** A module of the one backend: the others reach it directly, connected without keys. */
+  inBackend?: boolean;
   connectedAt: string | null;
   isActive: boolean;
   status: Health;

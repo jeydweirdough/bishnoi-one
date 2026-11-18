@@ -25,6 +25,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from modules import inprocess
 from modules.crm.config import Settings
 from modules.crm.tenants import company_header
 from modules.crm.models import Company, Contact, Quote
@@ -51,14 +52,14 @@ def call(settings: Settings, method: str, path: str, body: dict | None = None) -
     if not settings.pharmacy_linked:
         raise PharmacyUnavailable("The CRM is not connected to Pharmacy yet, so an Rx quote cannot be checked. Please contact your system administrator.")
     url = f"{settings.pharmacy_api_url}/integration/checks" + (f"/{urllib.parse.quote(path)}" if path else "")
-    headers = {"X-Bishnoi-Key": settings.pharmacy_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)}
+    headers = {**inprocess.key_header(settings.pharmacy_api_key), "Accept": "application/json", **company_header(settings)}
     data = None
     if body is not None:
         data = json.dumps(body).encode()
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
+        with inprocess.urlopen("crm", request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
             return json.loads(response.read())
     except urllib.error.HTTPError as e:
         if e.code == 401:

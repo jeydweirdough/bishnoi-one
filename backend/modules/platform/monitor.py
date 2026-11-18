@@ -27,6 +27,7 @@ import httpx
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session
 
+from modules import inprocess
 from modules.platform import addresses
 from modules.platform.api import as_utc, iso
 from modules.platform.models import Application, HealthCheck, Integration
@@ -62,7 +63,7 @@ def probe(url: str, timeout: float, slow_ms: int) -> Answer:
     """One look at one address. Replaced in tests, which have nothing to call."""
     started = time.perf_counter()
     try:
-        response = httpx.get(_ipv4_localhost(url), timeout=timeout, follow_redirects=False, headers={"User-Agent": "bishnoi-platform-monitor"})
+        response = inprocess.get("platform", _ipv4_localhost(url), timeout=timeout, follow_redirects=False, headers={"User-Agent": "bishnoi-platform-monitor"})
     except httpx.TimeoutException:
         return Answer("down", None, None, f"No answer within {timeout:g} seconds.")
     except httpx.HTTPError:

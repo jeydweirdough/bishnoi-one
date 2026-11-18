@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from modules import inprocess
 from modules.module_settings import module_sources
 
 # This module's folder (backend/modules/<name>): its alembic.ini and migrations/.
@@ -205,19 +206,19 @@ class Settings(BaseSettings):
 
     @property
     def inventory_linked(self) -> bool:
-        return bool(self.inventory_api_url and self.inventory_api_key)
+        return inprocess.linked(self.inventory_api_url, self.inventory_api_key)
 
     @property
     def finance_linked(self) -> bool:
-        return bool(self.finance_api_url and self.finance_api_key)
+        return inprocess.linked(self.finance_api_url, self.finance_api_key)
 
     @property
     def orders_linked(self) -> bool:
-        return bool(self.orders_api_url and self.orders_api_key)
+        return inprocess.linked(self.orders_api_url, self.orders_api_key)
 
     @property
     def pharmacy_linked(self) -> bool:
-        return bool(self.pharmacy_api_url and self.pharmacy_api_key)
+        return inprocess.linked(self.pharmacy_api_url, self.pharmacy_api_key)
 
     @property
     def discord_mock_dir(self) -> Path:

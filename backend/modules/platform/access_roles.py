@@ -33,6 +33,7 @@ import httpx
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from modules import inprocess
 from modules.platform import addresses
 from modules.platform.config import Settings
 from modules.platform.models import AccessRole, AccessRoleAbility, AccessRolePermission, AccessRoleScope, Application, Company, CompanyApp, Identity, IdentityApp
@@ -63,7 +64,7 @@ def catalog(app: Application) -> dict | None:
     if known and time.monotonic() - known[1] < (KEEP if known[0] else MISSING):
         return known[0]
     try:
-        r = httpx.get(f"{url}/platform/catalog", timeout=3)
+        r = inprocess.get("platform", f"{url}/platform/catalog", timeout=3)
         found = r.json() if r.status_code == 200 else None
         if not isinstance(found, dict) or not isinstance(found.get("areas"), list):
             found = None
@@ -216,7 +217,7 @@ def _send(sessions, settings: Settings, company_id: str) -> None:
                 continue
             url = base + "/platform/roles"
             try:
-                r = httpx.post(url, json={"pass": roles_note(db, settings, company, app)}, timeout=10)
+                r = inprocess.post("platform", url, json={"pass": roles_note(db, settings, company, app)}, timeout=10)
                 answer = "taken" if r.status_code == 204 else f"answered {r.status_code}"
             except httpx.HTTPError as e:
                 answer = f"out of reach ({e.__class__.__name__})"
@@ -249,7 +250,7 @@ def read_roles(settings: Settings, app: Application, slug: str) -> list[dict] | 
     now = int(time.time())
     ask = sign(settings, {"iss": ISSUER, "aud": app.key, "kind": "roles-ask", "slug": slug, "iat": now, "exp": now + ASK_LIFETIME, "jti": secrets.token_urlsafe(12)})
     try:
-        r = httpx.post(base + "/platform/roles/export", json={"pass": ask}, timeout=10)
+        r = inprocess.post("platform", base + "/platform/roles/export", json={"pass": ask}, timeout=10)
         found = r.json().get("roles") if r.status_code == 200 else None
     except (httpx.HTTPError, ValueError, AttributeError):
         found = None

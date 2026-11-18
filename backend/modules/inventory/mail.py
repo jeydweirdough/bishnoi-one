@@ -13,6 +13,7 @@ from email.utils import formataddr, make_msgid
 
 import httpx
 
+from modules import inprocess
 from modules.inventory.config import Settings
 from modules.inventory.platform_connect import connect_key
 
@@ -38,7 +39,7 @@ def relay(settings: Settings, company: str | None) -> Relay:
     if not settings.platform_api_url or not key:
         raise CantSend("Inventory isn't connected to Bishnoi One, so it has no email service to send with.")
     try:
-        r = httpx.get(f"{settings.platform_api_url.rstrip('/')}/connect/services", params={"company": company or ""},
+        r = inprocess.get("inventory", f"{settings.platform_api_url.rstrip('/')}/connect/services", params={"company": company or ""},
                       headers={"X-Bishnoi-App-Key": key}, timeout=8)
     except httpx.HTTPError as e:
         raise CantSend("Bishnoi One can't be reached right now. Try again in a moment.") from e

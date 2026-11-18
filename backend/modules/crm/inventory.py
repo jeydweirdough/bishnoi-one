@@ -23,6 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from modules import inprocess
 from modules.crm.config import Settings
 from modules.crm.tenants import company_header
 from modules.crm.models import PriceType, Product, ProductPrice
@@ -45,9 +46,9 @@ def call(settings: Settings, path: str, params: dict | None = None) -> dict:
     url = f"{settings.inventory_api_url}/integration/{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    request = urllib.request.Request(url, headers={"X-Bishnoi-Key": settings.inventory_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)})
+    request = urllib.request.Request(url, headers={**inprocess.key_header(settings.inventory_api_key), "Accept": "application/json", **company_header(settings)})
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
+        with inprocess.urlopen("crm", request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
             return json.loads(response.read())
     except urllib.error.HTTPError as e:
         if e.code == 401:

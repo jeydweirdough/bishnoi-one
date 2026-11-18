@@ -15,7 +15,7 @@ and that the company has, is given them.
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, Query, status
+from fastapi import APIRouter, Header, HTTPException, Query, Request, status
 from pydantic import Field
 from sqlalchemy import select
 
@@ -178,6 +178,7 @@ def check(db, settings, company: Company, key: str, actor: User | str) -> dict:
 
 @router.get("/connect/services")
 def my_services(
+    request: Request,
     db: DB,
     settings: SettingsDep,
     company: Annotated[str, Query(max_length=40)],
@@ -185,7 +186,7 @@ def my_services(
 ) -> dict:
     """An application's services at one company: switched on, filled in, and
     used by it, with every detail. Only for a company that has the application."""
-    app = links.app_of_key(db, key)
+    app = links.app_of_request(db, request, key)
     if app is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "That connect key isn't one the platform made, or it was replaced. Make a new one in Connections.")
     found = db.scalar(select(Company).where(Company.slug == company.strip().lower()))

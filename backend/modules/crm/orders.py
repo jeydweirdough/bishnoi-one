@@ -38,6 +38,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from modules import inprocess
 from modules.crm.config import Settings
 from modules.crm.tenants import company_header
 from modules.crm.models import Company, Contact, Product, Quote, Team, User
@@ -149,7 +150,7 @@ def send(settings: Settings, quote_id: str, body: dict) -> dict:
         data=json.dumps(body).encode(),
         method="POST",
         headers={
-            "X-Bishnoi-Key": settings.orders_api_key.get_secret_value(),
+            **inprocess.key_header(settings.orders_api_key),
             "Idempotency-Key": quote_id,
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -157,7 +158,7 @@ def send(settings: Settings, quote_id: str, body: dict) -> dict:
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
+        with inprocess.urlopen("crm", request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
             made = json.loads(response.read() or b"{}")
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):

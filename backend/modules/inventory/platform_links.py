@@ -23,6 +23,7 @@ import time
 import httpx
 from pydantic import SecretStr
 
+from modules import inprocess
 from modules.inventory.config import Settings
 
 log = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ NOTHING = {"uses": {}, "usedBy": {}}
 def _ask(settings: Settings, key: str) -> tuple[dict | None, float]:
     """(the platform's answer or None when it can't be had, seconds until asking again)."""
     try:
-        r = httpx.get(f"{settings.platform_api_url.rstrip('/')}/connect/links", headers={"X-Bishnoi-App-Key": key}, timeout=5)
+        r = inprocess.get("inventory", f"{settings.platform_api_url.rstrip('/')}/connect/links", headers={"X-Bishnoi-App-Key": key}, timeout=5)
     except httpx.HTTPError as e:
         # While starting, the Platform may be starting too: said quietly until the last try (platform_connect.connect_now).
         (log.info if _quiet else log.error)("Links: can't reach the platform at %s (%s)%s.", settings.platform_api_url, e.__class__.__name__, ", trying again shortly" if _quiet else "")

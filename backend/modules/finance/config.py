@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from modules import inprocess
 from modules.module_settings import module_sources
 
 # This module's folder (backend/modules/<name>): its alembic.ini and migrations/.
@@ -156,7 +157,7 @@ class Settings(BaseSettings):
 
     @property
     def crm_linked(self) -> bool:
-        return bool(self.crm_api_url and self.crm_api_key)
+        return inprocess.linked(self.crm_api_url, self.crm_api_key)
 
     # Bishnoi One Inventory, for what each product costs (the cost of goods sold on each invoice,
     # app/inventory.py): its API and the key it gave Finance. Given by the Platform once linked.
@@ -166,7 +167,7 @@ class Settings(BaseSettings):
 
     @property
     def inventory_linked(self) -> bool:
-        return bool(self.inventory_api_url and self.inventory_api_key)
+        return inprocess.linked(self.inventory_api_url, self.inventory_api_key)
 
     @property
     def discord_mock_dir(self) -> Path:

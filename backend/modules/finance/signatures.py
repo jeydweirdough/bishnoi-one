@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from modules import inprocess
 from modules.finance.models import FundRequest, JournalEntry, Signature, SignedStep, User
 
 PNG = b"\x89PNG\r\n\x1a\n"
@@ -107,7 +108,7 @@ def _platform_image(user: User) -> bytes | None | bool:
     if not url or not key or not user.platform_identity_id:
         return False
     try:
-        r = httpx.get(f"{url.rstrip('/')}/connect/signature", params={"identity": user.platform_identity_id}, headers={"X-Bishnoi-App-Key": key}, timeout=5)
+        r = inprocess.get("finance", f"{url.rstrip('/')}/connect/signature", params={"identity": user.platform_identity_id}, headers={"X-Bishnoi-App-Key": key}, timeout=5)
     except httpx.HTTPError:
         return False
     if r.status_code == 404:

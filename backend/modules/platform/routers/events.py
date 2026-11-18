@@ -40,7 +40,7 @@ class EventsIn(Api):
 @router.post("/connect/events")
 def take_events(body: EventsIn, request: Request, db: DB, settings: SettingsDep,
                 key: Annotated[str | None, Header(alias="X-Bishnoi-App-Key")] = None) -> dict:
-    app = links.app_of_key(db, key)
+    app = links.app_of_request(db, request, key)
     if app is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "That connect key isn't one the platform made, or it was replaced.")
     company = db.scalar(select(Company).where(Company.slug == body.company.strip().lower()))

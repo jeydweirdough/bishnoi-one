@@ -27,6 +27,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from modules import inprocess
 from modules.platform import addresses, passes
 from modules.platform.api import as_utc
 from modules.platform.config import Settings
@@ -92,6 +93,19 @@ def app_of_key(db: Session, key: str | None) -> Application | None:
     return found if found is not None and found.is_active else None
 
 
+def app_of_request(db: Session, request, key: str | None) -> Application | None:
+    """The application asking: by its connect key, or, for a module of the one backend calling
+    in-process (modules/inprocess.py), by who it is, with no key (stage M2)."""
+    found = app_of_key(db, key)
+    if found is not None:
+        return found
+    inside = inprocess.caller(request)
+    if not inside:
+        return None
+    found = db.scalar(select(Application).where(Application.key == inside))
+    return found if found is not None and found.is_active else None
+
+
 def database_company(db: Session, app: Application) -> dict | None:
     """Resolve Finance's existing subscription once, then pin its database owner.
 
@@ -126,11 +140,15 @@ def links_for(db: Session, settings: Settings, app: Application) -> dict:
     for link in db.scalars(select(AppLink).where(AppLink.is_on, (AppLink.from_app_id == app.id) | (AppLink.to_app_id == app.id))):
         caller, target = apps.get(link.from_app_id), apps.get(link.to_app_id)
         secret = unseal(settings, link.secret)
-        if caller is None or target is None or secret is None or (caller.key, target.key) not in KNOWN:
+        if caller is None or target is None or (caller.key, target.key) not in KNOWN:
+            continue
+        # Two modules of the one backend call each other in-process: the link needs no key (stage M2).
+        built_in = built_in_pair(caller, target)
+        if secret is None and not built_in:
             continue
         if caller.id == app.id and addresses.api_url(target):
             uses[target.key] = {"apiUrl": addresses.api_url(target), "appUrl": target.app_url, "key": secret}
-        if target.id == app.id:
+        if target.id == app.id and secret is not None:
             used_by[caller.key] = secret
     return {"app": app.key, "appUrl": app.app_url, "uses": uses, "usedBy": used_by, "dataKey": data_key(settings, app), **({"databaseCompany": database_company(db, app)} if app.key == "finance" else {}), "askAgainIn": ASK_AGAIN}
 
@@ -144,10 +162,20 @@ def data_key(settings: Settings, app: Application) -> str | None:
     return unseal(settings, app.data_key)
 
 
+def built_in_pair(caller: Application, target: Application) -> bool:
+    """Both are modules of the one backend: they call each other directly, no keys (stage M2)."""
+    return addresses.in_backend(caller) and addresses.in_backend(target)
+
+
 def link_state(link: AppLink, caller: Application, target: Application, health: dict[str, str]) -> tuple[str, str]:
     """(state, what it means), for the screens: on and working, or what's in the way."""
     if not link.is_on:
         return "off", "Switched off."
+    if built_in_pair(caller, target):
+        # No connect key or link key to wait for: the call stays inside the one backend.
+        if health.get(target.id) == "down":
+            return "problem", f"{target.name} isn't answering, so {caller.name} can't use it."
+        return "working", KNOWN.get((caller.key, target.key), "")
     if not addresses.api_url(target):
         return "waiting", f"Add {target.name}'s API address, so {caller.name} knows where to call."
     for a in (caller, target):
@@ -194,7 +222,7 @@ def deliver(sessions, settings: Settings, app_id: str) -> str:
         token = connect_pass(settings, app, key)
         url = addresses.api_url(app) + "/platform/connect"
     try:
-        r = httpx.post(url, json={"token": token}, timeout=10)
+        r = inprocess.post("platform", url, json={"token": token}, timeout=10)
     except httpx.HTTPError as e:
         log.warning("Links: couldn't deliver the connect key to %s (%s).", url, e.__class__.__name__)
         return f"Couldn't reach {url}."

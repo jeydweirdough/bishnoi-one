@@ -17,6 +17,7 @@ import logging
 
 import httpx
 
+from modules import inprocess
 from modules.admin.config import Settings
 
 log = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ class Refused(Exception):
 
 
 def linked(settings: Settings, app: str) -> bool:
-    return bool(getattr(settings, f"{app}_api_url") and getattr(settings, f"{app}_api_key"))
+    return inprocess.linked(getattr(settings, f"{app}_api_url"), getattr(settings, f"{app}_api_key"))
 
 
 def call(settings: Settings, app: str, method: str, path: str, body: dict | None = None) -> dict:
@@ -42,12 +43,12 @@ def call(settings: Settings, app: str, method: str, path: str, body: dict | None
     name = NAMES[app]
     if not linked(settings, app):
         raise Unavailable(f"Admin is not connected to {name} yet. Please contact your system administrator.")
-    headers = {"X-Bishnoi-Key": getattr(settings, f"{app}_api_key").get_secret_value(), "Accept": "application/json"}
+    headers = {**inprocess.key_header(getattr(settings, f"{app}_api_key")), "Accept": "application/json"}
     if settings.company:
         headers["X-Bishnoi-Company"] = settings.company
     url = getattr(settings, f"{app}_api_url").rstrip("/") + path
     try:
-        r = httpx.request(method, url, json=body, headers=headers, timeout=TIMEOUT)
+        r = inprocess.request("exec", method, url, json=body, headers=headers, timeout=TIMEOUT)
     except httpx.HTTPError as e:
         raise Unavailable(f"{name[0].upper()}{name[1:]} can't be reached right now.") from e
     if r.status_code == 401:

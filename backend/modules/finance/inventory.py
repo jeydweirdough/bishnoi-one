@@ -8,6 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from modules import inprocess
 from modules.finance.config import Settings
 
 TIMEOUT = 10  # seconds
@@ -18,12 +19,12 @@ def unit_costs(settings: Settings, skus: list[str]) -> dict[str, int] | None:
     wanted = sorted({s.strip() for s in skus if s and s.strip()})
     if not wanted or not settings.inventory_linked:
         return None if not settings.inventory_linked else {}
-    headers = {"X-Bishnoi-Key": settings.inventory_api_key.get_secret_value(), "Accept": "application/json"}
+    headers = {**inprocess.key_header(settings.inventory_api_key), "Accept": "application/json"}
     if settings.crm_company:
         headers["X-Bishnoi-Company"] = settings.crm_company
     url = f"{settings.inventory_api_url}/integration/costs?{urllib.parse.urlencode({'skus': ','.join(wanted)})}"
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=TIMEOUT) as response:
+        with inprocess.urlopen("finance", urllib.request.Request(url, headers=headers), timeout=TIMEOUT) as response:
             items = json.loads(response.read()).get("items", {})
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
         return None

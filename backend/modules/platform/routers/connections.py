@@ -33,8 +33,8 @@ router = APIRouter(tags=["connections"])
 
 
 @router.get("/connect/links")
-def my_links(db: DB, settings: SettingsDep, key: Annotated[str | None, Header(alias="X-Bishnoi-App-Key")] = None) -> dict:
-    app = links.app_of_key(db, key)
+def my_links(request: Request, db: DB, settings: SettingsDep, key: Annotated[str | None, Header(alias="X-Bishnoi-App-Key")] = None) -> dict:
+    app = links.app_of_request(db, request, key)
     if app is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "That connect key isn't one the platform made, or it was replaced. Make a new one in Connections.")
     answer = links.links_for(db, settings, app)
@@ -52,7 +52,7 @@ def link_out(link: AppLink, apps: dict[str, Application], health: dict[str, str]
     if caller is None or target is None:
         return None
     state, why = links.link_state(link, caller, target, health)
-    if link.is_on and links.unseal(settings, link.secret) is None:
+    if link.is_on and links.unseal(settings, link.secret) is None and not links.built_in_pair(caller, target):
         state, why = "problem", "The platform's signing key changed, so this link's key can't be read: make a new key."
     return {
         "id": link.id,
@@ -61,6 +61,8 @@ def link_out(link: AppLink, apps: dict[str, Application], health: dict[str, str]
         "isOn": link.is_on,
         "state": state,
         "why": why,
+        # Both in the one backend: connected directly, without keys.
+        "builtIn": links.built_in_pair(caller, target),
         "what": links.KNOWN.get((caller.key, target.key), ""),
         "changedAt": iso(link.changed_at),
     }
@@ -88,6 +90,8 @@ def connections(db: DB, settings: SettingsDep, _: CurrentUser) -> dict:
                 "appUrl": a.app_url,
                 "status": health.get(a.id),
                 "connected": bool(a.connect_key_hash),
+                # A module of the one backend: the others reach it directly, without keys.
+                "inBackend": addresses.in_backend(a),
                 "keyHint": a.connect_key_hint,
                 "keyMadeAt": iso(a.connect_key_made_at),
                 "connectedAt": iso(a.connected_at),

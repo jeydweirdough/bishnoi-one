@@ -27,6 +27,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from modules import inprocess
 from modules.platform import addresses
 from modules.platform.config import Settings
 from modules.platform.models import Application, BusinessEvent, Company, CompanyApp, EventDelivery
@@ -114,7 +115,7 @@ def _send(db: Session, settings: Settings, d: EventDelivery, event: BusinessEven
         answer, ok = "the app has no API address registered", False
     else:
         try:
-            r = httpx.post(base + "/platform/events", json={"pass": note(settings, event, company, d.target)}, timeout=10)
+            r = inprocess.post("platform", base + "/platform/events", json={"pass": note(settings, event, company, d.target)}, timeout=10)
             if r.status_code in (200, 204):
                 answer, ok = None, True
             elif r.status_code == 404:
@@ -204,7 +205,7 @@ def ask_to_flush(db: Session, settings: Settings) -> int:
         token = sign(settings, {"iss": ISSUER, "aud": app.key, "kind": "events-flush", "company": company.id, "slug": company.slug,
                                 "iat": now, "exp": now + LIFETIME, "jti": secrets.token_urlsafe(12)})
         try:
-            answered += httpx.post(base + "/platform/events/flush", json={"pass": token}, timeout=10).status_code in (200, 204)
+            answered += inprocess.post("platform", base + "/platform/events/flush", json={"pass": token}, timeout=10).status_code in (200, 204)
         except httpx.HTTPError:
             pass
     return answered

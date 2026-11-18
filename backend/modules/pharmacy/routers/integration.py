@@ -21,10 +21,11 @@ import hmac
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from pydantic import Field, field_validator
 from sqlalchemy import func, select
 
+from modules import inprocess
 from modules.pharmacy.api import Api, check_email, iso, next_number, not_found, today
 from modules.pharmacy.audit import audit
 from modules.pharmacy.config import Settings
@@ -35,12 +36,16 @@ from modules.pharmacy.stock import sellable
 
 
 def calling_app(
+    request: Request,
     settings: SettingsDep,
     x_bishnoi_key: Annotated[str | None, Header()] = None,
     # The header's name before the rename to Bishnoi One: still taken until every app is redeployed.
     x_nabhi_key: Annotated[str | None, Header()] = None,
 ) -> str:
     """The name of the app whose key came with the request."""
+    # A module of the one backend calling in-process (modules/inprocess.py) needs no key.
+    if (inside := inprocess.caller(request)):
+        return inside
     x_bishnoi_key = x_bishnoi_key or x_nabhi_key
     if x_bishnoi_key:
         for key in settings.integration_keys:

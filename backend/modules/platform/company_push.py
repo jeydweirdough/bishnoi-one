@@ -27,6 +27,7 @@ import threading
 
 from sqlalchemy import select
 
+from modules import inprocess
 from modules.platform import addresses
 from modules.platform.config import Settings
 from modules.platform.models import Application, Company, CompanyApp, CompanyPass
@@ -91,7 +92,7 @@ def _send(sessions, settings: Settings, company_id: str, app_ids: set[str], gone
                 slug = company.slug
             url = base + "/platform/company"
             try:
-                r = httpx.post(url, json={"pass": token}, timeout=5)
+                r = inprocess.post("platform", url, json={"pass": token}, timeout=5)
                 answer = "taken" if r.status_code == 204 else f"answered {r.status_code}"
             except httpx.HTTPError as e:
                 answer = f"out of reach ({e.__class__.__name__})"

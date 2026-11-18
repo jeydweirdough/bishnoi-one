@@ -37,6 +37,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import APIRouter, Request, Response
 
+from modules import inprocess
 from modules.inventory import platform_pass
 from modules.inventory.config import Settings
 from modules.inventory.platform_pass import ISSUERS, LEEWAY, _b64
@@ -157,7 +158,7 @@ def _keep(settings: Settings, slug: str, token: str, at: float) -> None:
 def _ask(settings: Settings, slug: str) -> Standing:
     """The platform's answer, checked, and kept when it's a pass."""
     try:
-        r = httpx.get(f"{settings.platform_api_url.rstrip('/')}/public/company-pass", params={"app": APP_KEY, "company": slug}, timeout=10)
+        r = inprocess.get("inventory", f"{settings.platform_api_url.rstrip('/')}/public/company-pass", params={"app": APP_KEY, "company": slug}, timeout=10)
     except httpx.HTTPError:
         raise ConnectionError from None
     now = time.time()

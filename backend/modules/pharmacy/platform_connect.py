@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import Column, MetaData, String, Table, Text, delete, insert, select, update
 
+from modules import inprocess
 from modules.pharmacy import platform_pass
 from modules.pharmacy.config import Settings
 
@@ -103,7 +104,7 @@ def say_hello(settings: Settings) -> None:
         import httpx
 
         try:
-            httpx.post(url, json={"app": APP}, timeout=5)
+            inprocess.post("pharmacy", url, json={"app": APP}, timeout=5)
         except httpx.HTTPError as e:
             log.warning("Connect key: couldn't reach the Platform at %s (%s).", url, e.__class__.__name__)
 

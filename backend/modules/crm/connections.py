@@ -24,6 +24,7 @@ from pathlib import Path
 import httpx
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
+from modules import inprocess
 from modules.crm.config import DATA_DIR, Settings
 
 log = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ def _key(settings: Settings) -> str:
 def _ask(settings: Settings, company: str) -> tuple[dict | None, float]:
     """(the company's services, or None when they can't be had; seconds until asking again)."""
     try:
-        r = httpx.get(
+        r = inprocess.get("crm", 
             f"{settings.platform_api_url.rstrip('/')}/connect/services",
             params={"company": company},
             headers={"X-Bishnoi-App-Key": _key(settings)},

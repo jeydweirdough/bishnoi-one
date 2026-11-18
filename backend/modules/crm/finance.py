@@ -15,6 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from modules import inprocess
 from modules.crm.config import Settings
 from modules.crm.tenants import company_header
 from modules.crm.models import Bundle, Product
@@ -30,11 +31,11 @@ def _post(settings: Settings, path: str, body: dict) -> dict:
     request = urllib.request.Request(
         f"{settings.finance_api_url}/integration/{path}",
         data=json.dumps(body).encode(),
-        headers={"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Content-Type": "application/json", "Accept": "application/json", **company_header(settings)},
+        headers={**inprocess.key_header(settings.finance_api_key), "Content-Type": "application/json", "Accept": "application/json", **company_header(settings)},
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
+        with inprocess.urlopen("crm", request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
             return json.loads(response.read())
     except urllib.error.HTTPError as e:
         if e.code == 401:
@@ -123,10 +124,10 @@ def customer_standing(settings: Settings, ids: list[str]) -> dict[str, dict] | N
         chunk = ",".join(ids[start:start + 300])
         request = urllib.request.Request(
             f"{settings.finance_api_url}/integration/customers?ids={urllib.parse.quote(chunk, safe=',')}",
-            headers={"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)},
+            headers={**inprocess.key_header(settings.finance_api_key), "Accept": "application/json", **company_header(settings)},
         )
         try:
-            with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
+            with inprocess.urlopen("crm", request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
                 out.update(json.loads(response.read()).get("customers") or {})
         except (urllib.error.URLError, TimeoutError, ValueError):
             return None
@@ -144,10 +145,10 @@ def sales_feed(settings: Settings, first_day: str, next_first_day: str) -> dict 
     query = urllib.parse.urlencode({"from": first_day, "to": next_first_day})
     request = urllib.request.Request(
         f"{settings.finance_api_url}/integration/sales?{query}",
-        headers={"X-Bishnoi-Key": settings.finance_api_key.get_secret_value(), "Accept": "application/json", **company_header(settings)},
+        headers={**inprocess.key_header(settings.finance_api_key), "Accept": "application/json", **company_header(settings)},
     )
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
+        with inprocess.urlopen("crm", request, timeout=TIMEOUT) as response:  # noqa: S310 (the address is ours, from settings)
             return json.loads(response.read())
     except (urllib.error.URLError, TimeoutError, ValueError):
         return None

@@ -27,7 +27,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import Field
 from sqlalchemy import func, select
@@ -461,12 +461,12 @@ def remove_signature(body: PasswordOnly, signed: Signed, db: DB) -> dict:
 
 
 @router.get("/connect/signature")
-def signature_for_app(db: DB, identity: str = Query(max_length=36), key: Annotated[str | None, Header(alias="X-Bishnoi-App-Key")] = None) -> dict:
+def signature_for_app(request: Request, db: DB, identity: str = Query(max_length=36), key: Annotated[str | None, Header(alias="X-Bishnoi-App-Key")] = None) -> dict:
     """A person's current signature, for an app placing their signed step (its connect key; only for a
     company that has the app). The app keeps its own copy with what was signed."""
     from modules.platform import links
 
-    app = links.app_of_key(db, key)
+    app = links.app_of_request(db, request, key)
     if app is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "That connect key isn't one the platform made, or it was replaced.")
     person = db.get(Identity, identity)

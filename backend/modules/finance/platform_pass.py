@@ -16,6 +16,7 @@ from datetime import UTC, datetime, timedelta
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from modules import inprocess
 
 ISSUER = "bishnoi-platform"
 # Passes the platform signed before the rename to Bishnoi One, until it's redeployed.
@@ -82,7 +83,7 @@ def public_key(settings, again: bool = False) -> str | None:
     import httpx  # here: only an application that asks the platform needs it
 
     try:
-        r = httpx.get(f"{url.rstrip('/')}/pass/key", timeout=5)
+        r = inprocess.get("finance", f"{url.rstrip('/')}/pass/key", timeout=5)
         key = r.json().get("publicKey") if r.status_code == 200 else None
     except (httpx.HTTPError, ValueError, AttributeError):
         key = None

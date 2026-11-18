@@ -36,14 +36,14 @@ import argparse
 import importlib
 import importlib.util
 import logging
-from collections.abc import Awaitable, Callable, MutableMapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from modules import inprocess
+from modules.dispatch import Modules
 from modules.module_settings import link_defaults
 
 log = logging.getLogger("bishnoi.backend")
@@ -62,8 +62,8 @@ MODULES: list[tuple[str, str]] = [
     ("finance", "/finance"),
 ]
 
-Scope = MutableMapping[str, Any]
-ASGIApp = Callable[[Scope, Callable, Callable], Awaitable[None]]
+# Each module's key on the Platform (Applications), the name it calls and is called by in-process.
+KEYS: dict[str, str] = {"admin": "exec", "in_licensing": "inlicensing"}
 
 
 def _unavailable(name: str, error: BaseException) -> FastAPI:
@@ -132,6 +132,9 @@ APPS: dict[str, FastAPI] = {}
 STARTED: dict[str, bool] = {}
 for _name, _path in MODULES:
     APPS[_name], STARTED[_name] = _start(_name)
+    # From now on the others reach it in-process (modules/inprocess.py): no network, no keys.
+    # Registered as each starts, so a module starting later reaches those before it at once.
+    inprocess.register(BACKEND_URL, KEYS.get(_name, _name), _path, APPS[_name])
 
 
 @asynccontextmanager
@@ -152,40 +155,6 @@ root = FastAPI(title="Bishnoi One", version="0.1.0", lifespan=lifespan, docs_url
 @root.get("/health", tags=["health"])
 def health() -> dict:
     return {"ok": True, "app": "bishnoi-one", "modules": {path.strip("/"): STARTED[name] for name, path in MODULES}}
-
-
-class Modules:
-    """Sends /<module>/... to that module with the prefix taken off; everything else to `root`.
-
-    The module sees the path it had when it ran alone. Its interactive docs (/crm/docs) get
-    root_path so they load /crm/openapi.json and try requests under /crm."""
-
-    def __init__(self, root_app: ASGIApp, mounts: list[tuple[str, FastAPI]]):
-        self.root = root_app
-        self.mounts = sorted(mounts, key=lambda m: len(m[0]), reverse=True)
-
-    async def __call__(self, scope: Scope, receive: Callable, send: Callable) -> None:
-        if scope["type"] in ("http", "websocket"):
-            path: str = scope["path"]
-            for prefix, module_app in self.mounts:
-                if path == prefix or path.startswith(prefix + "/"):
-                    child = dict(scope)
-                    rest = path[len(prefix):] or "/"
-                    child["path"] = rest
-                    raw = scope.get("raw_path")
-                    if raw is not None:
-                        encoded = prefix.encode()
-                        child["raw_path"] = (raw[len(encoded):] or b"/") if raw.startswith(encoded) else raw
-                    if rest in _docs_paths(module_app):
-                        child["root_path"] = scope.get("root_path", "") + prefix
-                    await module_app(child, receive, send)
-                    return
-        await self.root(scope, receive, send)
-
-
-def _docs_paths(module_app: FastAPI) -> set[str]:
-    return {p for p in (module_app.docs_url, module_app.redoc_url, module_app.openapi_url,
-                        module_app.swagger_ui_oauth2_redirect_url) if p}
 
 
 app = Modules(root, [(path, APPS[name]) for name, path in MODULES])

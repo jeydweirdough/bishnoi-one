@@ -16,6 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from modules import inprocess
 from modules.finance.config import Settings
 
 TIMEOUT = 10  # seconds
@@ -29,7 +30,7 @@ def _call(settings: Settings, path: str, body: dict | None = None, *, missing: s
     """GET path, or POST body to it, on the CRM's integration API."""
     if not settings.crm_linked:
         raise CrmUnavailable("Finance is not connected to the CRM. Please contact your system administrator.")
-    headers = {"X-Bishnoi-Key": settings.crm_api_key.get_secret_value(), "Accept": "application/json"}
+    headers = {**inprocess.key_header(settings.crm_api_key), "Accept": "application/json"}
     # The CRM keeps one database per company, so each call names Finance's
     # (CRM_COMPANY). In production the CRM won't guess, so don't ask unnamed.
     if settings.crm_company:
@@ -41,7 +42,7 @@ def _call(settings: Settings, path: str, body: dict | None = None, *, missing: s
         data, headers["Content-Type"] = json.dumps(body).encode(), "application/json"
     request = urllib.request.Request(f"{settings.crm_api_url}{path}", data=data, headers=headers, method="POST" if body is not None else "GET")
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+        with inprocess.urlopen("finance", request, timeout=TIMEOUT) as response:
             return json.loads(response.read())
     except urllib.error.HTTPError as e:
         if e.code == 401:

@@ -153,6 +153,12 @@ Inventory, Finance…, ports 8300–8308). To move to the one backend:
 > Not needed when the modules are connected to the Platform (2026-10-27): the link and its key are
 > made on its Connections page, and the address is `BACKEND_URL` + the module's path. These steps are
 > for the backend running without the Platform: settings go in `backend/.env`, with the module's prefix.
+>
+> Since stage M2 (2026-11-18) the modules of the one backend call each other directly, inside the
+> process (`backend/modules/inprocess.py`), and need **no keys at all** (here, for Finance and for
+> Pharmacy alike): an address under `BACKEND_URL` is enough. The keys below, and the link keys on
+> Connections, are only for a module running outside the one backend. A link switched off on
+> Connections is still off.
 
 The CRM's products come from Inventory, with their SRP, and it shows
 Inventory's stock on Products and on new quotes. The two modules talk through a
