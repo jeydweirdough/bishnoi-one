@@ -9,6 +9,8 @@ import type { PackagingRow } from "@/src/modules/inventory/lib/types";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FormError, Input } from "@/src/platform/ui/field";
 
+export { inPacks } from "@/src/modules/inventory/lib/packs";
+
 // Units with conversions (feature plan step 14e): an item's packs. Stock stays in its base unit; forms let people
 // type in packs, a pack's barcode scans as the whole pack, and quantities can be shown in packs.
 // Packs that can be broken (step 4A): each level says whether it may be sold and may have its own price.
@@ -18,32 +20,6 @@ const centavos = (text: string): number | null => {
   const n = Number(text.replace(/[₱,\s]/g, ""));
   return text.trim() === "" || !Number.isFinite(n) ? null : Math.round(n * 100);
 };
-
-/** Box → Boxes, Strip → Strips (as app/packs.py on the server). */
-function plural(name: string, n: number): string {
-  if (n === 1 || !name) return name;
-  const low = name.toLowerCase();
-  if (/(s|x|z|ch|sh)$/.test(low)) return `${name}es`;
-  if (/[^aeiou]y$/.test(low)) return `${name.slice(0, -1)}ies`;
-  return `${name}s`;
-}
-
-/** A quantity in the base unit, written in packs too: 1,050 → "10 Box + 5 Strip" (biggest first). */
-export function inPacks(quantity: number, packs: PackagingRow[], unit: string): string | null {
-  if (!packs.length || quantity <= 0) return null;
-  let left = quantity;
-  const parts: string[] = [];
-  for (const p of [...packs].sort((a, b) => b.quantity - a.quantity)) {
-    const n = Math.floor(left / p.quantity);
-    if (n > 0) {
-      parts.push(`${n.toLocaleString()} ${plural(p.name, n)}`);
-      left -= n * p.quantity;
-    }
-  }
-  if (!parts.length) return null;
-  if (left > 0) parts.push(`${left.toLocaleString()} ${plural(unit, left)}`);
-  return parts.join(" + ");
-}
 
 export function PackagingsEditor({ productId, unit, packs, canEdit, baseSellable = true, sellingPrice = 0 }: {
   productId: string; unit: string; packs: PackagingRow[]; canEdit: boolean; baseSellable?: boolean; sellingPrice?: number;
