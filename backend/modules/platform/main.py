@@ -28,6 +28,7 @@ from modules.platform.routers import (
     communications,
     companies,
     company_access,
+    hr_records,
     access_policy,
     company_console,
     events as events_router,
@@ -120,6 +121,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profile.router)
     app.include_router(identity.router)
     app.include_router(company_access.router)
+    app.include_router(hr_records.router)
     app.include_router(access_policy.router)
     app.include_router(organisation.router)
     app.include_router(company_console.router)

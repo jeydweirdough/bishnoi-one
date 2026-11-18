@@ -70,7 +70,20 @@ export type AccessData = {
   meId: string;
   /** How many people are in the recycle bin (2026-10-30). */
   inBin: number;
+  /** The one looking may open employees' HR records (step 4I). */
+  hrRecords?: boolean;
 };
+
+/** An employee's HR records (step 4I): labelled details and documents, for HR and administrators only. */
+export type HrDocument = { id: string; label: string; fileName: string; contentType: string; size: number; uploadedBy: string; uploadedAt: string; expiresOn: string | null };
+export type HrRecords = {
+  id: string;
+  details: { label: string; value: string }[];
+  documents: HrDocument[];
+  suggestedDetails: string[];
+  suggestedDocuments: string[];
+};
+export type HrPerson = { id: string; fullName: string; email: string; title: string | null; status: string };
 
 /** A person in the recycle bin: deleted, switched off, restorable. */
 export type BinPerson = { id: string; fullName: string; email: string; title: string | null; status: string; deletedAt: string; deletedBy: string | null; operator?: boolean };

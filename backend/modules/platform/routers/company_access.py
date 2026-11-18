@@ -32,6 +32,7 @@ from modules.platform.deps import DB, SettingsDep, as_utc
 from modules.platform.models import AccessRole, Application, AuditEntry, Company, CompanyApp, Identity, IdentityApp, IdentitySession, SignInFailure, SignInLink
 from modules.platform import email_rules, org_push, sign_in, standard_actions
 from modules.platform.accounts import account_of, memberships, runs_company
+from modules.platform.routers import hr_records
 from modules.platform.routers.identity import Signed
 
 router = APIRouter(prefix="/identity/access", tags=["company access"])
@@ -146,6 +147,8 @@ def overview(db: DB, me: Admin) -> dict:
         # Without a role here yet, with one in an application: each still goes by that one until given one here.
         "toChoose": to_choose,
         "meId": me.id,
+        # HR records (step 4I): who reads this may open each employee's (administrators always may).
+        "hrRecords": hr_records.may_keep_hr(db, me),
         "inBin": db.scalar(select(func.count()).select_from(Identity).where(Identity.company_id == me.company_id, Identity.deleted_at.is_not(None),
                                                                              Identity.via_operator.is_(False))) or 0,
     }
@@ -916,6 +919,7 @@ def erase_person(person_id: str, body: EraseIn, request: Request, db: DB, me: Ad
     others = [m for m in memberships(db, account) if m.id != p.id] if account else []
     for link in ("reports_to_id", "assistant_of_id"):
         db.execute(update(Identity).where(getattr(Identity, link) == p.id).values({link: None}))
+    hr_records.erase_of(db, p)
     db.delete(p)
     db.flush()
     if account is not None and not others and not account.is_operator:

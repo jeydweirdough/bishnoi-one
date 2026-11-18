@@ -64,8 +64,9 @@ export async function accountSend<T>(method: "GET" | "POST" | "PUT" | "PATCH" | 
   try {
     response = await fetch(`${PLATFORM_API}${path}`, {
       method,
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      // FormData (a file upload) sets its own multipart Content-Type; everything else is JSON.
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body === undefined || body instanceof FormData ? {} : { "Content-Type": "application/json" }) },
+      body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
       cache: "no-store",
     });
   } catch {
@@ -89,6 +90,8 @@ export type Account = {
   fullName: string;
   title: string | null;
   isCompanyAdmin: boolean;
+  /** May read and change the company's HR records (step 4I): its administrators and holders of "Manage HR records". */
+  hrRecords?: boolean;
   /** Also Bishnoi One staff (same email): "admin" (Platform Admin) or "member" (Support); null otherwise. */
   staff?: "admin" | "member" | null;
   company: { id: string; name: string; slug: string } | null;

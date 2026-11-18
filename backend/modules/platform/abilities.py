@@ -103,6 +103,8 @@ ABILITIES: tuple[Ability, ...] = (
     }),
     Ability("reports.export", "Export reports", "Company", {"crm": ("reports.view", "reports.export"), "inventory": ("reports.view", "reports.export")}),
     Ability("activity.see", "See each app's activity log", "Company", {"crm": ("admin.audit",), "inventory": ("admin.audit",), "finance": ("admin.audit",)}),
+    # HR records on employees (2026-11-18, step 4I): Bishnoi One's own, no app permission (routers/hr_records.py).
+    Ability("hr.records", "Manage HR records", "Company"),
 )
 
 ABILITY = {a.key: a for a in ABILITIES}

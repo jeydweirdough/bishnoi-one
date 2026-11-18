@@ -15,8 +15,9 @@ import { RowMenu } from "@/src/platform/ui/row-menu";
 import { Empty, Particulars, Sheet } from "@/src/platform/ui/sheet";
 import { addWatcher, removeWatcher, setPersonAppRole, setPersonModule } from "./actions";
 import { moduleLabel } from "./labels";
+import { HrRecordsView } from "./hr-records";
 import { usePersonActions } from "./person-dialogs";
-import type { AccessData, AccessPerson, PersonPage, Watcher } from "./types";
+import type { AccessData, AccessPerson, HrRecords, PersonPage, Watcher } from "./types";
 
 // A person in a panel beside People (2026-10-31, after Zoho Directory's): who they are and every action on them
 // at the top, then Info, Applications (each app with their role in it), Security and Activity (their own actions in
@@ -32,8 +33,12 @@ const TABS = [
   ["watchers", "Who can see them"],
   ["security", "Security"],
   ["activity", "Activity"],
+  // HR records (step 4I): only for HR and administrators (AccessData.hrRecords), read on the server when opened.
+  ["hr", "HR records"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
+/** Tabs read on the server only when opened, by their own address. */
+const READ_WHEN_OPENED: Partial<Record<Tab, true>> = { activity: true, hr: true };
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" }) : null);
 
@@ -46,9 +51,10 @@ function initials(name: string): string {
     .join("");
 }
 
-export function PersonPanel({ person, row, data, activity }: { person: PersonPage; row: AccessPerson; data: AccessData; activity: PanelLog }) {
+export function PersonPanel({ person, row, data, activity, hr = null }: { person: PersonPage; row: AccessPerson; data: AccessData; activity: PanelLog; hr?: HrRecords | null }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>(activity ? "activity" : "info");
+  const [tab, setTab] = useState<Tab>(activity ? "activity" : hr ? "hr" : "info");
+  const tabs = TABS.filter(([key]) => key !== "hr" || data.hrRecords);
   const isMe = row.id === data.meId;
   const colleagues = data.people.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.fullName }));
   const nameOf = (id?: string | null) => data.people.find((c) => c.id === id)?.fullName ?? null;
@@ -127,14 +133,15 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
       </div>
 
       <nav className="mt-5 flex gap-1 border-b border-rule px-6" aria-label={`About ${person.fullName}`}>
-        {TABS.map(([key, label]) => (
+        {tabs.map(([key, label]) => (
           <button
             key={key}
             type="button"
             onClick={() => {
               setTab(key);
-              // Activity is read on the server, only for the person open and only when asked for.
-              if (key === "activity" && !activity) router.push(`/platform/roles/people?person=${encodeURIComponent(row.id)}&tab=activity`, { scroll: false });
+              // Activity and HR records are read on the server, only for the person open and only when asked for.
+              if (READ_WHEN_OPENED[key] && !(key === "activity" ? activity : hr))
+                router.push(`/platform/roles/people?person=${encodeURIComponent(row.id)}&tab=${key}`, { scroll: false });
             }}
             aria-current={tab === key ? "page" : undefined}
             className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === key ? "border-ink font-semibold text-ink" : "border-transparent text-ink-3 hover:text-ink"}`}
@@ -177,6 +184,7 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
             ]}
           />
         )}
+        {tab === "hr" && data.hrRecords && (hr ? <HrRecordsView personId={row.id} name={person.fullName} records={hr} /> : <p className="text-sm text-ink-3">Reading their HR records…</p>)}
         {tab === "activity" &&
           (!activity ? (
             <p className="text-sm text-ink-3">Reading their activity…</p>

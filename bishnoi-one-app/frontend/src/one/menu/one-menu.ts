@@ -162,6 +162,8 @@ export function buildMenu(me: Account): OneMenu {
     group("Team", "people", [
       { href: "/platform/home", label: "Employee overview", icon: "overview", show: admin },
       { href: "/platform/roles/people", label: "Employees", icon: "people", show: admin },
+      // HR who aren't administrators (step 4I); administrators open HR records on Employees.
+      { href: "/platform/hr", label: "HR records", icon: "documents", show: !admin && !!me.hrRecords },
       { href: "/platform/organisation", label: "Organisation", icon: "teams", show: admin },
       { href: "/platform/roles", label: "Roles", icon: "roles", exact: true, show: admin },
       { href: "/crm/performance", label: "Targets and KPIs", icon: "goals", also: ["/crm/kpis"], show: sells && may("crm", "goals.view") },

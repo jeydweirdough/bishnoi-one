@@ -244,6 +244,8 @@ def app_permissions(db: Session, person: Identity, app: Application, grant: Iden
 
 @router.get("/identity/me")
 def me(signed: Signed, db: DB, settings: SettingsDep) -> dict:
+    from modules.platform.routers.hr_records import may_keep_hr
+
     _, person = signed
     company = db.get(Company, person.company_id)
     role = db.get(AccessRole, person.access_role_id) if person.access_role_id else None
@@ -254,6 +256,8 @@ def me(signed: Signed, db: DB, settings: SettingsDep) -> dict:
         "title": person.title,
         # Administers this company: the company's own choice, or the operator switch (accounts.runs_company).
         "isCompanyAdmin": runs_company(db, person),
+        # May read and change the company's HR records (step 4I): its administrators, and holders of "Manage HR records".
+        "hrRecords": may_keep_hr(db, person),
         "company": {"id": company.id, "name": company.name, "slug": company.slug} if company else None,
         # Every company they work for, to switch to (this one too).
         "companies": sorted(

@@ -510,6 +510,27 @@ class Identity(Base):
     # What each app keeps of its own about them, kept here (2026-10-30): {"crm": {"employeeId"}, "pharmacy": {"licenseNo"},
     # "finance": {"calendarOn"}}. Sent to each app with the people it's told about (access_roles.roles_note).
     app_details: Mapped[dict | None] = mapped_column(JSON, default=None)
+    # HR records (2026-11-18, step 4I): labelled details ("SSS no.", "TIN", any label HR adds) → text. Read and changed
+    # only by the company's administrators and holders of the "Manage HR records" ability (hr_records.py); never sent to the apps.
+    hr_details: Mapped[dict | None] = mapped_column(JSON, default=None, deferred=True)
+
+
+class HrDocument(Base):
+    """One HR document of an employee (2026-11-18, step 4I): a contract, an NBI clearance, a background check. Only
+    the company's administrators and holders of "Manage HR records" read or change them (hr_records.py)."""
+
+    __tablename__ = "nbpl_hr_documents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    identity_id: Mapped[str] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="CASCADE"), index=True)
+    label: Mapped[str] = mapped_column(String(60))
+    file_name: Mapped[str] = mapped_column(String(200))
+    content_type: Mapped[str] = mapped_column(String(100))
+    data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    size: Mapped[int] = mapped_column(Integer)
+    uploaded_by: Mapped[str] = mapped_column(String(254))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_on: Mapped[date | None] = mapped_column(Date, default=None)
 
 
 # ---- Access: one role per person per company, for every module -------------------

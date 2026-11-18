@@ -54,6 +54,9 @@ export function consoleGroups(me: Account): ConsoleGroup[] {
     });
     // People reports only (2026-10-30): each app's own reports, money ones too, are in that app.
     groups.push({ label: "Reports", pages: [{ href: "/platform/reports", label: "Reports", icon: "reports" }] });
+  } else if (me.hrRecords) {
+    // HR who aren't administrators (step 4I): only the employees' HR records. Administrators use Employees' HR records tab.
+    groups.push({ label: "Employees", icon: "people", pages: [{ href: "/platform/hr", label: "HR records", icon: "documents" }] });
   }
   return groups;
 }
