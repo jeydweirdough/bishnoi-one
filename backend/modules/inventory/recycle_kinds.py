@@ -37,6 +37,13 @@ def back(db: Session, rows: list[tuple[str, dict]]) -> None:
     _balance(db, rows, +1)
 
 
+def delivery_extra(db: Session, row: dict) -> list[tuple[str, str, object]]:
+    """A delivery takes its stock movements, and its photos and its packages' photos (nbin_photos, no foreign key)."""
+    from modules.inventory.models import Package
+    package_ids = db.scalars(select(Package.id).where(Package.order_id == row["id"])).all()
+    return [*movements_of(db, row), (P + "photos", "target_id", row["id"]), *((P + "photos", "target_id", i) for i in package_ids)]
+
+
 posted_doc = {"extra": movements_of, "on_delete": off, "on_restore": back, "tables_named": {P + "movements": "stock movements"}}
 
 KINDS: list[Kind] = [
@@ -46,7 +53,7 @@ KINDS: list[Kind] = [
          posted=lambda r: True, **posted_doc),
     Kind("sales-orders", "Sales orders", P + "sales_orders", "number", owns=(P + "sales_order_lines",), search=("number", "customer_name"), sub="customer_name"),
     Kind("deliveries", "Deliveries", P + "orders", "number", owns=(P + "order_lines", P + "packages", P + "package_lines"), search=("number", "recipient"), sub="status",
-         posted=lambda r: r.get("status") in ("issued", "delivered"), **posted_doc),
+         posted=lambda r: r.get("status") in ("issued", "delivered"), **{**posted_doc, "extra": delivery_extra}),
     Kind("transfers", "Transfers", P + "transfers", "number", owns=(P + "transfer_lines",), search=("number",), sub="status",
          posted=lambda r: r.get("status") in ("dispatched", "in_transit", "received"), **posted_doc),
     Kind("adjustments", "Adjustments", P + "adjustments", "number", owns=(P + "adjustment_lines",), search=("number", "reason"), sub="status",

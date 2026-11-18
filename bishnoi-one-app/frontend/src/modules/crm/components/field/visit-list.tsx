@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Format } from "@/src/platform/lib/format";
 import { DeleteVisit } from "@/src/modules/crm/components/field/delete-visit";
 import type { Visit } from "@/src/modules/crm/components/field/types";
+import { VisitPhotos } from "@/src/modules/crm/components/field/visit-photos";
 import { distanceText, mapLink } from "@/src/modules/crm/components/field/where";
 import { CARE_GROUP, outcomeOf, reactionOf } from "@/src/modules/crm/components/field/words";
 
@@ -63,6 +64,11 @@ export function VisitList({ visits, fmt, today, showDoctor = true, showWho = tru
                 </ol>
               )}
               {v.notes && <p className="mt-1 text-sm text-ink-2">{v.notes}</p>}
+              {v.photos?.length > 0 && (
+                <div className="mt-2">
+                  <VisitPhotos visitId={v.id} photos={v.photos} canAdd={false} />
+                </div>
+              )}
               {v.nextObjective && (
                 <p className="mt-1 text-meta text-ink-3">
                   <span className="font-semibold text-ink-2">Next visit objective:</span> {v.nextObjective}

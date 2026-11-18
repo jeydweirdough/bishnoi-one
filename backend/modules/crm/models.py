@@ -843,6 +843,27 @@ class Visit(Owned, Base):
     owner: Mapped[User] = relationship(foreign_keys="Visit.owner_id", lazy="joined")
 
 
+class Photo(Base):
+    """A photo kept with a visit (2026-11-18, Step 4B): the clinic, a display, a receipt. Never required.
+    No foreign key to the visit (target_type + target_id), so deleting it never fails on one: the visit's own
+    delete takes them, and the recycle bin takes them with the visit or its customer (recycle_kinds.py)."""
+
+    __tablename__ = "nbcm_photos"
+    __table_args__ = (Index("ix_nbcm_photos_target", "target_type", "target_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # "visit" (an nbcm_visits row).
+    target_type: Mapped[str] = mapped_column(String(20))
+    target_id: Mapped[str] = mapped_column(String(36))
+    content_type: Mapped[str] = mapped_column(String(20))
+    data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    size: Mapped[int] = mapped_column(Integer)
+    taken_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    taken_by: Mapped["User | None"] = relationship(foreign_keys=[taken_by_id], lazy="joined")
+
+
 class TrailBatch(Base):
     """Where a field agent went while the CRM was open: one row per upload
     (about every 15 minutes), its points packed (app/trail.py). Kept 90 days;

@@ -304,3 +304,18 @@ export async function bulkDeletePurchaseOrders(ids: string[]) {
 export async function bulkDeleteTransfers(ids: string[]) {
   return eachOf("Delete transfers", ids, deleteTransfer);
 }
+
+// Optional photos on a delivery or a package (Step 4B). Shrunk in the browser before they come here.
+export type InventoryPhoto = { id: string; href: string; takenBy: { id: string; name: string } | null; createdAt: string; canRemove: boolean };
+export async function addPhoto(targetType: "delivery" | "package", targetId: string, form: FormData): Promise<Result<InventoryPhoto>> {
+  form.set("targetType", targetType);
+  form.set("targetId", targetId);
+  return attempt(async () => {
+    const out = await api.upload<InventoryPhoto>("/inventory/photos", form);
+    refresh();
+    return out;
+  });
+}
+export async function removePhoto(id: string): Promise<Result<null>> {
+  return send<null>("del", `/inventory/photos/${enc(id)}`);
+}

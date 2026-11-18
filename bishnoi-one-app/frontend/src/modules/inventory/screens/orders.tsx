@@ -18,6 +18,8 @@ import { ReceivedProof, SignForDelivery } from "@/src/modules/inventory/componen
 import { ShippingCard } from "@/src/modules/inventory/components/shipping";
 import { PickCheck } from "@/src/modules/inventory/components/scan";
 import { PackingCard } from "@/src/modules/inventory/components/packing";
+import { RecordPhotos } from "@/src/modules/inventory/components/photos";
+import type { InventoryPhoto } from "@/src/modules/inventory/actions/inventory";
 import { SaleDocuments } from "@/src/modules/inventory/components/supply";
 import { PrintLink } from "@/src/modules/inventory/components/print-button";
 import { PickForm, type PickLine } from "@/src/modules/inventory/components/pick-form";
@@ -245,6 +247,9 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
   const packing = ["confirmed", "picking", "issued"].includes(o.status) ? await load<Packing>(`/inventory/orders/${o.id}/packages`) : null;
   // Its items' documents that go with every sale (step 15e).
   const docs = await load<(ProductDocument & { product: { name: string } })[]>(`/inventory/orders/${o.id}/documents`);
+  // Its photos (optional, Step 4B): the goods, the proof of delivery.
+  const photos = await load<InventoryPhoto[]>(`/inventory/photos?targetType=delivery&targetId=${encodeURIComponent(o.id)}`);
+  const mayPhoto = (may("orders.edit") || may("orders.issue")) && o.status !== "cancelled";
 
   return (
     <>
@@ -284,6 +289,11 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
           <div className="mt-4 border-t border-rule pt-3">
             <ShippingCard orderId={o.id} issued={o.status === "issued"} shipping={o.shipping} couriers={couriers}
               may={{ edit: may("orders.edit"), issue: may("orders.issue") }} signedFor={Boolean(o.received)} />
+          </div>
+        )}
+        {(mayPhoto || photos.length > 0) && (
+          <div className="mt-4 border-t border-rule pt-3">
+            <RecordPhotos targetType="delivery" targetId={o.id} photos={photos} canAdd={mayPhoto} />
           </div>
         )}
         {docs.length > 0 && (

@@ -8,7 +8,8 @@ import { Button, LinkButton } from "@/src/platform/ui/button";
 import { Field, FormError, FormGrid, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { makeFormat } from "@/src/platform/lib/format";
 import type { Org } from "@/src/platform/lib/types";
-import { logVisit, pinClinic } from "@/src/modules/crm/actions/field";
+import { addVisitPhoto, logVisit, pinClinic } from "@/src/modules/crm/actions/field";
+import { AddPhoto, sendPhotos } from "@/src/platform/ui/photo-field";
 import { localDateTime } from "@/src/modules/crm/components/crm/words";
 import type { CareGroup, VisitOutcome } from "@/src/modules/crm/components/field/types";
 import { DetailingFields, type DetailDraft } from "@/src/modules/crm/components/field/detailing-fields";
@@ -66,6 +67,8 @@ export function LogVisitForm({
   const [notes, setNotes] = useState("");
   const [details, setDetails] = useState<DetailDraft[]>([]);
   const [objective, setObjective] = useState("");
+  // Photos (optional, Step 4B): held until the visit is saved, then sent with it.
+  const [photos, setPhotos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
@@ -162,7 +165,10 @@ export function LogVisitForm({
         return;
       }
       const v = result.data;
-      toast.success(v.outcome === "collected" ? `Collected ${fmt.peso(v.amountCentavos)}` : "Visit logged", { description: v.company.name });
+      const unsent = photos.length ? await sendPhotos(photos, (form) => addVisitPhoto(v.id, form)) : 0;
+      toast.success(v.outcome === "collected" ? `Collected ${fmt.peso(v.amountCentavos)}` : "Visit logged", {
+        description: unsent ? `${v.company.name}. ${unsent === 1 ? "A photo" : `${unsent} photos`} couldn't be sent.` : v.company.name,
+      });
       router.push(back);
       router.refresh();
     });
@@ -259,6 +265,7 @@ export function LogVisitForm({
       <Field label="Notes" optional error={fields.notes}>
         {(p) => <Textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={collecting ? "Payment notes" : "Visit notes and next steps"} />}
       </Field>
+      <AddPhoto onChange={setPhotos} max={5} label="Photo (optional)" disabled={pending} />
       <FormError message={error} />
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" variant="primary" loading={pending} disabled={!companyId}>

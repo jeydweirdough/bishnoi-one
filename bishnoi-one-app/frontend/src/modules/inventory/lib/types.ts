@@ -213,7 +213,9 @@ export type PackagingRow = { id: string; name: string; quantity: number; barcode
 /** A delivery's packages (step 14d). */
 export type Packing = {
   packages: { id: string; number: string; index: number; of: number; weightGrams: number | null; notes: string | null; packedBy: Person | null; createdAt: string;
-              lines: { lineId: string; product: ProductRef; quantity: number }[] }[];
+              lines: { lineId: string; product: ProductRef; quantity: number }[];
+              /** Photos of the box (Step 4B). */
+              photos: { id: string; href: string; takenBy: { id: string; name: string } | null; createdAt: string; canRemove: boolean }[] }[];
   lines: { lineId: string; product: ProductRef; quantity: number; packed: number }[];
   allPacked: boolean;
 };

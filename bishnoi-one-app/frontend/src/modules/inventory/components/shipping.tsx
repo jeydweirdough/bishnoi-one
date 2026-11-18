@@ -5,10 +5,11 @@ import { Check, ExternalLink, Pencil, RotateCcw, Truck, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { markDelivered, markFailed, saveCourier, sendAgain, setShipping } from "@/src/modules/inventory/actions/inventory";
+import { addPhoto, markDelivered, markFailed, saveCourier, sendAgain, setShipping } from "@/src/modules/inventory/actions/inventory";
+import { AddPhoto, sendPhotos } from "@/src/platform/ui/photo-field";
 import type { Courier, DeliveryMethod, Shipping } from "@/src/modules/inventory/lib/types";
 import { Button } from "@/src/platform/ui/button";
-import { Choice, Field, FileInput, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { Empty } from "@/src/platform/ui/sheet";
 
 // Shipping with couriers (feature plan step 12): how a delivery goes (courier, our delivery, pick-up), the
@@ -24,15 +25,6 @@ const METHODS: { value: DeliveryMethod; label: string }[] = [
 const TONE: Record<string, string> = { out: "border-due-today text-due-today", delivered: "border-sage-deep text-sage-deep", failed: "border-danger text-danger" };
 
 const pesos = (centavos: number) => (centavos / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-function readFile(file: File): Promise<string> {
-  return new Promise((done, fail) => {
-    const r = new FileReader();
-    r.onload = () => done(String(r.result));
-    r.onerror = () => fail(r.error);
-    r.readAsDataURL(file);
-  });
-}
 
 /** The delivery's shipping, with its steps: set how it goes, then delivered, failed or sent again. */
 export function ShippingCard({ orderId, issued, shipping, couriers, may, signedFor }: {
@@ -52,7 +44,8 @@ export function ShippingCard({ orderId, issued, shipping, couriers, may, signedF
     fee: shipping.fee ? String(shipping.fee / 100) : "", feeCharged: shipping.feeCharged,
   });
   const [receivedBy, setReceivedBy] = useState("");
-  const [photo, setPhoto] = useState<File | null>(null);
+  // Proof-of-delivery photos (optional, Step 4B): sent to the delivery's photos once it's marked delivered.
+  const [photos, setPhotos] = useState<File[]>([]);
   const [reason, setReason] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -89,9 +82,11 @@ export function ShippingCard({ orderId, issued, shipping, couriers, may, signedF
   function deliver() {
     if (receivedBy.trim().length < 2) return setFields({ receivedBy: "Who received it, as the courier reports." });
     start(async () => {
-      const r = await markDelivered(orderId, receivedBy.trim(), photo ? await readFile(photo) : null);
+      const r = await markDelivered(orderId, receivedBy.trim(), null);
       if (!r.ok) return fail(r);
-      done("Delivered", photo ? "The courier's photo is kept as proof of delivery." : undefined);
+      const unsent = photos.length ? await sendPhotos(photos, (form) => addPhoto("delivery", orderId, form)) : 0;
+      setPhotos([]);
+      done("Delivered", unsent ? `${unsent === 1 ? "A photo" : `${unsent} photos`} couldn't be sent: add them under Photos.` : photos.length ? "The photos are kept as proof of delivery." : undefined);
     });
   }
 
@@ -217,9 +212,7 @@ export function ShippingCard({ orderId, issued, shipping, couriers, may, signedF
           <Field label="Received by" error={fields.receivedBy}>
             {(p) => <Input {...p} value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} maxLength={120} autoFocus />}
           </Field>
-          <Field label="Courier's proof-of-delivery photo" optional error={fields.photo} hint="PNG or JPEG, up to 3 MB.">
-            {(p) => <FileInput {...p} accept="image/png,image/jpeg" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />}
-          </Field>
+          <AddPhoto onChange={setPhotos} max={5} label="Proof-of-delivery photo (optional)" disabled={busy} />
           <FormError message={error} />
         </div>
       </Modal>

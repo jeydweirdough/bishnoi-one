@@ -25,6 +25,8 @@ export type Visit = {
   distanceM: number | null;
   atClinic: boolean | null;
   can: { edit: boolean; delete: boolean };
+  /** Its photos (Step 4B): the clinic, a display, a receipt. */
+  photos: { id: string; href: string; takenBy: { id: string; name: string } | null; createdAt: string; canRemove: boolean }[];
 };
 
 export type Reaction = "will_prescribe" | "already_prescribes" | "interested" | "neutral" | "concerns" | "not_interested";

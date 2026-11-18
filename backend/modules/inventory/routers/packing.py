@@ -22,6 +22,7 @@ from modules.inventory.audit import audit
 from modules.inventory.deps import DB, CurrentUser
 from modules.inventory.models import Order, Package, PackageLine
 from modules.inventory.out import person, product_ref
+from modules.inventory.routers.photos import drop_photos, photo_out, photos_of
 from modules.inventory.stock import next_number
 
 router = APIRouter(prefix="/inventory", tags=["packing"])
@@ -41,9 +42,10 @@ def packed(o: Order, packages: list[Package]) -> dict[str, int]:
     return out
 
 
-def package_out(o: Order, p: Package, index: int, of: int) -> dict:
+def package_out(o: Order, p: Package, index: int, of: int, photos: list | None = None) -> dict:
     lines = {line.id: line for line in o.lines}
     return {
+        "photos": photos or [],
         "id": p.id, "number": p.number, "index": index, "of": of, "weightGrams": p.weight_grams, "notes": p.notes,
         "packedBy": person(p.packed_by), "createdAt": iso(p.created_at),
         "lines": [{"lineId": pl.order_line_id, "product": product_ref(lines[pl.order_line_id].product), "quantity": pl.quantity}
@@ -55,19 +57,20 @@ def packages_of(db: DB, o: Order) -> list[Package]:
     return list(db.scalars(select(Package).where(Package.order_id == o.id).order_by(Package.created_at, Package.number)))
 
 
-def packing_out(db: DB, o: Order) -> dict:
+def packing_out(db: DB, o: Order, access=None) -> dict:
     packages = packages_of(db, o)
     done = packed(o, packages)
+    shots = photos_of(db, "package", [p.id for p in packages])
     return {
-        "packages": [package_out(o, p, i + 1, len(packages)) for i, p in enumerate(packages)],
+        "packages": [package_out(o, p, i + 1, len(packages), [photo_out(x, access) for x in shots[p.id]] if access else []) for i, p in enumerate(packages)],
         "lines": [{"lineId": line.id, "product": product_ref(line.product), "quantity": line.quantity, "packed": done.get(line.id, 0)} for line in o.lines],
         "allPacked": all(done.get(line.id, 0) >= line.quantity for line in o.lines),
     }
 
 
 @router.get("/orders/{order_id}/packages")
-def list_packages(_: allowed("orders.view"), db: DB, order_id: str) -> dict:
-    return packing_out(db, found(db, Order, order_id, "order"))
+def list_packages(access: allowed("orders.view"), db: DB, order_id: str) -> dict:
+    return packing_out(db, found(db, Order, order_id, "order"), access)
 
 
 class PackLineIn(Api):
@@ -82,7 +85,7 @@ class PackageIn(Api):
 
 
 @router.post("/orders/{order_id}/packages", status_code=status.HTTP_201_CREATED)
-def pack(_: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: str, body: PackageIn) -> dict:
+def pack(access: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: str, body: PackageIn) -> dict:
     o = found(db, Order, order_id, "order")
     if o.status not in PACKABLE or o.delivery_status == "delivered":
         raise conflict("Pack a delivery once its stock is held, and before it's delivered.")
@@ -107,11 +110,11 @@ def pack(_: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: str, bod
     db.flush()
     audit(db, me, "order.packed", target=f"{o.number} · {p.number}", target_type="order", target_id=o.id)
     db.commit()
-    return packing_out(db, o)
+    return packing_out(db, o, access)
 
 
 @router.delete("/orders/{order_id}/packages/{package_id}")
-def unpack(_: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: str, package_id: str) -> dict:
+def unpack(access: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: str, package_id: str) -> dict:
     o = found(db, Order, order_id, "order")
     p = found(db, Package, package_id, "package")
     if p.order_id != o.id:
@@ -119,7 +122,8 @@ def unpack(_: allowed("orders.issue"), me: CurrentUser, db: DB, order_id: str, p
     if o.delivery_status == "delivered":
         raise conflict("This delivery is delivered: its packages stay as they were.")
     audit(db, me, "order.unpacked", target=f"{o.number} · {p.number}", target_type="order", target_id=o.id)
+    drop_photos(db, "package", p.id)
     db.delete(p)
     db.commit()
-    return packing_out(db, o)
+    return packing_out(db, o, access)
 

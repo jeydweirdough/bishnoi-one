@@ -166,3 +166,22 @@ export async function removeAssistanceFile(id: string, n: number): Promise<Resul
     return a;
   });
 }
+
+// Optional photos on a visit (Step 4B). Shrunk in the browser before they come here.
+export type VisitPhoto = { id: string; href: string; takenBy: { id: string; name: string } | null; createdAt: string; canRemove: boolean };
+export async function addVisitPhoto(visitId: string, form: FormData): Promise<Result<VisitPhoto>> {
+  form.set("targetType", "visit");
+  form.set("targetId", visitId);
+  return attempt(async () => {
+    const out = await api.upload<VisitPhoto>("/photos", form);
+    refresh();
+    return out;
+  });
+}
+export async function removeVisitPhoto(id: string): Promise<Result> {
+  return attempt(async () => {
+    await api.del(`/photos/${enc(id)}`);
+    refresh();
+    return null;
+  });
+}

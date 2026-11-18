@@ -38,6 +38,7 @@ from modules.crm.config import Settings
 from modules.crm.deps import DB, CurrentUser, SettingsDep
 from modules.crm.kpis import by_code, person_targets, set_person_target
 from modules.crm.models import DETAIL_REACTIONS, AuditEntry, Balance, Company, PlanStop, Product, RouteDay, TrailBatch, User, Visit
+from modules.crm.routers.photos import drop_photos, photos_of
 from modules.crm.scope import reachable_people, reaches, within
 from modules.crm.trail import Point, decode, encode, metres, path_metres
 
@@ -141,10 +142,12 @@ class VisitPatch(VisitFields):
     outcome: Outcome | None = None
 
 
-def visit_out(visit: Visit, access: Access) -> dict:
+def visit_out(visit: Visit, access: Access, photos: list[dict] | None = None) -> dict:
     inside = reaches(visit, access)
     return {
         "id": visit.id,
+        # Its photos (Step 4B, routers/photos.py), when the caller read them.
+        "photos": photos or [],
         "company": {"id": visit.company.id, "name": visit.company.name},
         "visitedAt": iso(visit.visited_at),
         "outcome": visit.outcome,
@@ -218,7 +221,8 @@ def list_visits(
         query = query.where(Visit.visited_at >= start, Visit.visited_at < end)
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     visits = db.scalars(query.order_by(Visit.visited_at.desc()).limit(limit).offset(offset)).unique().all()
-    return {"items": [visit_out(v, access) for v in visits], "total": total}
+    shots = photos_of(db, [v.id for v in visits], access)
+    return {"items": [visit_out(v, access, shots[v.id]) for v in visits], "total": total}
 
 
 @router.post("/visits", status_code=status.HTTP_201_CREATED)
@@ -297,7 +301,7 @@ def update_visit(access: Edit, me: CurrentUser, db: DB, settings: SettingsDep, v
     audit(db, me, "visit.updated", target=visit.company.name, target_type="visit", target_id=visit.id)
     db.commit()
     db.refresh(visit)
-    return visit_out(visit, access)
+    return visit_out(visit, access, photos_of(db, [visit.id], access)[visit.id])
 
 
 @router.get("/field/visit-brief")
@@ -346,6 +350,7 @@ def detailing_summary(access: View, db: DB, settings: SettingsDep, month: str | 
 def delete_visit(access: Delete, me: CurrentUser, db: DB, visit_id: str) -> Response:
     visit = get_visit(db, access, visit_id)
     audit(db, me, "visit.deleted", target=visit.company.name, target_type="visit", target_id=visit.id)
+    drop_photos(db, visit.id)
     db.delete(visit)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

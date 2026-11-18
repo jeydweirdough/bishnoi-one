@@ -281,6 +281,8 @@ def delete_order(_: allowed("orders.edit"), me: CurrentUser, db: DB, order_id: s
     if o.status != "draft":
         raise conflict("Only a draft can be deleted. Cancel it instead.")
     audit(db, me, "order.deleted", target=o.number, target_type="order", target_id=o.id)
+    from modules.inventory.routers.photos import drop_photos
+    drop_photos(db, "delivery", o.id)
     db.delete(o)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

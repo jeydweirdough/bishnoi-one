@@ -15,7 +15,7 @@ from modules.inventory.models import AuditEntry
 from modules.inventory.first_admin import make_first_admin
 from modules.inventory.tenants import HEADER, Tenants, clean
 from modules.inventory import graphql_api
-from modules.inventory.routers import adjustments, admin, auth, catalog, count_schedules, profile, insight, integration, orders, packagings, packing, product_documents, purchasing, quality, replenishment, sales, scan, shipping, stock, transfers, unset, warehouses
+from modules.inventory.routers import adjustments, admin, auth, catalog, count_schedules, profile, insight, integration, orders, packagings, packing, photos, product_documents, purchasing, quality, replenishment, sales, scan, shipping, stock, transfers, unset, warehouses
 from modules.inventory.guard import install as install_guard
 
 # Every response is someone's data: never cached, never framed, never sniffed.
@@ -75,7 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"ok": True, "app": "inventory"}
 
-    for module in (auth, profile, admin, catalog, warehouses, stock, purchasing, quality, count_schedules, scan, packing, packagings, replenishment, product_documents, sales, shipping, orders, transfers, adjustments, insight, integration, unset, graphql_api):
+    for module in (auth, profile, admin, catalog, warehouses, stock, purchasing, quality, count_schedules, scan, packing, photos, packagings, replenishment, product_documents, sales, shipping, orders, transfers, adjustments, insight, integration, unset, graphql_api):
         app.include_router(module.router)
     from modules.inventory import business_events, platform_connect, platform_roles
 

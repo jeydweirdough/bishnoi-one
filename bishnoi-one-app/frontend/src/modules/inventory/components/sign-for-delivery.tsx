@@ -5,7 +5,8 @@ import { PenLine } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { signForDelivery } from "@/src/modules/inventory/actions/inventory";
+import { addPhoto, signForDelivery } from "@/src/modules/inventory/actions/inventory";
+import { AddPhoto, sendPhotos } from "@/src/platform/ui/photo-field";
 import { Button } from "@/src/platform/ui/button";
 import { Field, FormError, Input } from "@/src/platform/ui/field";
 import type { Cleaned } from "@/src/platform/signature/clean";
@@ -19,6 +20,8 @@ export function SignForDelivery({ orderId, recipient }: { orderId: string; recip
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [signature, setSignature] = useState<Cleaned | null>(null);
+  // Photos of what was handed over (optional, Step 4B): sent to the delivery's photos once it's signed for.
+  const [photos, setPhotos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -28,7 +31,10 @@ export function SignForDelivery({ orderId, recipient }: { orderId: string; recip
     start(async () => {
       const r = await signForDelivery(orderId, name.trim(), signature.dataUrl);
       if (!r.ok) return setError(r.error);
-      toast.success(`Signed for by ${name.trim()}`, { description: "Their signature is on the delivery note." });
+      const unsent = photos.length ? await sendPhotos(photos, (form) => addPhoto("delivery", orderId, form)) : 0;
+      toast.success(`Signed for by ${name.trim()}`, {
+        description: unsent ? `Their signature is on the delivery note. ${unsent === 1 ? "A photo" : `${unsent} photos`} couldn't be sent: add them under Photos.` : "Their signature is on the delivery note.",
+      });
       setOpen(false);
       router.refresh();
     });
@@ -43,6 +49,7 @@ export function SignForDelivery({ orderId, recipient }: { orderId: string; recip
         <div className="mt-3 space-y-4">
           <Field label="Name of the person receiving it">{(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoFocus />}</Field>
           <DrawPad onChange={setSignature} />
+          <AddPhoto onChange={setPhotos} max={5} label="Photo (optional)" disabled={pending} />
           <FormError message={error} />
           <div className="flex gap-2">
             <Button variant="primary" loading={pending} onClick={save}>

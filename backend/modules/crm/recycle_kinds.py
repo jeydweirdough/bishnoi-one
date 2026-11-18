@@ -1,20 +1,34 @@
 """What an administrator can clean up in the CRM (app/recycle_bin.py, 2026-10-30). People, roles and teams
 aren't here: they're kept on the Platform (Admin Console → People)."""
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from modules.crm.recycle_bin import Kind
 
 P = "nbcm_"
 
+
+def visit_photos(db: Session, row: dict) -> list[tuple[str, str, object]]:
+    """A visit's photos (nbcm_photos, no foreign key) go with it."""
+    return [(P + "photos", "target_id", row["id"])]
+
+
+def customer_photos(db: Session, row: dict) -> list[tuple[str, str, object]]:
+    """A customer takes its visits (owns), and so their photos."""
+    from modules.crm.models import Visit
+    return [(P + "photos", "target_id", i) for i in db.scalars(select(Visit.id).where(Visit.company_id == row["id"]))]
+
 KINDS: list[Kind] = [
     # Records
     Kind("customers", "Customers", P + "companies", "name", owns=(P + "visits", P + "plan_stops", P + "activity_links", P + "balances", P + "assistance", P + "deals"),
-         search=("name", "code"), sub="code", tables_named={P + "deals": "deals"}),
+         search=("name", "code"), sub="code", tables_named={P + "deals": "deals"}, extra=customer_photos),
     Kind("contacts", "Contacts", P + "contacts", lambda r: " ".join(x for x in (r.get("first_name"), r.get("last_name")) if x) or r.get("email") or r.get("id"),
          search=("first_name", "last_name", "email", "phone"), sub="email"),
     Kind("deals", "Deals", P + "deals", "name", search=("name",)),
     Kind("quotes", "Quotes", P + "quotes", lambda r: r.get("number") or r.get("id"), owns=(P + "quote_controls", P + "quote_links"), search=("number", "customer_name"), sub="customer_name"),
     Kind("activities", "Activities", P + "activities", lambda r: r.get("subject") or r.get("kind"), owns=(P + "activity_links",), search=("subject",), sub="kind"),
-    Kind("visits", "Visits", P + "visits", lambda r: f"Visit {str(r.get('visited_at') or r.get('created_at') or '')[:16]}", sub="outcome"),
+    Kind("visits", "Visits", P + "visits", lambda r: f"Visit {str(r.get('visited_at') or r.get('created_at') or '')[:16]}", sub="outcome", extra=visit_photos),
     Kind("media", "Media", P + "media", "title", search=("title",)),
     Kind("saved-views", "Saved views", P + "saved_views", "name", search=("name",)),
     # Set-up lists

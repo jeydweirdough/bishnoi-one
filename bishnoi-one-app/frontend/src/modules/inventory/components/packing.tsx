@@ -10,6 +10,7 @@ import { packDelivery, unpackDelivery } from "@/src/modules/inventory/actions/in
 import type { Packing } from "@/src/modules/inventory/lib/types";
 import { Button } from "@/src/platform/ui/button";
 import { CellInput, Field, FormError, Input } from "@/src/platform/ui/field";
+import { RecordPhotos } from "@/src/modules/inventory/components/photos";
 
 // Packages (feature plan step 14d): pick → pack → ship. Wave picking was removed 2026-11-17.
 
@@ -82,6 +83,12 @@ export function PackingCard({ orderId, packing, canPack }: { orderId: string; pa
                   <Trash2 className="size-4" aria-hidden />
                   <span className="sr-only">Unpack {p.number}</span>
                 </button>
+              )}
+              {/* Photos of the box (optional, Step 4B). */}
+              {(canPack || p.photos.length > 0) && (
+                <div className="basis-full pb-1.5">
+                  <RecordPhotos targetType="package" targetId={p.id} photos={p.photos} canAdd={canPack} max={5} label={`Photos of ${p.number} (optional)`} />
+                </div>
               )}
             </li>
           ))}

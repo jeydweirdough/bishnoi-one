@@ -911,6 +911,30 @@ class PackageLine(Base):
     package: Mapped[Package] = relationship(back_populates="lines")
 
 
+# --- photos, optional, on deliveries and packages (2026-11-18, Step 4B) -------------------
+
+
+class Photo(Base):
+    """A photo kept with a delivery or one of its packages (the goods, the proof of delivery, a box). Never required.
+    No foreign key to what it shows (target_type + target_id), so deleting that never fails on it; the recycle bin
+    takes a delivery's photos with it (recycle_kinds.py) and a package's go when it's unpacked."""
+
+    __tablename__ = "nbin_photos"
+    __table_args__ = (Index("ix_nbin_photos_target", "target_type", "target_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # "delivery" (an nbin_orders row) or "package" (an nbin_packages row).
+    target_type: Mapped[str] = mapped_column(String(20))
+    target_id: Mapped[str] = mapped_column(String(36))
+    content_type: Mapped[str] = mapped_column(String(20))
+    data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    size: Mapped[int] = mapped_column(Integer)
+    taken_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbin_users.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    taken_by: Mapped["User | None"] = relationship(foreign_keys=[taken_by_id], lazy="joined")
+
+
 # --- quality checks on receipt (step 14a) -------------------------------------------------
 
 
