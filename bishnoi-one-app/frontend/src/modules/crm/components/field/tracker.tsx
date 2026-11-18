@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LocationGuide } from "@/src/modules/crm/components/field/location-guide";
-import { inWorkHours, locate, metres, type NoLocation, type Where } from "@/src/modules/crm/components/field/where";
-
-type TrailPoint = Where & { at: string };
+import { keepPoint, moveOldPoints, sendQueue, setQueueUser, type QueuedPointData } from "@/src/modules/crm/components/field/offline-queue";
+import { QueueChip } from "@/src/modules/crm/components/field/queue-chip";
+import { inWorkHours, locate, metres, type NoLocation } from "@/src/modules/crm/components/field/where";
 
 // A field agent's location while the CRM is open, in work hours only. It's
 // required: without it, a guide stands in front of the CRM until it's on.
@@ -12,20 +12,21 @@ type TrailPoint = Where & { at: string };
 // The trail:
 // - A point is kept when they've moved 50 m from the last one, or 5 minutes
 //   have passed: parked at a clinic that's one point in five minutes.
-// - Kept points wait on the phone (this browser's storage), so a dropped
-//   signal or a closed tab loses nothing already kept.
-// - Every 15 minutes, when the page is hidden or closed, and when the phone
-//   comes back online, the waiting points go up in one request. They're only
-//   cleared once the API has them.
+// - Kept points wait on the phone (the offline queue, offline-queue.ts, with
+//   visits logged offline), so days without a signal or a closed tab lose
+//   nothing already kept (Step 4H).
+// - Weak readings (less sure than 200 m) are kept too: the route map marks
+//   them weak and leaves them out of the distance.
+// - Every 5 minutes, when the page is hidden or closed, when the app opens
+//   and when the phone comes back online, what's waiting goes up. Each item
+//   is only cleared once the API has it.
 //
 // The browser only gives the location while the page is open on screen, so
 // the trail has gaps when the phone is locked. The pill in the corner says,
 // always, whether the location is being taken.
 const MOVED_M = 50;
 const EVERY_MS = 5 * 60_000;
-const SEND_EVERY_MS = 15 * 60_000;
-const WORST_ACCURACY_M = 200;
-const MOST_WAITING = 2000;
+const SEND_EVERY_MS = 5 * 60_000;
 // What stops the CRM until it's fixed. "slow" doesn't: a clinic's thick walls
 // shouldn't lock an agent out; the pill says it's still looking.
 const BLOCKING: NoLocation[] = ["denied", "off", "unsupported", "insecure"];
@@ -46,54 +47,22 @@ const PILL: Record<State, { text: string; hint: string }> = {
 export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: string }) {
   const [state, setState] = useState<State>("starting");
   const [retrying, setRetrying] = useState(false);
-  const sending = useRef(false);
   // Starts (or restarts) following the phone; set once the effect has run.
   const restart = useRef<() => void>(() => {});
 
   useEffect(() => {
-    const key = `bishnoi-trail:${userId}`;
-    const read = (): TrailPoint[] => {
-      try {
-        return JSON.parse(localStorage.getItem(key) ?? "[]");
-      } catch {
-        return [];
-      }
-    };
-    const write = (points: TrailPoint[]) => {
-      try {
-        localStorage.setItem(key, JSON.stringify(points.slice(-MOST_WAITING)));
-      } catch {
-        // Storage full or off: the points in hand still go up with the next send.
-      }
-    };
-    let last: TrailPoint | null = read().at(-1) ?? null;
-
-    function send(closing = false) {
-      const waiting = read();
-      if (!waiting.length || sending.current) return;
-      // A closing page can only send a small body; the rest waits for next time.
-      const batch = waiting.slice(0, closing ? 300 : 1000);
-      sending.current = true;
-      fetch("/crm/api/trail", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ points: batch }), keepalive: closing })
-        .then((r) => {
-          // Points kept while this was on its way stay, after the ones sent.
-          if (r.ok) write(read().slice(batch.length));
-        })
-        .catch(() => {})
-        .finally(() => {
-          sending.current = false;
-        });
-    }
+    setQueueUser(userId);
+    let last: QueuedPointData | null = null;
+    const send = (closing = false) => void sendQueue(userId, { closing });
 
     function keep(position: GeolocationPosition) {
       if (!inWorkHours(timeZone)) return setState("after-hours");
       setState("on");
       const accuracyM = Math.round(position.coords.accuracy);
-      if (accuracyM > WORST_ACCURACY_M) return;
       const point = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracyM, at: new Date(position.timestamp).toISOString() };
       if (last && metres(last, point) < MOVED_M && position.timestamp - Date.parse(last.at) < EVERY_MS) return;
       last = point;
-      write([...read(), point]);
+      keepPoint(userId, point).catch(() => {});
     }
 
     let watch: number | null = null;
@@ -129,7 +98,7 @@ export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: s
       follow();
     };
     follow();
-    send();
+    moveOldPoints(userId).catch(() => {}).finally(() => send());
 
     // When they allow it in the browser's settings, carry on by itself.
     let permission: PermissionStatus | null = null;
@@ -150,6 +119,9 @@ export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: s
     };
     const onLeave = () => send(true);
     const onOnline = () => send();
+    // Background Sync (public/sw.js): the phone says it's back online, send now.
+    const onWorker = (e: MessageEvent) => e.data?.type === "send" && send();
+    navigator.serviceWorker?.addEventListener("message", onWorker);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pagehide", onLeave);
     window.addEventListener("online", onOnline);
@@ -161,6 +133,8 @@ export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: s
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pagehide", onLeave);
       window.removeEventListener("online", onOnline);
+      navigator.serviceWorker?.removeEventListener("message", onWorker);
+      setQueueUser(null);
     };
   }, [userId, timeZone]);
 
@@ -191,6 +165,7 @@ export function FieldTracker({ userId, timeZone }: { userId: string; timeZone: s
         {pill.text}
         <span className="sr-only">. {pill.hint}</span>
       </div>
+      <QueueChip userId={userId} />
     </>
   );
 }

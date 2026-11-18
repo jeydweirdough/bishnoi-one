@@ -1,17 +1,19 @@
 """Photos, optional, on a visit (2026-11-18, owner's Step 4B): the clinic, a display, a receipt. Never required.
 
     GET    /photos?targetType=visit&targetId=   a visit's photos, oldest first
-    POST   /photos                              multipart: file, targetType, targetId
+    POST   /photos                              multipart: file, targetType, targetId[, clientId]
     GET    /photos/{id}                         the image
     DELETE /photos/{id}                         the person who took it, or visits.edit
 
 Only for a visit within the person's reach: seeing needs visits.view, adding visits.create or visits.edit. The
-screens shrink a photo before sending it (about 1600 px, JPEG), so 3 MB is plenty.
+screens shrink a photo before sending it (about 1600 px, JPEG), so 3 MB is plenty. A photo sent from the phone's
+offline queue (Step 4H) carries the phone's clientId: sent again, the photo already kept comes back (200), not a copy.
 """
 
 from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -69,6 +71,12 @@ def photos_of(db: Session, target_ids: list[str], access: Access) -> dict[str, l
     return out
 
 
+def sent_before(db: Session, taker_id: str, client_id: str | None) -> Photo | None:
+    if not client_id:
+        return None
+    return db.scalar(select(Photo).where(Photo.taken_by_id == taker_id, Photo.client_id == client_id))
+
+
 def drop_photos(db: Session, visit_id: str) -> None:
     for p in db.scalars(select(Photo).where(Photo.target_type == "visit", Photo.target_id == visit_id)):
         db.delete(p)
@@ -82,11 +90,15 @@ def list_photos(access: CurrentAccess, db: DB, target_type: Target = Query(alias
 
 
 @router.post("/photos", status_code=status.HTTP_201_CREATED)
-async def add_photo(access: CurrentAccess, me: CurrentUser, db: DB, file: UploadFile = File(...),
-                    target_type: Target = Form(alias="targetType"), target_id: str = Form(alias="targetId", max_length=36)) -> dict:
+async def add_photo(access: CurrentAccess, me: CurrentUser, db: DB, response: Response, file: UploadFile = File(...),
+                    target_type: Target = Form(alias="targetType"), target_id: str = Form(alias="targetId", max_length=36),
+                    client_id: str | None = Form(None, alias="clientId", pattern=r"^[A-Za-z0-9_-]{8,64}$")) -> dict:
     if not (access.can("visits.create") or access.can("visits.edit")):
         raise forbidden()
     visit = visit_of(db, access, target_id)
+    if (kept := sent_before(db, me.id, client_id)) is not None:
+        response.status_code = status.HTTP_200_OK
+        return photo_out(kept, access)
     data = await file.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The photo is too large: keep it under 3 MB.")
@@ -95,9 +107,16 @@ async def add_photo(access: CurrentAccess, me: CurrentUser, db: DB, file: Upload
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "The photo must be a PNG, JPEG or WebP image.")
     if len(photos_of(db, [visit.id], access)[visit.id]) >= PER_TARGET:
         raise HTTPException(status.HTTP_409_CONFLICT, f"{PER_TARGET} photos at most on a visit. Remove one first.")
-    photo = Photo(target_type=target_type, target_id=visit.id, content_type=kind, data=data, size=len(data), taken_by_id=me.id)
+    photo = Photo(target_type=target_type, target_id=visit.id, content_type=kind, data=data, size=len(data), taken_by_id=me.id, client_id=client_id)
     db.add(photo)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        if (kept := sent_before(db, me.id, client_id)) is None:
+            raise
+        response.status_code = status.HTTP_200_OK
+        return photo_out(kept, access)
     audit(db, me, "visit.photo_added", target=visit.company.name, target_type="visit", target_id=visit.id)
     db.commit()
     db.refresh(photo)

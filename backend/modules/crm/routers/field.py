@@ -12,7 +12,9 @@ their goals.
 - /field/goals: the month's goals per person (goals.manage).
 - /field/doctors/{id}/location: a clinic's pin, set by an agent standing there.
 - /field/trail: an agent's points, sent about every 15 minutes while the CRM
-  is open during work hours; /field/routes: a person's day on the map.
+  is open during work hours, or later from the phone's offline queue (Step 4H:
+  up to 7 days old, sent twice kept once, weak ones kept and marked);
+  /field/routes: a person's day on the map.
 
 Locations are only ever taken during work hours (WORK_HOURS, the company's
 own time): the phone doesn't send others, and the API drops any that come.
@@ -29,6 +31,7 @@ from modules.crm.terms import terms_of
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from modules.crm.access import Access, CurrentAccess, permissions_of, require
@@ -57,9 +60,14 @@ MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
 WORK_HOURS = (6, 20)
 # A visit this close to its clinic's pin (less the phone's own uncertainty) was there.
 AT_CLINIC_M = 150
-# Points less sure than this aren't kept: they'd draw a route that wasn't taken.
-MAX_ACCURACY_M = 200
+# Points less sure than this are weak (Step 4H): kept and shown as weak on the map, but left out of
+# the day's distance and times, since they'd draw a route that wasn't taken.
+WEAK_ACCURACY_M = 200
 TRAIL_DAYS = 90
+# How old a point the phone may still send: it keeps them while offline for several days.
+SEND_WITHIN_DAYS = 7
+# The phone's own id for something it kept while offline.
+CLIENT_ID = r"^[A-Za-z0-9_-]{8,64}$"
 
 
 # --- months ----------------------------------------------------------------------------------
@@ -136,6 +144,8 @@ class VisitIn(VisitFields):
     outcome: Outcome
     # Where the phone was, if it said (it asks the person first).
     location: Where | None = None
+    # The phone's own id when the visit was kept offline (Step 4H): sent again, the same visit comes back.
+    client_id: str | None = Field(None, pattern=CLIENT_ID)
 
 
 class VisitPatch(VisitFields):
@@ -225,8 +235,18 @@ def list_visits(
     return {"items": [visit_out(v, access, shots[v.id]) for v in visits], "total": total}
 
 
+def sent_before(db: Session, me: User, client_id: str | None) -> Visit | None:
+    if not client_id:
+        return None
+    return db.scalar(select(Visit).where(Visit.owner_id == me.id, Visit.client_id == client_id))
+
+
 @router.post("/visits", status_code=status.HTTP_201_CREATED)
-def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, body: VisitIn) -> dict:
+def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, body: VisitIn, response: Response) -> dict:
+    # Sent again from the phone's offline queue: the visit it already made, not a second one.
+    if (kept := sent_before(db, me, body.client_id)) is not None:
+        response.status_code = status.HTTP_200_OK
+        return visit_out(kept, access, photos_of(db, [kept.id], access)[kept.id])
     doctor = db.get(Company, body.company_id)
     if doctor is None or not reaches(doctor, access):
         raise field_error("companyId", "Pick someone you can see.")
@@ -251,6 +271,7 @@ def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep,
         detailing=check_detailing(db, body.detailing),
         next_objective=(body.next_objective or "").strip() or None,
         care_group=body.care_group,
+        client_id=body.client_id,
         owner_id=me.id,
         team_id=me.team_id,
         created_by_id=me.id,
@@ -266,7 +287,15 @@ def create_visit(access: Create, me: CurrentUser, db: DB, settings: SettingsDep,
     if body.care_group == "enrolled" and doctor.care_group_at is None:
         doctor.care_group_at = visited_at
     db.add(visit)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # The same queued visit arrived twice at once: the first one is kept.
+        db.rollback()
+        if (kept := sent_before(db, me, body.client_id)) is None:
+            raise
+        response.status_code = status.HTTP_200_OK
+        return visit_out(kept, access, photos_of(db, [kept.id], access)[kept.id])
     audit(db, me, "visit.created", target=doctor.name, target_type="visit", target_id=visit.id)
     db.commit()
     db.refresh(visit)
@@ -709,6 +738,8 @@ def set_goals(access: Manage, me: CurrentUser, db: DB, settings: SettingsDep, bo
 
 class TrailPoint(Where):
     at: datetime
+    # The phone's own id for the point (its queue's); the point itself is told apart by its time.
+    client_id: str | None = Field(None, pattern=CLIENT_ID)
 
 
 class TrailIn(Api):
@@ -724,22 +755,65 @@ def in_work_hours(moment: datetime, settings: Settings) -> bool:
     return WORK_HOURS[0] <= hour < WORK_HOURS[1]
 
 
+def is_weak(point: Point) -> bool:
+    return point.accuracy_m > WEAK_ACCURACY_M
+
+
+def day_points(db: Session, user_id: str, day: str) -> list[Point]:
+    points: list[Point] = []
+    for batch in db.scalars(select(TrailBatch).where(TrailBatch.user_id == user_id, TrailBatch.day == day)):
+        points += decode(batch.points, as_utc(batch.started_at))
+    return sorted(points, key=lambda p: p.at)
+
+
+def second_of(moment: datetime) -> int:
+    return round(moment.timestamp())
+
+
+def sum_up(db: Session, user_id: str, day: str) -> None:
+    """The day's summary from all its points, whatever order they came in (a phone back online sends
+    yesterday's after today's). Distance and times count sure points only; weak ones are just counted."""
+    points = day_points(db, user_id, day)
+    sure = [p for p in points if not is_weak(p)]
+    ends = sure or points
+    summary = db.scalar(select(RouteDay).where(RouteDay.user_id == user_id, RouteDay.day == day))
+    if summary is None:
+        summary = RouteDay(user_id=user_id, day=day)
+        db.add(summary)
+    summary.distance_m = round(path_metres(sure))
+    summary.points = len(points)
+    summary.first_at, summary.last_at = ends[0].at, ends[-1].at
+    summary.last_lat, summary.last_lng = ends[-1].lat, ends[-1].lng
+
+
 @router.post("/field/trail")
 def upload_trail(access: Create, me: CurrentUser, db: DB, settings: SettingsDep, body: TrailIn) -> dict:
-    """Points the phone kept since its last upload. Kept: ones from the last
-    day, in work hours, and sure enough to draw a route with. One row per
-    day they fall in; the day's summary moves on with them."""
+    """Points the phone kept since its last upload, perhaps days of them from its offline queue. Kept:
+    ones from the last 7 days, in work hours; weak ones too, marked weak. A point already kept (the
+    same second) isn't kept again, so a batch sent twice keeps one copy. One row per day they fall in;
+    the day's summary is worked out again from all its points."""
     now = datetime.now(UTC)
-    kept = sorted(
-        (Point(p.latitude, p.longitude, p.accuracy_m, to_utc(p.at, settings)) for p in body.points if p.accuracy_m <= MAX_ACCURACY_M),
+    fresh = sorted(
+        (Point(p.latitude, p.longitude, p.accuracy_m, to_utc(p.at, settings)) for p in body.points),
         key=lambda p: p.at,
     )
-    kept = [p for p in kept if now - timedelta(days=1) <= p.at <= now + timedelta(minutes=5) and in_work_hours(p.at, settings)]
+    fresh = [p for p in fresh if now - timedelta(days=SEND_WITHIN_DAYS) <= p.at <= now + timedelta(minutes=5) and in_work_hours(p.at, settings)]
     by_day: dict[str, list[Point]] = {}
-    for p in kept:
+    for p in fresh:
         by_day.setdefault(local_day(p.at, settings), []).append(p)
 
-    for day, points in by_day.items():
+    kept = weak = 0
+    for day, came in by_day.items():
+        seen = {second_of(p.at) for p in day_points(db, me.id, day)}
+        points = []
+        for p in came:
+            if second_of(p.at) not in seen:
+                seen.add(second_of(p.at))
+                points.append(p)
+        if not points:
+            continue
+        kept += len(points)
+        weak += sum(is_weak(p) for p in points)
         start = points[0].at
         db.add(
             TrailBatch(
@@ -755,25 +829,15 @@ def upload_trail(access: Create, me: CurrentUser, db: DB, settings: SettingsDep,
                 max_lng=max(p.lng for p in points),
             )
         )
-        summary = db.scalar(select(RouteDay).where(RouteDay.user_id == me.id, RouteDay.day == day))
-        gone = path_metres(points)
-        if summary is None:
-            summary = RouteDay(user_id=me.id, day=day, distance_m=0, points=0, first_at=start, last_at=start, last_lat=points[0].lat, last_lng=points[0].lng)
-            db.add(summary)
-        elif start >= as_utc(summary.last_at):
-            # Joined on from where the day's trail had got to.
-            gone += metres(summary.last_lat, summary.last_lng, points[0].lat, points[0].lng)
-        summary.distance_m = (summary.distance_m or 0) + round(gone)
-        summary.points = (summary.points or 0) + len(points)
-        summary.first_at = min(as_utc(summary.first_at), start)
-        if points[-1].at >= as_utc(summary.last_at):
-            summary.last_at, summary.last_lat, summary.last_lng = points[-1].at, points[-1].lat, points[-1].lng
+        db.flush()
+        sum_up(db, me.id, day)
 
     # Detailed trails are kept 90 days; the days' summaries stay.
     for batch in db.scalars(select(TrailBatch).where(TrailBatch.user_id == me.id, TrailBatch.started_at < now - timedelta(days=TRAIL_DAYS))):
         db.delete(batch)
     db.commit()
-    return {"received": len(body.points), "kept": len(kept)}
+    # received: what came; kept: new points (a repeat isn't kept again); weak: of those, the weak ones.
+    return {"received": len(body.points), "kept": kept, "weak": weak}
 
 
 def route_person(db: Session, access: Access, me: User, person: str | None) -> User:
@@ -808,10 +872,7 @@ def read_route(
         start_local = datetime.fromisoformat(day).replace(tzinfo=ZoneInfo(settings.org_timezone))
     except ValueError:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Write the day as YYYY-MM-DD.") from None
-    points: list[Point] = []
-    for batch in db.scalars(select(TrailBatch).where(TrailBatch.user_id == user.id, TrailBatch.day == day).order_by(TrailBatch.started_at)):
-        points += decode(batch.points, as_utc(batch.started_at))
-    points.sort(key=lambda p: p.at)
+    points = day_points(db, user.id, day)
     start, end = start_local.astimezone(UTC), (start_local + timedelta(days=1)).astimezone(UTC)
     visits = db.scalars(select(Visit).where(Visit.owner_id == user.id, Visit.visited_at >= start, Visit.visited_at < end).order_by(Visit.visited_at)).unique().all()
     summary = db.scalar(select(RouteDay).where(RouteDay.user_id == user.id, RouteDay.day == day))
@@ -825,9 +886,10 @@ def read_route(
         "day": day,
         "today": local_day(datetime.now(UTC), settings),
         "summary": day_out(summary) if summary else None,
-        "points": [{"latitude": p.lat, "longitude": p.lng, "accuracyM": p.accuracy_m, "at": iso(p.at)} for p in points],
+        "points": [{"latitude": p.lat, "longitude": p.lng, "accuracyM": p.accuracy_m, "at": iso(p.at), "weak": is_weak(p)} for p in points],
         "visits": [{**visit_out(v, access), "clinic": pin_out(v.company)} for v in visits],
         "keptDays": TRAIL_DAYS,
+        "weakAccuracyM": WEAK_ACCURACY_M,
     }
 
 

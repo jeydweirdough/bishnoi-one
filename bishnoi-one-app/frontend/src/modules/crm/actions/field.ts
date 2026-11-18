@@ -9,6 +9,8 @@ import type { Where } from "@/src/modules/crm/components/field/where";
 // Field work: logging visits, and the month's goals. The API checks who may.
 
 export type VisitInput = {
+  /** The phone's own id (Step 4H): the same visit sent twice is kept once. */
+  clientId?: string;
   companyId: string;
   outcome: VisitOutcome;
   /** The company's local time ("2026-09-24T10:30"). */

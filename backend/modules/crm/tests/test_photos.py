@@ -52,3 +52,13 @@ def test_deleting_a_visit_takes_its_photos(client, field, app):  # noqa: F811
     from modules.crm.models import Photo
     with app.state.sessions() as db:
         assert db.get(Photo, shot["id"]) is None
+
+
+def test_a_photo_sent_twice_from_the_queue_is_kept_once(client, field):  # noqa: F811
+    v = visit(client, field["fay"], doctor(client, field, "Dr. Lim", "fay"))
+    form = {"targetType": "visit", "targetId": v["id"], "clientId": "photo-0001-phone"}
+    first = client.post("/photos", data=form, files={"file": ("a.jpg", io.BytesIO(JPEG), "image/jpeg")}, headers=field["fay"])
+    assert first.status_code == 201, first.text
+    again = client.post("/photos", data=form, files={"file": ("a.jpg", io.BytesIO(JPEG), "image/jpeg")}, headers=field["fay"])
+    assert again.status_code == 200 and again.json()["id"] == first.json()["id"]
+    assert len(client.get(f"/photos?targetType=visit&targetId={v['id']}", headers=field["fay"]).json()) == 1

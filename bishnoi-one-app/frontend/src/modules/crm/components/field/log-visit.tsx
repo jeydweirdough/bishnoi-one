@@ -16,6 +16,7 @@ import { DetailingFields, type DetailDraft } from "@/src/modules/crm/components/
 import { distanceText, locate, metres, NO_LOCATION, type Where } from "@/src/modules/crm/components/field/where";
 import { VisitMap, type MapDoctor } from "@/src/modules/crm/components/field/visit-map";
 import { AddCustomerDialog } from "@/src/modules/crm/components/crm/new-customer";
+import { keepVisit, newClientId, queueUser } from "@/src/modules/crm/components/field/offline-queue";
 import { CARE_GROUP, OUTCOMES } from "@/src/modules/crm/components/field/words";
 import { useTerms } from "@/src/modules/crm/components/terms/provider";
 import { lower } from "@/src/modules/crm/components/terms/terms";
@@ -62,6 +63,8 @@ export function LogVisitForm({
   const [outcome, setOutcome] = useState<VisitOutcome>("detailed");
   const [careGroup, setCareGroup] = useState<CareGroup>("not_now");
   const [at, setAt] = useState(() => localDateTime(new Date(now), org.timezone));
+  // Left as it was, the visit's time is when it's logged on this phone (a page opened offline may be days old).
+  const [atTouched, setAtTouched] = useState(false);
   const [amount, setAmount] = useState("");
   const [receipt, setReceipt] = useState("");
   const [notes, setNotes] = useState("");
@@ -147,10 +150,12 @@ export function LogVisitForm({
         return;
       }
       const location = found.ok ? found.where : null;
-      const result = await logVisit({
+      const input = {
+        // The phone's own id (Step 4H): sent again from the offline queue, the CRM keeps one visit.
+        clientId: newClientId(),
         companyId,
         outcome,
-        visitedAt: at || null,
+        visitedAt: atTouched ? at || null : localDateTime(new Date(), org.timezone),
         amountCentavos: cents,
         receiptNo: collecting ? receipt.trim() || null : null,
         notes: notes.trim() || null,
@@ -158,7 +163,26 @@ export function LogVisitForm({
         nextObjective: objective.trim() || null,
         careGroup: outcome === "not_in" ? null : careGroup,
         location,
-      });
+      };
+      // No signal: the visit and its photos wait on the phone and go up once it's back online.
+      const keepOffline = async () => {
+        const who = queueUser();
+        if (!who) {
+          setError("You're offline. Log the visit again when you're back online.");
+          return;
+        }
+        await keepVisit(who, input, chosen?.name ?? "a visit", photos);
+        toast.success("Visit kept on this phone", { description: "It will be sent with its photos when you're back online." });
+        router.push(back);
+      };
+      if (typeof navigator !== "undefined" && !navigator.onLine) return keepOffline();
+      let result: Awaited<ReturnType<typeof logVisit>>;
+      try {
+        result = await logVisit(input);
+      } catch {
+        // The request never got an answer (signal lost on the way): kept, and sent again with the same id.
+        return keepOffline();
+      }
       if (!result.ok) {
         setError(result.error);
         setFields(result.fields ?? {});
@@ -257,7 +281,10 @@ export function LogVisitForm({
         </FormGrid>
       )}
       <Field label="Date and time" error={fields.visitedAt}>
-        {(p) => <Input {...p} type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />}
+        {(p) => <Input {...p} type="datetime-local" value={at} onChange={(e) => {
+          setAt(e.target.value);
+          setAtTouched(true);
+        }} />}
       </Field>
       {outcome !== "not_in" && (
         <DetailingFields companyId={companyId} rows={details} onRows={setDetails} objective={objective} onObjective={setObjective} errors={fields} />

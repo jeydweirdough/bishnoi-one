@@ -88,7 +88,8 @@ export type DoctorBalance = {
   can: { pin: boolean; unpin: boolean };
 };
 
-export type RoutePoint = { latitude: number; longitude: number; accuracyM: number; at: string };
+/** A trail point; weak: less sure than 200 m (Step 4H), drawn apart and left out of the distance. */
+export type RoutePoint = { latitude: number; longitude: number; accuracyM: number; at: string; weak?: boolean };
 
 export type RouteDaySummary = { day: string; distanceM: number; points: number; firstAt: string; lastAt: string };
 
@@ -100,6 +101,7 @@ export type Route = {
   points: RoutePoint[];
   visits: (Visit & { clinic: Pin | null })[];
   keptDays: number;
+  weakAccuracyM?: number;
   /** The day's plan, each planned doctor visited or not. */
   planned: { id: string; slot: "morning" | "midday" | "afternoon"; doctor: { id: string; name: string; zone: Zone | null; tier: 1 | 2 | 3 | null }; visited: boolean }[];
 };

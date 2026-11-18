@@ -98,6 +98,11 @@ export default async function FieldRoutesPage({ searchParams }: { searchParams: 
           <Sheet className="p-2">
             <RouteMap points={route.points} visits={route.visits} />
             {!route.points.length && <p className="px-3 pt-2 pb-1 text-meta text-ink-3">No location data for this day: Bishnoi One wasn&apos;t open on their phone during work hours.</p>}
+            {route.points.some((p) => p.weak) && (
+              <p className="px-3 pt-2 pb-1 text-meta text-ink-3">
+                {route.points.filter((p) => p.weak).length.toLocaleString()} weak readings (less sure than {route.weakAccuracyM ?? 200} m) shown as grey rings: kept, but left out of the distance.
+              </p>
+            )}
           </Sheet>
           <Sheet className="px-5 pt-4 pb-2">
             <SectionTitle icon="visit">Visits</SectionTitle>

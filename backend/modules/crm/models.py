@@ -827,6 +827,8 @@ class Visit(Owned, Base):
     __table_args__ = (
         CheckConstraint("outcome IN ('detailed', 'collected', 'promised', 'not_in', 'updated', 'other')", name="visit_outcome"),
         CheckConstraint("amount_centavos >= 0", name="visit_amount"),
+        # A visit logged offline and sent again (Step 4H) is the same visit: one per owner and phone id.
+        Index("ix_nbcm_visits_owner_client", "owner_id", "client_id", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -850,6 +852,8 @@ class Visit(Owned, Base):
     # The doctor's Patient Care Group, this visit (Rx playbook): "enrolled" them
     # in one, "followed_up" on theirs, or "not_now".
     care_group: Mapped[str | None] = mapped_column(String(12), default=None)
+    # The phone's own id for a visit kept while offline (Step 4H), so sending it twice keeps one.
+    client_id: Mapped[str | None] = mapped_column(String(64), default=None)
 
     company: Mapped[Company] = relationship(lazy="joined")
     owner: Mapped[User] = relationship(foreign_keys="Visit.owner_id", lazy="joined")
@@ -861,7 +865,10 @@ class Photo(Base):
     delete takes them, and the recycle bin takes them with the visit or its customer (recycle_kinds.py)."""
 
     __tablename__ = "nbcm_photos"
-    __table_args__ = (Index("ix_nbcm_photos_target", "target_type", "target_id"),)
+    __table_args__ = (
+        Index("ix_nbcm_photos_target", "target_type", "target_id"),
+        Index("ix_nbcm_photos_taker_client", "taken_by_id", "client_id", unique=True),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     # "visit" (an nbcm_visits row).
@@ -871,6 +878,8 @@ class Photo(Base):
     data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
     size: Mapped[int] = mapped_column(Integer)
     taken_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbcm_users.id", ondelete="SET NULL"), default=None)
+    # The phone's own id for a photo sent from the offline queue (Step 4H): sent twice, kept once.
+    client_id: Mapped[str | None] = mapped_column(String(64), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     taken_by: Mapped["User | None"] = relationship(foreign_keys=[taken_by_id], lazy="joined")
@@ -878,8 +887,8 @@ class Photo(Base):
 
 class TrailBatch(Base):
     """Where a field agent went while the CRM was open: one row per upload
-    (about every 15 minutes), its points packed (app/trail.py). Kept 90 days;
-    the day's RouteDay stays after that."""
+    (about every 15 minutes, or a phone's offline queue), its points packed (app/trail.py). Kept 90 days;
+    the day's RouteDay stays after that. A point already kept (same person, same second) isn't kept again."""
 
     __tablename__ = "nbcm_trail_batches"
 
