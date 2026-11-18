@@ -22,6 +22,7 @@ from pydantic import Field, field_validator, model_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from modules.crm import price_slips
 from modules.crm.access import Access, require, settings_change
 from modules.crm.api import Api, camel, changed, field_error, iso, not_found
 from modules.crm.audit import audit
@@ -261,6 +262,9 @@ def product_out(p: Product, access: Access) -> dict:
                 "status": pp.approval_status,
                 "amount": pp.amount_centavos,
                 "proposedAmount": pp.proposed_amount_centavos,
+                # Approved by Finance, live once its approval slip signs (Step 4C).
+                "waitsForSlip": pp.slip_state == "pending",
+                "heldAmount": pp.slip_held_centavos,
                 "submittedById": pp.submitted_by_id,
                 "submittedAt": iso(pp.submitted_at),
                 "approvedById": pp.approved_by_id,
@@ -420,6 +424,7 @@ def set_prices(db: Session, product: Product, prices: dict[str, int | None], me:
                 ))
                 touched.append(code)
             elif amount is not None and (there.amount_centavos != amount or there.approval_status != "approved"):
+                price_slips.cleared(there)
                 there.amount_centavos = amount
                 there.proposed_amount_centavos = None
                 there.approval_status = "approved"
@@ -464,6 +469,9 @@ def set_prices(db: Session, product: Product, prices: dict[str, int | None], me:
                     there.rejection_reason = None
                 pending_approvals.append(code)
                 touched.append(code)
+    if pending_approvals:
+        # Step 4C: the special prices proposed here go on one approval slip, beside Finance's own approval.
+        price_slips.ask(db, me, [pp for pp in product.prices if pp.price_type_code in pending_approvals])
     return touched, pending_approvals
 
 

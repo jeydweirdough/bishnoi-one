@@ -85,7 +85,16 @@ def _sales_order(db, data: dict, slug: str) -> None:
     quote.sales_order = order
 
 
-HANDLERS: dict[str, Callable] = {"organisation.changed": _organisation, "sales_order.updated": _sales_order}
+def _approval_decided(db, data: dict, slug: str) -> None:
+    """An approval slip ended (Step 4C): a price change goes live, or is withdrawn (crm/price_slips.py)."""
+    from modules.crm import price_slips
+
+    if data.get("kind") == price_slips.KIND:
+        price_slips.decided(db, data)
+
+
+HANDLERS: dict[str, Callable] = {"organisation.changed": _organisation, "sales_order.updated": _sales_order,
+                                 "approval.decided": _approval_decided}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])

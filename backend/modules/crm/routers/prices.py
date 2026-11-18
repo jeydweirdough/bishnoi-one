@@ -19,6 +19,7 @@ from pydantic import Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from modules.crm import price_slips
 from modules.crm.access import Access, require
 from modules.crm.api import Api, field_error, not_found
 from modules.crm.audit import audit
@@ -79,6 +80,9 @@ def sheet_out(db: Session, team: Team) -> dict:
                         "teamStatus": row.approval_status if row else "approved",
                         "teamApproved": row.amount_centavos if row and row.approval_status == "approved" else None,
                         "teamProposed": row.proposed_amount_centavos if row else None,
+                        # Approved by Finance, live once its approval slip signs (Step 4C).
+                        "teamWaitsForSlip": bool(row and row.slip_state == "pending"),
+                        "teamHeld": row.slip_held_centavos if row else None,
                     }
                     for code in listed
                     for row in [own_rows.get((p.id, code))]
@@ -156,7 +160,10 @@ def decide_price(
     if not x or x.approval_status != "pending":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "This price proposal is not pending approval.")
     now = datetime.now(UTC)
-    if body.decision == "approve":
+    if body.decision == "approve" and price_slips.waits_for_slip(x):
+        # Step 4C: Finance's approval is kept; the price goes live once its approval slip signs (crm/price_slips.py).
+        price_slips.hold(x)
+    elif body.decision == "approve":
         if x.proposed_amount_centavos == 0:
             db.delete(x)  # the proposal was to take the price away
         else:
@@ -237,6 +244,7 @@ def set_prices(access: SetPrices, me: CurrentUser, db: DB, body: PricesIn, team:
                 if there:
                     db.delete(there)
             elif there:
+                price_slips.cleared(there)
                 there.amount_centavos = item.amount_centavos
                 there.proposed_amount_centavos = None
                 there.approval_status = "approved"
@@ -284,6 +292,13 @@ def set_prices(access: SetPrices, me: CurrentUser, db: DB, body: PricesIn, team:
                     submitted_by_id=me.id,
                     submitted_at=now,
                 ))
+    if body.items and not finance:
+        # Step 4C: the prices proposed in this save go on one approval slip, beside Finance's own approval.
+        db.flush()
+        codes = {(i.product_id, i.price_type_code) for i in body.items}
+        rows = [r for r in db.scalars(select(TeamPrice).where(TeamPrice.team_id == found.id, TeamPrice.approval_status == "pending"))
+                if (r.product_id, r.price_type_code) in codes]
+        price_slips.ask(db, me, rows, team=found)
     if body.items:
         audit(db, me, "team_prices.set" if finance else "team_prices.submitted_for_approval", target=found.name, target_type="team", target_id=found.id)
         db.commit()

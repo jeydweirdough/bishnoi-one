@@ -453,6 +453,11 @@ class ProductPrice(Base):
     approved_by_name: Mapped[str | None] = mapped_column(String(120), nullable=True, default=None)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     rejection_reason: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
+    # Its approval slip (Step 4C, crm/price_slips.py): the save it was proposed in, the slip's state, and what Finance
+    # approved while the slip still waits (live once it signs; 0 = take the price away).
+    slip_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True, default=None, index=True)
+    slip_state: Mapped[str | None] = mapped_column(String(10), nullable=True, default=None)
+    slip_held_centavos: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
 
 
 class TeamPriceType(Base):
@@ -482,6 +487,11 @@ class TeamPrice(Base):
     approved_by_name: Mapped[str | None] = mapped_column(String(120), nullable=True, default=None)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
     rejection_reason: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
+    # Its approval slip (Step 4C, crm/price_slips.py): the save it was proposed in, the slip's state, and what Finance
+    # approved while the slip still waits (live once it signs; 0 = take the price away).
+    slip_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True, default=None, index=True)
+    slip_state: Mapped[str | None] = mapped_column(String(10), nullable=True, default=None)
+    slip_held_centavos: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
 
 
 PROMO_KINDS = ("percent", "amount", "free_goods", "tiered")
