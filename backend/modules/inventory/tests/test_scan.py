@@ -30,7 +30,7 @@ def test_counting_by_scanning_adds_up(ana, world):
 def test_packs_convert_to_the_base_unit(ana, world):
     """Units with conversions (step 14e): a pack's barcode counts the whole pack; stock stays in the base unit."""
     packs = ana.post(f"/inventory/products/{world['gloves']}/packagings", {"name": "Case", "quantity": 10, "barcode": "CASE-GLV"})
-    assert packs == [{"id": packs[0]["id"], "name": "Case", "quantity": 10, "barcode": "CASE-GLV"}]
+    assert packs == [{"id": packs[0]["id"], "name": "Case", "quantity": 10, "barcode": "CASE-GLV", "sellable": True, "price": None}]
     assert ana.c.post(f"/inventory/products/{world['gloves']}/packagings", headers=ana.h, json={"name": "case", "quantity": 5}).status_code == 422
     assert ana.c.post(f"/inventory/products/{world['gloves']}/packagings", headers=ana.h, json={"name": "Pallet", "quantity": 1}).status_code == 422
     assert ana.get(f"/inventory/products/{world['gloves']}")["packagings"][0]["name"] == "Case"
