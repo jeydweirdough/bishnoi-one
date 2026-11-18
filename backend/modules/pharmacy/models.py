@@ -122,6 +122,8 @@ class AuditEntry(Base):
     values, so it can be shown to admins without leaking what something was."""
 
     __tablename__ = "nbph_audit_log"
+    # One person's entries, newest first (their activity, step 4F).
+    __table_args__ = (Index("nbph_audit_log_actor", "actor_id", "id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

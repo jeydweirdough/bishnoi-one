@@ -290,8 +290,10 @@ def activity_log(
     limit: int = Query(50, ge=1, le=200),
     action: str | None = Query(None, max_length=64, description="an action, or its start: 'prescription.' for every prescription"),
     actor_id: str | None = Query(None, max_length=36, alias="actorId"),
+    person: str | None = Query(None, max_length=254, description="one person's own entries, by their email"),
 ) -> dict:
-    """Newest first. Pass the last entry's id as `before` for the next page."""
+    """Newest first. Pass the last entry's id as `before` for the next page. `person` (an email) reads only what
+    that person did here, through the actor index (2026-11-18, step 4F)."""
     q = select(AuditEntry).order_by(AuditEntry.id.desc()).limit(limit + 1)
     if before is not None:
         q = q.where(AuditEntry.id < before)
@@ -299,6 +301,11 @@ def activity_log(
         q = q.where(AuditEntry.action.startswith(action) if action.endswith(".") else AuditEntry.action == action)
     if actor_id:
         q = q.where(AuditEntry.actor_id == actor_id)
+    if person:
+        ids = db.scalars(select(User.id).where(func.lower(User.email) == person.strip().lower())).all()
+        if not ids:
+            return {"items": [], "more": False}
+        q = q.where(AuditEntry.actor_id.in_(ids))
     entries = db.scalars(q).all()
     return {
         "items": [

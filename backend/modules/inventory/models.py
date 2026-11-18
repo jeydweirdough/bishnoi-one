@@ -125,6 +125,8 @@ class AuditEntry(Base):
     changed, never their values. Stock itself is traced by `Movement`."""
 
     __tablename__ = "nbin_audit_log"
+    # One person's entries, newest first (their activity, step 4F).
+    __table_args__ = (Index("nbin_audit_log_actor", "actor_id", "id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

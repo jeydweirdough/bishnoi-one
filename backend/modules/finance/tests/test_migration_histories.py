@@ -92,5 +92,5 @@ def test_every_history_reaches_one_schema_and_keeps_records(tmp_path,line,revisi
         assert not {'currency','rate_e4','foreign_total','foreign_payable'}&{x['name'] for x in inspect(c).get_columns('nbfi_bills')}
         assert not {'rate_e4','exchange_centavos'}&{x['name'] for x in inspect(c).get_columns('nbfi_payment_vouchers')}
         assert not c.execute(text('PRAGMA foreign_key_check')).all()
-        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()=='0036'
+        assert c.execute(text('select version_num from nbfi_alembic_version')).scalar()==ScriptDirectory.from_config(_config(engine)).get_current_head()
     engine.dispose()

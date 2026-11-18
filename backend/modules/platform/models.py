@@ -792,7 +792,11 @@ class AuditEntry(Base):
     """Who did what, and when. Names the fields that changed, never their values."""
 
     __tablename__ = "nbpl_audit"
-    __table_args__ = (_one_of("category", AUDIT_CATEGORIES, "nbpl_audit_category"),)
+    __table_args__ = (
+        _one_of("category", AUDIT_CATEGORIES, "nbpl_audit_category"),
+        # One employee's own entries at a company, newest first (their activity, step 4F).
+        Index("nbpl_audit_actor", "company_id", "actor", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

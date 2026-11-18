@@ -122,6 +122,8 @@ class AuditEntry(Base):
     """The activity log: who changed what, and when."""
 
     __tablename__ = "nbad_audit_log"
+    # One person's entries, newest first (their activity, step 4F).
+    __table_args__ = (Index("nbad_audit_log_actor", "actor_id", "id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

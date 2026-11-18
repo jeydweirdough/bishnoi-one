@@ -235,6 +235,8 @@ class AuditEntry(Base):
     its events (FundEvent)."""
 
     __tablename__ = "nbfi_audit_log"
+    # One person's entries, newest first (their activity, step 4F).
+    __table_args__ = (Index("nbfi_audit_log_actor", "actor_id", "id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

@@ -784,6 +784,23 @@ def person_page(person_id: str, db: DB, me: Admin, settings: SettingsDep) -> dic
     }
 
 
+@router.get("/people/{person_id}/activity")
+def person_activity(person_id: str, db: DB, me: Admin, before: datetime | None = None, limit: int = 50) -> dict:
+    """What this employee did themselves in Bishnoi One (2026-11-18, step 4F), newest first, 50 a page; `before`
+    (the last one's `at`) gets the next page. Read through the (company, actor, time) index: only their entries.
+    Each app's own part comes from that app's /admin/audit?person=."""
+    from modules.platform.routers.activity import entry_out
+
+    p = get_person(db, me, person_id)
+    limit = max(1, min(limit, 200))
+    query = (select(AuditEntry).where(AuditEntry.company_id == me.company_id, AuditEntry.actor.in_({p.email, p.email.lower()}))
+             .order_by(AuditEntry.created_at.desc()))
+    if before:
+        query = query.where(AuditEntry.created_at < before)
+    rows = db.scalars(query.limit(limit + 1)).all()
+    return {"entries": [entry_out(e) for e in rows[:limit]], "more": len(rows) > limit}
+
+
 class AppRoleIn(Api):
     role_id: str | None = None
 

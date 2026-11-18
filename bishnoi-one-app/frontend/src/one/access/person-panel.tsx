@@ -19,16 +19,19 @@ import { usePersonActions } from "./person-dialogs";
 import type { AccessData, AccessPerson, PersonPage, Watcher } from "./types";
 
 // A person in a panel beside People (2026-10-31, after Zoho Directory's): who they are and every action on them
-// at the top, then Info, Applications (each app with their role in it), Security and Account activity.
+// at the top, then Info, Applications (each app with their role in it), Security and Activity (their own actions in
+// Bishnoi One and every app, 2026-11-18).
 
-export type PanelActivity = { id: string; at: string; text: string };
+export type PanelActivity = { id: string; at: string; app: string; text: string; fields: string[] };
+/** Read on the server only when the Activity tab is open (null: not open). */
+export type PanelLog = { entries: PanelActivity[]; older: string | null; unavailable: string[] } | null;
 
 const TABS = [
   ["info", "Info"],
   ["apps", "Applications"],
   ["watchers", "Who can see them"],
   ["security", "Security"],
-  ["activity", "Account activity"],
+  ["activity", "Activity"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
@@ -43,9 +46,9 @@ function initials(name: string): string {
     .join("");
 }
 
-export function PersonPanel({ person, row, data, activity }: { person: PersonPage; row: AccessPerson; data: AccessData; activity: PanelActivity[] }) {
+export function PersonPanel({ person, row, data, activity }: { person: PersonPage; row: AccessPerson; data: AccessData; activity: PanelLog }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("info");
+  const [tab, setTab] = useState<Tab>(activity ? "activity" : "info");
   const isMe = row.id === data.meId;
   const colleagues = data.people.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.fullName }));
   const nameOf = (id?: string | null) => data.people.find((c) => c.id === id)?.fullName ?? null;
@@ -128,7 +131,11 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
+            onClick={() => {
+              setTab(key);
+              // Activity is read on the server, only for the person open and only when asked for.
+              if (key === "activity" && !activity) router.push(`/platform/roles/people?person=${encodeURIComponent(row.id)}&tab=activity`, { scroll: false });
+            }}
             aria-current={tab === key ? "page" : undefined}
             className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === key ? "border-ink font-semibold text-ink" : "border-transparent text-ink-3 hover:text-ink"}`}
           >
@@ -171,25 +178,45 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
           />
         )}
         {tab === "activity" &&
-          (activity.length === 0 ? (
-            <Empty icon="auditLog" title="Nothing yet">
-              What they do in their account shows here: sign-ins, passwords, two-step sign-in.
-            </Empty>
+          (!activity ? (
+            <p className="text-sm text-ink-3">Reading their activity…</p>
           ) : (
             <>
-              <ul className="divide-y divide-rule">
-                {activity.map((e) => (
-                  <li key={e.id} className="flex items-baseline gap-3 py-2 text-sm">
-                    <time dateTime={e.at} title={when(e.at)} className="w-24 shrink-0 text-meta text-ink-3">
-                      {ago(e.at)}
-                    </time>
-                    <span className="min-w-0 flex-1 text-ink-2">{e.text}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link href={`/platform/company/activity?q=${encodeURIComponent(person.email)}`} className="mt-3 inline-block text-meta text-ink-2 hover:text-hema hover:underline">
-                Everything in the Activity log
-              </Link>
+              {activity.unavailable.length > 0 && (
+                <p role="status" className="mb-3 rounded-lg border border-promo bg-promo-tint px-4 py-2 text-sm text-promo-ink">
+                  {activity.unavailable.join(", ")} can&apos;t be read just now, so {activity.unavailable.length === 1 ? "its" : "their"} entries are left out.
+                </p>
+              )}
+              {activity.entries.length === 0 ? (
+                <Empty icon="auditLog" title="Nothing recorded yet">
+                  What they do in Bishnoi One and in every app shows here, newest first.
+                </Empty>
+              ) : (
+                <ul className="divide-y divide-rule">
+                  {activity.entries.map((e) => (
+                    <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2 text-sm">
+                      <time dateTime={e.at} title={when(e.at)} className="w-24 shrink-0 text-meta text-ink-3">
+                        {ago(e.at)}
+                      </time>
+                      <span className="w-20 shrink-0 truncate text-meta text-ink-3">{e.app}</span>
+                      <span className="min-w-0 flex-1 text-ink-2">
+                        {e.text}
+                        {e.fields.length > 0 && <span className="text-meta text-ink-3"> ({e.fields.join(", ")})</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 flex flex-wrap gap-4">
+                {activity.older && (
+                  <Link href={activity.older} scroll={false} className="text-sm font-medium text-sage-deep hover:underline">
+                    Older
+                  </Link>
+                )}
+                <Link href="/platform/company/activity" className="text-meta text-ink-2 hover:text-hema hover:underline">
+                  Company activity log
+                </Link>
+              </div>
             </>
           ))}
       </div>
