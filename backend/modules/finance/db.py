@@ -16,6 +16,14 @@ class Base(DeclarativeBase):
     pass
 
 
+
+def _count(name: str, default: int) -> int:
+    try:
+        return max(0, int(os.environ.get(name, default)))
+    except ValueError:
+        return default
+
+
 def make_engine(url: str, postgres_driver: str = "psycopg") -> Engine:
     if url.startswith("sqlite"):
         # The folder the database file lives in, made on first start.
@@ -52,7 +60,11 @@ def make_engine(url: str, postgres_driver: str = "psycopg") -> Engine:
         return create_engine(url, poolclass=NullPool, connect_args=connect_args)
     # With every pooled connection busy, a request waits at most 10 seconds for one,
     # then answers 503 (app/guard.py), rather than piling up behind the others.
-    engine = create_engine(url, connect_args=connect_args, pool_timeout=10)
+    # How many connections each database keeps (2026-11-19): the one backend opens a pool per module and per
+    # company's database, and Postgres allows about 100 in all, so each is kept small (3, up to 10 when busy);
+    # DB_POOL_SIZE and DB_MAX_OVERFLOW change it. Connections are renewed every half hour.
+    engine = create_engine(url, connect_args=connect_args, pool_timeout=10, pool_recycle=1800,
+                           pool_size=_count("DB_POOL_SIZE", 3), max_overflow=_count("DB_MAX_OVERFLOW", 7))
     ping_when_idle(engine)
     return engine
 

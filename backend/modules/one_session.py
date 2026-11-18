@@ -30,6 +30,7 @@ is False and the module takes only its own sessions and passes, as before.
 from __future__ import annotations
 
 import hashlib
+import os
 import threading
 import time
 from typing import Any
@@ -37,7 +38,12 @@ from typing import Any
 from modules import inprocess
 
 PATH = "/internal/session"
-TTL = 60  # seconds an answer is kept
+# Seconds an answer is kept (2026-11-19: 60 -> 15). Sign-out forgets it at once in this process; with several
+# worker processes the others keep it until it runs out, so it's short. ONE_SESSION_CACHE_SECONDS changes it.
+try:
+    TTL = max(0, int(os.environ.get("ONE_SESSION_CACHE_SECONDS", "15")))
+except ValueError:
+    TTL = 15
 ACCOUNT_PREFIX = "account:"  # a module's session row for an account token is kept under hash(ACCOUNT_PREFIX + token)
 MOST = 5000  # answers kept at most; the expired ones go first
 

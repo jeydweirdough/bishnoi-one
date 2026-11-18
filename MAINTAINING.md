@@ -70,7 +70,7 @@ to check, and the others run (`/health` lists which started).
 |---|---|
 | Build pack | Railpack (Nixpacks works too): Python with uv, from `pyproject.toml` / `uv.lock` |
 | Base directory | `backend` |
-| Start command | `uv run uvicorn main:app --host 0.0.0.0 --port 8300` |
+| Start command | `uv run uvicorn main:app --host 0.0.0.0 --port 8300 --workers 3 --limit-concurrency 200 --timeout-keep-alive 5` (see Keeping it up and safe under load) |
 | Ports Exposes | `8300` |
 | Domain | none: internal only, reached at its internal address (e.g. `http://10.0.1.1:8300`) |
 | Health check | `GET /health` |
@@ -104,6 +104,7 @@ setting for one module only is written with its prefix: `CRM_…`,
 |---|---|
 | `BACKEND_URL` | The backend's internal address, e.g. `http://10.0.1.1:8300`. |
 | `ONE_APP_URL` | `https://one.bishnoi.ai` |
+| `TRUST_FORWARDED_FOR` | `false` (only Cloudflare's CF-Connecting-IP is taken as the visitor's address) |
 
 Remove the old per-module addresses from the one app (`PLATFORM_API_URL`,
 `CRM_API_URL`, `INVENTORY_API_URL`, `FINANCE_API_URL`, `ADMIN_API_URL`,
@@ -112,6 +113,64 @@ Remove the old per-module addresses from the one app (`PLATFORM_API_URL`,
 **3. Check**: `GET <BACKEND_URL>/health` shows every module `true`; the one
 app's `/login` opens; signing in opens CRM, Inventory and Finance; in the CRM,
 Products shows Inventory's stock (the CRM → Inventory link).
+
+### Keeping it up and safe under load (2026-11-19)
+
+What the code does by itself, and what must be set on the server and in Cloudflare.
+
+**Built in** (every module, `backend/modules/<name>/guard.py`):
+
+- Requests per minute: 600 per signed-in person (120 changes), 120 per address before sign-in, 3000 per
+  address in all (one office behind one address), 20 sign-in tries per address. Wrong passwords also lock
+  the account for a while (counted in the database). Too many: 429 with how long to wait.
+- The visitor's address: the one app takes Cloudflare's `CF-Connecting-IP` (a visitor can't fake it) and
+  passes it on; the backend believes a forwarded address only from its own network (`TRUSTED_PROXIES`).
+- Requests over 12 MB refused while they arrive; a database not answering gives 503 in 10 seconds instead
+  of piling up; errors never show their insides. API docs are off in production.
+- The one app sends browser protections on every page (no framing by other sites, no type guessing,
+  camera and location only for this site, HTTPS only).
+- Each database pool is small (3 kept, up to 10 when busy: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`).
+
+**Backend start command, with several workers** (a 4-core server: 3 workers):
+
+    uv run uvicorn main:app --host 0.0.0.0 --port 8300 --workers 3 --limit-concurrency 200 --timeout-keep-alive 5
+
+Safe with several workers: migrations take a database lock (one migrates, the others wait), events are
+taken once, and a sign-out reaches every worker within 15 seconds (`ONE_SESSION_CACHE_SECONDS`). Each
+worker counts the request limits on its own, so the real limits are up to 3x those above: the edge limits
+in Cloudflare (below) are the firm ones.
+
+**Database connections**: every worker opens a pool per module and per company database. With 3 workers
+and two companies that can reach about 270 at the busiest, and PostgreSQL allows 100 unless told. Do one:
+
+- set on the backend `DB_POOL_SIZE=2` and `DB_MAX_OVERFLOW=4`, and in Coolify's PostgreSQL raise
+  `max_connections` to 200 (Postgres configuration, then restart the database); or
+- put PgBouncer (transaction mode) in front of PostgreSQL and point `DATABASE_URL` at it (the backend
+  already works behind a transaction pooler).
+
+**The one app**: set `TRUST_FORWARDED_FOR=false` once Cloudflare is in front (only `CF-Connecting-IP` is
+believed then). Start command unchanged (`npm run start`).
+
+**Cloudflare** (dashboard, zone bishnoi.ai):
+
+1. Security → Settings: Security level Medium; Browser integrity check on; Bot fight mode on.
+2. Security → WAF → Rate limiting rules: `URI path contains "/login"` and method POST, 10 requests per
+   minute per IP, block for 10 minutes; a second rule for everything on one.bishnoi.ai, 600 requests per
+   minute per IP, managed challenge.
+3. Security → WAF → Managed rules: Cloudflare managed ruleset on (free plan: the free managed ruleset).
+4. SSL/TLS: Full (strict) if the tunnel serves HTTPS, else Full; Always use HTTPS on; minimum TLS 1.2.
+5. When attacked: Security → Settings → "I'm under attack" mode (a check page for everyone until turned off).
+6. Make sure the server takes no traffic except through the tunnel: no port forwarded on the office router
+   to 80, 443, 8300, 4301 or 5432 (the tunnel connects out, it needs no open port).
+
+**Staying up**: a UPS on the server and the router; automatic database backups each night copied off the
+server, and a restore tried once a month; an uptime check on `https://one.bishnoi.ai/login` (Cloudflare
+health checks, UptimeRobot or similar) that alerts by email; later a second internet line, or a copy in
+the cloud.
+
+**Before go-live, measure** on a copy, never live: `scripts/load_test.py` (instructions at its top) with
+10, 50, 100 and 200 people. On this computer (SQLite, one process, 2026-11-19) 50 people gave no errors,
+a median of 40-70 ms and the slowest 1 in 20 at 1.3-1.7 s (CRM reports, quotes and deals the heaviest).
 
 ### Moving from eight applications to one (once)
 

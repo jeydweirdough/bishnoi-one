@@ -1,5 +1,6 @@
 "use server";
 
+import { clientAddressFrom } from "@/src/platform/lib/client-address";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AccountError, PLATFORM_API, accountCall, accountToken } from "@/src/platform/lib/account";
@@ -25,7 +26,7 @@ type Waiting = { twoStep: true; ticket: string };
 const onSite = (next: string) => (next.startsWith("/") && !next.startsWith("//") ? next : "/");
 
 async function forwardedFor(): Promise<string | null> {
-  return (await headers()).get("x-forwarded-for")?.split(",")[0].trim() || null;
+  return clientAddressFrom(await headers());
 }
 
 /** Each module's session, and where they were, dropped: they open again from the account. */

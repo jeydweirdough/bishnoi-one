@@ -36,11 +36,11 @@ def get_db(request: Request):
 
 
 def client_address(request: Request) -> str | None:
-    """Who is asking, as the screens' server reports it (it sits in front)."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()[:64] or None
-    return request.client.host if request.client else None
+    """Who is asking: as the screens' server reports it when it's our own (modules/platform/guard.py), else the connection."""
+    from modules.platform.guard import address_of
+
+    found = address_of(request)
+    return found[:64] if found and found != "?" else None
 
 
 def as_utc(moment: datetime) -> datetime:

@@ -16,6 +16,20 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingRoot: import.meta.dirname,
   poweredByHeader: false,
+  // Browser protections on every page (2026-11-19): not framed by another site (clickjacking), files not
+  // guessed into scripts, addresses not leaked to other sites, camera and location only for this site
+  // (field photos and route tracking), and HTTPS only once served over it (production).
+  async headers() {
+    const always = [
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "Content-Security-Policy", value: "frame-ancestors 'self'; base-uri 'self'; object-src 'none'" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(self), geolocation=(self), microphone=(), payment=(), usb=()" },
+    ];
+    const https = process.env.NODE_ENV === "production" ? [{ key: "Strict-Transport-Security", value: "max-age=15552000" }] : [];
+    return [{ source: "/:path*", headers: [...always, ...https] }];
+  },
   // Bishnoi One.exe runs the screens on each PC as a small server of their own
   // (its build sets BISHNOI_DESKTOP).
   ...(process.env.BISHNOI_DESKTOP ? { output: "standalone" as const } : {}),

@@ -29,7 +29,7 @@ def make_engine(url: str) -> Engine:
             cursor.close()
 
         return engine
-    engine = create_engine(url)
+    engine = create_engine(url, pool_size=2, max_overflow=3, pool_timeout=10, pool_recycle=1800)  # coming-soon module: little use
     _ping_when_idle(engine)
     return engine
 

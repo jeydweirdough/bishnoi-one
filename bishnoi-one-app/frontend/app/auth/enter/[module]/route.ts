@@ -1,3 +1,4 @@
+import { clientAddressFrom } from "@/src/platform/lib/client-address";
 import { NextResponse, type NextRequest } from "next/server";
 import { oneAppUrl } from "@/src/platform/lib/account";
 import { openModuleSession } from "@/src/platform/lib/module-session";
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return response;
   };
   if (!account) return toLogin();
-  const address = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
+  const address = clientAddressFrom(request.headers);
 
   const opened = await openModuleSession(m, account, oneAppUrl(request.headers, request.url), address);
   if (!opened.ok) return opened.signedOut ? toLogin() : home(opened.message);

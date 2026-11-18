@@ -1,3 +1,4 @@
+import { clientAddressFrom } from "@/src/platform/lib/client-address";
 import "server-only";
 import { sendToErrorPage } from "./fail";
 import { cookies, headers } from "next/headers";
@@ -45,14 +46,9 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Who is asking, for the API's per-address limits on sign-in. It's what the
- * reverse proxy in front of this server says; in production that proxy must
- * overwrite X-Forwarded-For, or a browser could claim any address.
- */
+/** Who is asking, for the API's per-address limits on sign-in (src/platform/lib/client-address.ts). */
 async function clientAddress(): Promise<string | null> {
-  const incoming = await headers();
-  return incoming.get("x-forwarded-for")?.split(",")[0].trim() || incoming.get("x-real-ip") || null;
+  return clientAddressFrom(await headers());
 }
 
 type Extra = Record<string, string>;

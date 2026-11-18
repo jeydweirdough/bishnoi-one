@@ -3,7 +3,13 @@
 - Every request gets a reference (X-Request-ID), so a person can quote it and
   the log line can be found.
 - Too many requests from one person (or one address, before sign-in) are
-  turned away with 429 and how long to wait, before any work is done.
+  turned away with 429 and how long to wait, before any work is done. Every
+  request also counts against its address, so made-up tokens don't escape the
+  limit, and signing in has a tighter limit of its own (password guessing).
+- The address is the connection's own, unless it comes from a proxy we trust
+  (this network: the one app, the host's proxy), whose X-Forwarded-For is then
+  taken; anyone else's X-Forwarded-For is ignored, so it can't be faked.
+- Calls between modules of the one backend (modules/inprocess.py) aren't counted.
 - A request bigger than the API takes is turned away with 413, counted as it
   arrives, so a huge upload can't fill the memory.
 - An error nobody planned for answers in plain words with its reference,
@@ -13,12 +19,15 @@
 
 Limits come from the environment, so a host can loosen or tighten them
 without a deploy: RATE_LIMIT_PER_MINUTE, RATE_LIMIT_WRITES_PER_MINUTE,
-RATE_LIMIT_ANONYMOUS_PER_MINUTE, MAX_REQUEST_MB.
+RATE_LIMIT_ANONYMOUS_PER_MINUTE, RATE_LIMIT_PER_ADDRESS_PER_MINUTE,
+RATE_LIMIT_SIGN_IN_PER_MINUTE, MAX_REQUEST_MB, TRUSTED_PROXIES (comma-separated
+addresses or networks; default loopback and private networks).
 
 The same file is in every app's API (app/guard.py).
 """
 
 import hashlib
+import ipaddress
 import logging
 import os
 import threading
@@ -35,6 +44,49 @@ log = logging.getLogger("bishnoi.guard")
 WRITES = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # Answered without counting: the host's checks, and the browser's preflight.
 FREE_PATHS = frozenset({"/health", "/"})
+# Signing in, its second step and password links: tighter, per address (password and code guessing).
+SIGN_IN_PATHS = frozenset({
+    "/identity/login", "/identity/login/code", "/identity/password/forgot", "/identity/password/link",
+    "/identity/password/set", "/identity/setup", "/auth/login", "/auth/platform",
+})
+
+
+def _networks(text: str) -> list:
+    out = []
+    for part in text.split(","):
+        part = part.strip()
+        if part:
+            try:
+                out.append(ipaddress.ip_network(part, strict=False))
+            except ValueError:
+                log.warning("TRUSTED_PROXIES: %r isn't an address or network; left out", part)
+    return out
+
+
+# Who may tell us the person's address: our own network (the one app and the host's proxy reach the
+# backend from here; the public never does). Set TRUSTED_PROXIES to narrow it.
+TRUSTED = _networks(os.environ.get("TRUSTED_PROXIES", "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"))
+
+
+def _trusted(host: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return host in ("testclient", "testserver")  # the test client has no address
+    return any(ip in n for n in TRUSTED)
+
+
+def address_of(request: Request) -> str:
+    """The person's address: the connection's own, or what a trusted proxy says it is."""
+    peer = request.client.host if request.client else "?"
+    if _trusted(peer):
+        forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        if forwarded:
+            try:
+                return str(ipaddress.ip_address(forwarded))
+            except ValueError:
+                pass
+    return peer
 
 
 def _number(name: str, default: int) -> int:
@@ -75,11 +127,8 @@ def _who(request: Request) -> tuple[str, bool]:
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer ") and len(auth) > 20:
         return "t:" + hashlib.sha256(auth[7:].encode()).hexdigest()[:24], True
-    # Behind a host's proxy (Vercel) the first forwarded address is the person's;
-    # the screens' server passes it on (src/platform/lib/api.ts).
-    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-    peer = request.client.host if request.client else "?"
-    return "a:" + (forwarded or peer), False
+    # The screens' server passes the person's address on (src/platform/lib/client-address.ts).
+    return "a:" + address_of(request), False
 
 
 def _reference(request: Request) -> str:
@@ -102,6 +151,9 @@ def install(app: FastAPI, name: str) -> None:
     per_minute = _number("RATE_LIMIT_PER_MINUTE", 600)
     writes_per_minute = _number("RATE_LIMIT_WRITES_PER_MINUTE", 120)
     anonymous_per_minute = _number("RATE_LIMIT_ANONYMOUS_PER_MINUTE", 120)
+    # One office behind one address: a hundred people working; a made-up token per request still stops here.
+    per_address = _number("RATE_LIMIT_PER_ADDRESS_PER_MINUTE", 3000)
+    sign_in_per_minute = _number("RATE_LIMIT_SIGN_IN_PER_MINUTE", 20)
     largest = _number("MAX_REQUEST_MB", 12) * 1024 * 1024
     window = Window()
 
@@ -142,10 +194,18 @@ def install(app: FastAPI, name: str) -> None:
                 await send(message)
 
             method = scope.get("method", "GET")
-            if method != "OPTIONS" and scope.get("path") not in FREE_PATHS:
+            path = scope.get("path")
+            # Another module of the one backend asking (in-process; outside requests never carry the mark).
+            internal = bool(scope.get("bishnoi.internal"))
+            if method != "OPTIONS" and path not in FREE_PATHS and not internal:
                 key, signed_in = _who(request)
+                where = "a:" + address_of(request)
                 now = time.monotonic()
                 wait = window.take(key, per_minute if signed_in else anonymous_per_minute, now)
+                if not wait and signed_in:
+                    wait = window.take(where + ":all", per_address, now)
+                if not wait and path in SIGN_IN_PATHS and method in WRITES:
+                    wait = window.take(where + ":sign-in", sign_in_per_minute, now)
                 if not wait and method in WRITES:
                     wait = window.take(key + ":w", writes_per_minute, now)
                 if wait:
@@ -176,4 +236,5 @@ def install(app: FastAPI, name: str) -> None:
                 await response(scope, receive, send)
 
     app.add_middleware(Guard)
-    log.info("%s: guard on (%s a minute signed in, %s writes, %s before sign-in; up to %s MB a request)", name, per_minute, writes_per_minute, anonymous_per_minute, largest // (1024 * 1024))
+    log.info("%s: guard on (%s a minute signed in, %s writes, %s before sign-in, %s per address, %s sign-ins; up to %s MB a request)",
+             name, per_minute, writes_per_minute, anonymous_per_minute, per_address, sign_in_per_minute, largest // (1024 * 1024))
