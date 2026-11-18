@@ -329,8 +329,8 @@ function ReportPaper({
             <div key={i}>
               <p className="text-[8pt]">{s.role}:</p>
               <div className="mt-9 border-b border-black" />
-              <p className="mt-1 font-semibold">{s.name || "00a0"}</p>
-              <p className="text-[8pt]">{s.title || "00a0"}</p>
+              <p className="mt-1 font-semibold">{s.name || " "}</p>
+              <p className="text-[8pt]">{s.title || " "}</p>
               <p className="mt-2 text-[8pt]">Date: ____________________</p>
             </div>
           ))}
