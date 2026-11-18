@@ -1,11 +1,7 @@
 import "server-only";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { accountSend, getAccount } from "@/src/platform/lib/account";
 import { ApiError, apiFor } from "@/src/platform/lib/api";
-import { enterSoftly } from "@/src/platform/lib/enter";
 import { moduleByAppKey, type ModuleDef, type ModuleKey } from "@/src/platform/lib/modules";
-import { moduleCookie } from "@/src/platform/lib/session-cookie";
 import type { ActivityEntry } from "./types";
 
 // The company's one activity log (2026-10-31): Bishnoi One's own (sign-ins, people, roles, the company) and each
@@ -48,7 +44,6 @@ export async function readLog({ sources, before, q, category, here, skip, person
   /** One employee's own entries only (2026-11-18, step 4F): each source reads just theirs, by its actor index. */
   person?: { id: string; email: string };
 }): Promise<{ entries: LogEntry[]; more: boolean; next: Record<string, string>; unavailable: string[] }> {
-  const jar = await cookies();
   const unavailable: string[] = [];
   const read = sources.map(async (s): Promise<{ key: string; items: LogEntry[]; more: boolean }> => {
     if (s.module === null) {
@@ -61,8 +56,6 @@ export async function readLog({ sources, before, q, category, here, skip, person
       unavailable.push(s.label);
       return { key: s.key, items: [], more: false };
     }
-    // Its session first, softly: if it can't be opened, the page comes back with it in `unavailable`.
-    if (!jar.get(moduleCookie(s.module.key))?.value) redirect(enterSoftly(s.module.key, here));
     try {
       const data = await apiFor(s.module.key as ModuleKey).get<{ items: AppItem[]; more: boolean }>(`/admin/audit?limit=${PAGE}${before[s.key] ? `&before=${before[s.key]}` : ""}${person ? `&person=${encodeURIComponent(person.email)}` : ""}`);
       const items = data.items.map((e) => ({

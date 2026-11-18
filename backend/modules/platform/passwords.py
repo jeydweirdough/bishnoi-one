@@ -35,3 +35,7 @@ def set_for(db: Session, email: str, hashed: str, now: datetime) -> None:
     staff = db.scalar(select(User).where(func.lower(User.email) == email.lower()))
     if staff is not None:
         staff.password_hash, staff.password_changed_at = hashed, now
+    # Every module asks the Platform again about account sessions (modules/one_session.py): the ended ones are refused.
+    from modules import one_session
+
+    one_session.forget_all()

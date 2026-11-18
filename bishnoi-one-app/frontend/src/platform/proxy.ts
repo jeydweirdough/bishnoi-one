@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { borrowedOf, isPublicPath, moduleOfPath, moduleByKey } from "./lib/modules";
-import { ACCOUNT_COOKIE, FRAME_HEADER, HERE_COOKIE, MODULE_HEADER, cookieOptions, moduleCookie } from "./lib/session-cookie";
+import { ACCOUNT_COOKIE, FRAME_HEADER, HERE_COOKIE, MODULE_HEADER, cookieOptions } from "./lib/session-cookie";
 import { siteUrl } from "./lib/site";
 
 // Where each app's old people pages went (the Admin Console).
@@ -46,7 +46,7 @@ const FINANCE_SETTINGS: Record<string, string> = {
 //    anyway; this only saves a page that would bounce);
 //  - a page of a module whose screens are here: the request is marked with
 //    that module (MODULE_HEADER, from the path only, so the browser can't pick
-//    another), and the module's session is opened on first use (app/auth/enter).
+//    another); every module takes the account's own session (M3), so nothing is opened on the way.
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   // OAuth codes must never enter login return URLs or the last-page cookie.
@@ -122,14 +122,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request: { headers } });
   }
 
-  // The frame's session first (its sidebar is drawn around the page), then the page's own. The Admin Console
-  // works on the account itself, so as a frame it needs no session of its own.
-  for (const m of frame && !frame.accountOnly ? [frame, here] : [here]) {
-    if (request.cookies.get(moduleCookie(m.key))?.value) continue;
-    const enter = siteUrl(`/auth/enter/${m.key}`, request);
-    enter.searchParams.set("next", next);
-    return NextResponse.redirect(enter);
-  }
+  // One sign-in (stage M3, 2026-11-18): every module takes the Bishnoi One account's session (src/platform/lib/api.ts),
+  // so no module session is opened on the way. A module that refuses it sends the page to app/auth/renew, which
+  // opens that module's own session (app/auth/enter) as the fallback.
   headers.set(MODULE_HEADER, here.key);
   if (frame) headers.set(FRAME_HEADER, frame.key);
   const response = NextResponse.next({ request: { headers } });

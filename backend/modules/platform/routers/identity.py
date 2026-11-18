@@ -33,6 +33,7 @@ from pydantic import Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from modules import inprocess, one_session
 from modules.platform.api import Api
 from modules.platform.access_roles import role_for_pass
 from modules.platform.org_push import placement
@@ -41,7 +42,7 @@ from modules.platform import document_chain, platform_admins, sign_in, signature
 from modules.platform.accounts import account_by_email, account_of, memberships, runs_company
 from modules.platform.deps import DB, Address, SettingsDep, as_utc, get_db
 from modules.platform.models import AccessRole, Account, Application, Company, User, CompanyApp, Identity, IdentityApp, IdentitySession
-from modules.platform.passes import ISSUER, PassUnavailable, issue, key_id, public_key
+from modules.platform.passes import ISSUER, PassUnavailable, issue, key_id, person_claims, public_key
 from modules.platform import passwords
 from modules.platform.security import DUMMY_HASH, MAX_PASSWORD, check_password_rules, hash_password, new_token, token_hash, verify_password
 
@@ -197,6 +198,7 @@ def login_code(body: CodeIn, db: DB, settings: SettingsDep, address: Address, re
 def logout(signed: Signed, db: DB) -> Response:
     record, person = signed
     record.revoked_at = datetime.now(UTC)
+    one_session.forget(record.token_hash)  # every module asks again, and is refused
     audit(db, person.email, "identity.signed_out", category="security", target=person.email, target_type="identity", target_id=person.id)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -306,6 +308,7 @@ def switch(body: SwitchIn, signed: Signed, db: DB, settings: SettingsDep, addres
     record, person = signed
     there = at_company(db, person, body.company)
     record.revoked_at = datetime.now(UTC)
+    one_session.forget(record.token_hash)
     response.headers["Cache-Control"] = "no-store"
     return open_session(db, settings, there, address, "identity.switched_company")
 
@@ -341,15 +344,9 @@ def check_return(app: Application, return_to: str, settings) -> str:
     raise HTTPException(status.HTTP_400_BAD_REQUEST, "That return address isn't one this application uses.")
 
 
-@router.post("/identity/pass")
-def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, address: Address, response: Response) -> dict:
-    _, person = signed
-    if body.company:
-        person = at_company(db, person, body.company)
-    app = db.scalar(select(Application).where(Application.key == body.app, Application.is_active))
-    if app is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such application.")
-    return_to = check_return(app, body.return_to, settings)
+def may_open(db: Session, settings, person: Identity, app: Application) -> tuple[Company, IdentityApp]:
+    """Their company and their grant on `app`, once they may open it now; else 403 saying why. The same
+    for a pass and for a module of the one backend asking about an account session (/internal/session)."""
     company = db.get(Company, person.company_id)
     if company is None or company.status != "active":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your company's Bishnoi One access is suspended. Ask your company's administrator.")
@@ -363,6 +360,44 @@ def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, addre
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Change the password you were given first: open Bishnoi One and choose your own.")
     if sign_in.needs_two_step(settings, holder, runs_company(db, person)):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Set up two-step sign-in first: open Bishnoi One, Your profile.")
+    return company, grant
+
+
+def from_a_module(request: Request) -> str:
+    """Only a module of the one backend, in-process (modules/inprocess.py): from outside there's nothing here."""
+    caller = inprocess.caller(request)
+    if caller is None or request.query_params.get("app") != caller:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+    return caller
+
+
+@router.get("/internal/session", include_in_schema=False)
+def internal_session(caller: Annotated[str, Depends(from_a_module)], signed: Signed, db: DB, settings: SettingsDep) -> dict:
+    """One sign-in (stage M3, 2026-11-18; modules/one_session.py): a module of the one backend asks who
+    an account session is, for itself only. The answer is what a pass for that module would say, and it
+    is refused as a pass would be (current_identity: ended, revoked, suspended, password changed;
+    may_open: the company or the person without the module, a password or two-step still owed)."""
+    record, person = signed
+    app = db.scalar(select(Application).where(Application.key == caller, Application.is_active))
+    if app is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This part isn't on Bishnoi One.")
+    company, grant = may_open(db, settings, person, app)
+    answer = person_claims(person, company, grant, role_for_pass(db, person, app), placement(db, person), company_admin=runs_company(db, person))
+    answer["signedInAt"] = as_utc(record.created_at).isoformat()
+    answer["expiresAt"] = as_utc(record.expires_at).isoformat()
+    return answer
+
+
+@router.post("/identity/pass")
+def make_pass(body: PassIn, signed: Signed, db: DB, settings: SettingsDep, address: Address, response: Response) -> dict:
+    _, person = signed
+    if body.company:
+        person = at_company(db, person, body.company)
+    app = db.scalar(select(Application).where(Application.key == body.app, Application.is_active))
+    if app is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such application.")
+    return_to = check_return(app, body.return_to, settings)
+    company, grant = may_open(db, settings, person, app)
     try:
         token = issue(settings, person, company, app, grant, role_for_pass(db, person, app), placement(db, person), company_admin=runs_company(db, person))
     except PassUnavailable as e:

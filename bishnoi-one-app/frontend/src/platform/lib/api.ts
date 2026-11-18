@@ -61,17 +61,20 @@ async function send(method: string, path: string, body?: unknown, extra: Extra =
   const [jar, address, here] = await Promise.all([cookies(), clientAddress(), named ? Promise.resolve(named) : currentModule()]);
   if (!here) throw new ApiError(500, "This page isn't part of a module, so there's no API to ask.");
   const API_URL = await moduleApi(here);
-  // A module on the Bishnoi One account itself (the Admin Console) asks with the account's own sign-in.
-  const token = jar.get(here.accountOnly ? ACCOUNT_COOKIE : moduleCookie(here.key))?.value;
-  // Before signing in, which company: the one last signed in to here. Signed
-  // in, the token says (it starts with the company), so nothing is added.
-  const company = token ? undefined : jar.get(COMPANY_COOKIE)?.value;
+  // One sign-in (stage M3, 2026-11-18): every module of the one backend takes the Bishnoi One account's own
+  // session (it asks the Platform who it is, backend/modules/one_session.py), so the account token goes to
+  // every module. A module's own session (its cookie, opened by app/auth/enter) is only the fallback, for a
+  // module that refuses the account token as ended (a backend not yet upgraded); never kept otherwise.
+  const account = jar.get(ACCOUNT_COOKIE)?.value;
+  const own = here.accountOnly ? undefined : jar.get(moduleCookie(here.key))?.value;
   // An administrator viewing this module as someone: every request answered as them, read-only (src/one/view-as.tsx).
   const viewAs = here.accountOnly ? undefined : jar.get(viewAsCookie(here.key))?.value?.split("|")[0];
   // FormData (a file upload) sets its own multipart Content-Type; everything else is JSON.
   const form = body instanceof FormData;
-  try {
-    return await fetch(`${API_URL}${path}`, {
+  const ask = (token: string | undefined) => {
+    // Before signing in, which company: the one last signed in to here. Signed in, the token says, so nothing is added.
+    const company = token ? undefined : jar.get(COMPANY_COOKIE)?.value;
+    return fetch(`${API_URL}${path}`, {
       method,
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -84,6 +87,13 @@ async function send(method: string, path: string, body?: unknown, extra: Extra =
       body: body === undefined ? undefined : form ? body : JSON.stringify(body),
       cache: "no-store",
     });
+  };
+  try {
+    const first = await ask(account ?? own);
+    // A 401 is answered before anything is done, so asking again with the module's own session is safe for saves too.
+    if (first.status !== 401 || !account || !own || own === account) return first;
+    await first.body?.cancel();
+    return await ask(own);
   } catch {
     throw new ApiError(503, "Can't reach the server just now. Try again in a moment.");
   }

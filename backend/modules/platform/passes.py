@@ -110,6 +110,29 @@ def sign(settings: Settings, claims: dict) -> str:
     return f"{signing_input}.{b64url(signing_key(settings).sign(signing_input.encode()))}"
 
 
+def person_claims(identity: Identity, company: Company, grant: IdentityApp, role: dict | None = None, org: dict | None = None,
+                  company_admin: bool | None = None) -> dict:
+    """Who the person is to one application: what a pass says about them, and what the Platform answers a
+    module of the one backend asking about an account session (routers/internal_session.py)."""
+    claims = {
+        "sub": identity.id,
+        "email": identity.email,
+        "name": identity.full_name,
+        "company": company.id,
+        "companySlug": company.slug,
+        "companyName": company.name,
+        "role": role["name"] if role else grant.role,
+        "appAdmin": grant.is_app_admin or bool(role and role.get("admin")),
+        "companyAdmin": identity.is_company_admin if company_admin is None else company_admin,
+    }
+    if org:
+        claims["org"] = org
+    if role:
+        # The role itself, so the application keeps it as the platform has it before matching it by name.
+        claims["roleDef"] = role
+    return claims
+
+
 def issue(settings: Settings, identity: Identity, company: Company, app: Application, grant: IdentityApp, role: dict | None = None, org: dict | None = None,
           company_admin: bool | None = None) -> str:
     """`role`: their one role at the company, as this application keeps it
@@ -120,24 +143,11 @@ def issue(settings: Settings, identity: Identity, company: Company, app: Applica
     claims = {
         "iss": ISSUER,
         "aud": app.key,
-        "sub": identity.id,
-        "email": identity.email,
-        "name": identity.full_name,
-        "company": company.id,
-        "companySlug": company.slug,
-        "companyName": company.name,
-        "role": role["name"] if role else grant.role,
-        "appAdmin": grant.is_app_admin or bool(role and role.get("admin")),
-        "companyAdmin": identity.is_company_admin if company_admin is None else company_admin,
+        **person_claims(identity, company, grant, role, org, company_admin),
         "iat": now,
         "exp": now + LIFETIME,
         "jti": secrets.token_urlsafe(18),
     }
-    if org:
-        claims["org"] = org
-    if role:
-        # The role itself, so the application keeps it as the platform has it before matching it by name.
-        claims["roleDef"] = role
     signing_input = f"{b64url(json.dumps(header, separators=(',', ':')).encode())}.{b64url(json.dumps(claims, separators=(',', ':')).encode())}"
     signature = signing_key(settings).sign(signing_input.encode())
     return f"{signing_input}.{b64url(signature)}"

@@ -14,6 +14,7 @@ import time
 from collections import defaultdict, deque
 from datetime import UTC, datetime, timedelta
 
+from modules import one_session
 from fastapi import Depends, APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -146,16 +147,11 @@ def sign_in_with_platform(body: PlatformIn, request: Request, response: Response
         return _open_platform_session(db, base, tenant.slug, claims, response)
 
 
-def _open_platform_session(db, settings: Settings, slug: str, claims: dict, response: Response) -> dict:
-    now = datetime.now(UTC)
-    db.execute(delete(PlatformPass).where(PlatformPass.expires_at < now))
-    db.add(PlatformPass(jti=str(claims["jti"])[:64], expires_at=platform_pass.expires(claims)))
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link was already used. Sign in again from the start.") from None
-
+def user_from_claims(db, claims: dict, now: datetime) -> User:
+    """The person a pass (or, in the one backend, the Platform's answer about an account session,
+    modules/one_session.py) is about: found by their Bishnoi One account, or by email the first time,
+    added with their role from the Platform when new, and brought in step (name, email, role, place on the org chart).
+    Refuses someone switched off here, or whose role isn't set up here."""
     email = str(claims["email"]).strip().lower()
     # Their role as the Platform keeps it (app/platform_roles.py), kept here before it is matched by name.
     if isinstance(claims.get("roleDef"), dict):
@@ -207,6 +203,29 @@ def _open_platform_session(db, settings: Settings, slug: str, claims: dict, resp
 
     # Where they sit on the company's org chart, as the Platform keeps it (app/platform_org.py).
     platform_org.follow_pass(db, user, claims)
+    return user
+
+
+def account_session(db, token: str, found: dict, fresh: bool) -> SignInSession:
+    """One sign-in (stage M3, modules/one_session.py): the session row kept here for a Bishnoi One
+    account token the Platform vouches for, the person found or added as a pass would."""
+
+    def opened(user: User) -> None:
+        audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id, fields=["with a Bishnoi One account"])
+
+    return one_session.session_row(db, SignInSession, token, found, fresh, lambda now: user_from_claims(db, found, now), opened)
+
+
+def _open_platform_session(db, settings: Settings, slug: str, claims: dict, response: Response) -> dict:
+    now = datetime.now(UTC)
+    db.execute(delete(PlatformPass).where(PlatformPass.expires_at < now))
+    db.add(PlatformPass(jti=str(claims["jti"])[:64], expires_at=platform_pass.expires(claims)))
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link was already used. Sign in again from the start.") from None
+    user = user_from_claims(db, claims, now)
     token = f"{slug}.{new_token()}"
     expires_in = settings.session_hours * 3600
     db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))

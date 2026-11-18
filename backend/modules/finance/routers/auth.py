@@ -10,6 +10,7 @@ import time
 from collections import defaultdict, deque
 from datetime import UTC, datetime, timedelta
 
+from modules import one_session
 from fastapi import Depends, APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -127,29 +128,11 @@ def role_from(db: DB, claims: dict) -> Role:
     return found or db.scalar(select(Role).where(Role.name == FINANCE_STAFF))
 
 
-@router.post("/platform")
-def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, response: Response) -> dict:
-    """Takes a pass from the platform (app/platform_pass.py) and opens a session
-    here, as /auth/login does. The person is found by their Bishnoi One account, or
-    by email the first time; someone new is added. Their role comes from the
-    platform every time (see role_from), and nobody is turned away for a role
-    this app doesn't have. The platform decides who may open this application;
-    this only refuses someone switched off here."""
-    try:
-        claims = platform_pass.check_for(settings, body.token, APP_KEY)
-    except platform_pass.PassRefused as e:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from None
-    if claims.get("kind") is not None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This pass is not a sign-in pass.")
-    now = datetime.now(UTC)
-    db.execute(delete(PlatformPass).where(PlatformPass.expires_at < now))
-    db.add(PlatformPass(jti=str(claims["jti"])[:64], expires_at=platform_pass.expires(claims)))
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link was already used. Sign in again from the start.") from None
-
+def user_from_claims(db, claims: dict, now: datetime) -> User:
+    """The person a pass (or, in the one backend, the Platform's answer about an account session,
+    modules/one_session.py) is about: found by their Bishnoi One account, or by email the first time,
+    added with their role from the Platform when new, and brought in step (name, email, role).
+    Refuses someone switched off here."""
     email = str(claims["email"]).strip().lower()
     # Their role as the Platform keeps it (app/platform_roles.py), kept here before it is matched by name.
     if isinstance(claims.get("roleDef"), dict):
@@ -195,7 +178,45 @@ def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, respo
             changed.append("role")
         if changed:
             audit(db, email, "user.updated", target=email, target_type="user", target_id=user.id, fields=changed)
+    return user
 
+
+def account_session(db, settings, token: str, found: dict, fresh: bool) -> SignInSession:
+    """One sign-in (stage M3, modules/one_session.py): the session row kept here for a Bishnoi One
+    account token the Platform vouches for, the person found or added as a pass would."""
+
+    def opened(user: User) -> None:
+        audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id, fields=["with a Bishnoi One account"])
+
+    row = one_session.session_row(db, SignInSession, token, found, fresh, lambda now: user_from_claims(db, found, now), opened)
+    if fresh:
+        business_events.remember_company(settings, found.get("companySlug"))
+    return row
+
+
+@router.post("/platform")
+def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, response: Response) -> dict:
+    """Takes a pass from the platform (app/platform_pass.py) and opens a session
+    here, as /auth/login does. The person is found by their Bishnoi One account, or
+    by email the first time; someone new is added. Their role comes from the
+    platform every time (see role_from), and nobody is turned away for a role
+    this app doesn't have. The platform decides who may open this application;
+    this only refuses someone switched off here."""
+    try:
+        claims = platform_pass.check_for(settings, body.token, APP_KEY)
+    except platform_pass.PassRefused as e:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from None
+    if claims.get("kind") is not None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This pass is not a sign-in pass.")
+    now = datetime.now(UTC)
+    db.execute(delete(PlatformPass).where(PlatformPass.expires_at < now))
+    db.add(PlatformPass(jti=str(claims["jti"])[:64], expires_at=platform_pass.expires(claims)))
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link was already used. Sign in again from the start.") from None
+    user = user_from_claims(db, claims, now)
     token = new_token()
     expires_in = settings.session_hours * 3600
     db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))

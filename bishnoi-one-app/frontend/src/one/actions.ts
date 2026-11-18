@@ -5,12 +5,11 @@ import { redirect } from "next/navigation";
 import { AccountError, PLATFORM_API, accountCall, accountToken } from "@/src/platform/lib/account";
 import { MODULES } from "@/src/platform/lib/modules";
 import { ACCOUNT_COOKIE, HERE_COOKIE, cookieOptions, moduleCookie, viewAsCookie } from "@/src/platform/lib/session-cookie";
-import { openEveryPart } from "@/src/platform/lib/module-session";
-import { siteOrigin } from "@/src/platform/lib/site";
 
 // Signing in to the one app with the Bishnoi One account, signing out, and
-// moving to another company. One person per browser: a new sign-in (or a new
-// company) drops every module's session and opens each again as them, all at once (M3, 2026-11-18).
+// moving to another company. One person per browser, one session (M3, 2026-11-18): every module takes
+// the Bishnoi One account's own session (src/platform/lib/api.ts), so nothing else is opened; a new
+// sign-in (or a new company) drops any module session and view-as kept from before.
 
 // After signing in, the browser itself goes on (`go`), not a server redirect: the
 // next page may be a module's, whose session is opened by a redirect that sets a
@@ -27,12 +26,6 @@ const onSite = (next: string) => (next.startsWith("/") && !next.startsWith("//")
 
 async function forwardedFor(): Promise<string | null> {
   return (await headers()).get("x-forwarded-for")?.split(",")[0].trim() || null;
-}
-
-/** One sign-in (M3, 2026-11-18): every part this person may open, opened at once with the new account session. */
-async function openParts(account: string): Promise<void> {
-  const h = await headers();
-  await openEveryPart(account, siteOrigin(h, `http://${h.get("host") ?? "localhost:4301"}`), await forwardedFor());
 }
 
 /** Each module's session, and where they were, dropped: they open again from the account. */
@@ -64,9 +57,8 @@ export async function signIn(_previous: SignInState, form: FormData): Promise<Si
 async function opened(session: Session, next: string): Promise<SignInState> {
   await dropModuleSessions();
   (await cookies()).set(ACCOUNT_COOKIE, session.accessToken, cookieOptions(session.expiresIn));
-  // A handed-over password or a missing two-step first: no part opens until then (the Platform refuses passes).
+  // A handed-over password or a missing two-step first: no part opens until then (the Platform refuses them).
   if (session.mustChangePassword || session.needsTwoStep) return { go: `/login/first?next=${encodeURIComponent(next)}&offer=1` };
-  await openParts(session.accessToken);
   if (session.offerTwoStep) return { go: `/login/first?next=${encodeURIComponent(next)}&offer=1` };
   return { go: next };
 }
@@ -155,7 +147,6 @@ export async function switchCompany(form: FormData): Promise<void> {
   }
   await dropModuleSessions();
   (await cookies()).set(ACCOUNT_COOKIE, session.accessToken, cookieOptions(session.expiresIn));
-  await openParts(session.accessToken);
   redirect("/");
 }
 
@@ -205,7 +196,6 @@ export async function setUp(_previous: SetUpState, form: FormData): Promise<SetU
     const session = await accountCall<Session>("/identity/login", { email: values.email, password }, null, await forwardedFor());
     await dropModuleSessions();
     (await cookies()).set(ACCOUNT_COOKIE, session.accessToken, cookieOptions(session.expiresIn));
-    await openParts(session.accessToken);
   } catch {
     return { go: "/login" };
   }
