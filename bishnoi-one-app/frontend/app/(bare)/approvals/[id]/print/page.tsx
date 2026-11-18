@@ -79,7 +79,7 @@ export default async function ApprovalSlipPrint({ params }: { params: Promise<{ 
                   <td className={`${td} tabular-nums`}>{i + 1}</td>
                   <td className={td}>{l.name}</td>
                   <td className={`${td} text-right tabular-nums`}>{fmt.count(l.quantity)}{l.freeQuantity ? ` + ${fmt.count(l.freeQuantity)} free` : ""}{l.soldAs ? ` (${l.soldAs})` : ""}</td>
-                  <td className={`${td} text-right tabular-nums`}>{fmt.peso(l.totalCentavos)}</td>
+                  <td className={`${td} text-right tabular-nums`}>{l.totalCentavos ? fmt.peso(l.totalCentavos) : "—"}</td>
                 </tr>
               ))}
             </tbody>

@@ -203,7 +203,7 @@ def list_adjustments(
 
 
 @router.post("/adjustments", status_code=status.HTTP_201_CREATED)
-def create_adjustment(access: CurrentAccess, _: allowed("adjustments.create"), me: CurrentUser, db: DB, body: AdjustmentIn) -> dict:
+def create_adjustment(access: CurrentAccess, _: allowed("adjustments.create"), me: CurrentUser, db: DB, body: AdjustmentIn, request: Request) -> dict:
     warehouse = db.get(Warehouse, body.warehouse_id)
     if warehouse is None or not warehouse.is_active:
         raise field_error("warehouseId", "Pick a warehouse that's switched on.")
@@ -215,6 +215,9 @@ def create_adjustment(access: CurrentAccess, _: allowed("adjustments.create"), m
     # An approver's own adjustment needs nobody else: it's posted now.
     if access.can("adjustments.approve"):
         post_adjustment(db, me, a)
+    else:
+        # Step 4C: waiting adjustments go on an approval slip, signed up the requester's chart.
+        ask_for_approval(db, request, me, a)
     audit(db, me, "adjustment.posted" if a.status == "posted" else "adjustment.submitted", target=a.number, target_type="adjustment", target_id=a.id)
     db.commit()
     return {"id": a.id, "number": a.number, "status": a.status}
@@ -225,11 +228,76 @@ def read_adjustment(_: allowed("adjustments.view"), db: DB, settings: SettingsDe
     return adjustment_out(found(db, Adjustment, adjustment_id, "adjustment"), settings.expiry_warning_days)
 
 
+# ---- The approval slip (Step 4C, 2026-11-18) ---------------------------------------------------
+# A waiting adjustment asks the Platform for a slip (approval.requested, kind "adjustment"); the slip's end comes back
+# as approval.decided: posted as the last signer, or rejected with the note. While connected, only an administrator
+# decides one here, and its slip is withdrawn.
+
+
+def on_slip(request: Request) -> bool:
+    return bool(getattr(request.app.state.settings, "platform_api_url", None))
+
+
+def ask_for_approval(db: DB, request: Request, me: User, a: Adjustment) -> None:
+    db.flush()
+    lines = []
+    for line in a.lines[:30]:
+        product = db.get(Product, line.product_id)
+        lines.append({"name": product.name if product else "", "quantity": line.quantity, "totalCentavos": 0, "soldAs": None})
+    business_events.emit(db, getattr(request.state, "company", None), "approval.requested", {
+        "kind": "adjustment", "id": a.id, "number": a.number, "title": f"Inventory adjustment {a.number}: {REASON_LABELS[a.reason].lower()}",
+        "url": f"/inventory/adjustments/{a.id}",
+        "requester": {"identityId": me.platform_identity_id, "email": me.email, "name": me.full_name},
+        "summary": {"warehouse": a.warehouse.name if a.warehouse else None, "lines": lines, "moreLines": max(0, len(a.lines) - len(lines)),
+                    "notes": a.notes, "reason": REASON_LABELS[a.reason]},
+        "attachments": [],
+    })
+
+
+def decided_here(request: Request, db: DB, me: User, a: Adjustment, what: str) -> None:
+    if not on_slip(request):
+        return
+    if not me.role.is_system:
+        raise conflict(f"This adjustment is {what} on its approval slip: open Approvals, or the slip on this adjustment.")
+    business_events.emit(db, getattr(request.state, "company", None), "approval.withdrawn",
+                         {"kind": "adjustment", "id": a.id, "reason": f"Decided in Inventory by {me.full_name} (administrator).", "by": me.email})
+
+
+def decided_on_slip(db, data: dict, slug: str | None) -> None:
+    """The slip's end: posted as its last signer (or, if the stock moved meanwhile, rejected saying why), or rejected."""
+    from fastapi import HTTPException
+
+    from modules.inventory.sales import _signer
+
+    a = db.get(Adjustment, str(data.get("id") or ""))
+    if a is None or a.status != "pending":
+        return
+    signer = _signer(db, data.get("by") or {})
+    actor = signer if isinstance(signer, User) else signer.email
+    slip = str((data.get("approval") or {}).get("number") or "")
+    if data.get("decision") == "approved":
+        try:
+            with db.begin_nested():
+                post_adjustment(db, signer, a)
+            audit(db, actor, "adjustment.approved", target=a.number, target_type="adjustment", target_id=a.id, fields=[slip])
+            return
+        except HTTPException as e:
+            why = f"Approved on {slip}, but it couldn't be posted: {e.detail}"
+    elif data.get("decision") == "returned":
+        why = f"Returned on {slip}: {data.get('note') or ''}".strip()
+    else:
+        return
+    a.status, a.decided_by_id, a.decided_at = "rejected", signer.id, datetime.now(UTC)
+    a.notes = ((a.notes + "\n") if a.notes else "") + why[:480]
+    audit(db, actor, "adjustment.rejected", target=a.number, target_type="adjustment", target_id=a.id, fields=[slip])
+
+
 @router.post("/adjustments/{adjustment_id}/approve")
-def approve_adjustment(_: allowed("adjustments.approve"), me: CurrentUser, db: DB, adjustment_id: str) -> dict:
+def approve_adjustment(_: allowed("adjustments.approve"), me: CurrentUser, db: DB, adjustment_id: str, request: Request) -> dict:
     a = found(db, Adjustment, adjustment_id, "adjustment")
     if a.status != "pending":
         raise conflict(f"This adjustment is already {a.status}.")
+    decided_here(request, db, me, a, "approved")
     post_adjustment(db, me, a)
     audit(db, me, "adjustment.approved", target=a.number, target_type="adjustment", target_id=a.id)
     db.commit()
@@ -237,10 +305,11 @@ def approve_adjustment(_: allowed("adjustments.approve"), me: CurrentUser, db: D
 
 
 @router.post("/adjustments/{adjustment_id}/reject")
-def reject_adjustment(_: allowed("adjustments.approve"), me: CurrentUser, db: DB, adjustment_id: str) -> dict:
+def reject_adjustment(_: allowed("adjustments.approve"), me: CurrentUser, db: DB, adjustment_id: str, request: Request) -> dict:
     a = found(db, Adjustment, adjustment_id, "adjustment")
     if a.status != "pending":
         raise conflict(f"This adjustment is already {a.status}.")
+    decided_here(request, db, me, a, "returned")
     a.status, a.decided_by_id, a.decided_at = "rejected", me.id, datetime.now(UTC)
     audit(db, me, "adjustment.rejected", target=a.number, target_type="adjustment", target_id=a.id)
     db.commit()

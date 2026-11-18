@@ -26,6 +26,7 @@ from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from modules.crm import quote_slips
 from modules.crm import clidp
 from modules.crm.access import Access, require
 from modules.crm.api import Api, iso, not_found, person_out
@@ -445,6 +446,10 @@ def save_quote(
         # Kept in the database, with the quote: saved together or not at all.
         db.add(StoredFile(ref=stored["ref"], content_type=stored["contentType"], data=data))
     audit(db, me, "quote.created", target=record.number, target_type="quote", target_id=record.id)
+    if record.approval_status == "pending" and not finance_decides(record) and quote_slips.connected(settings):
+        # Step 4C: a quote waiting for its team lead goes on an approval slip, signed up the rep's chart. A quote at a
+        # requested price stays Finance's to decide, as before (no slip).
+        quote_slips.ask(db, settings, record, me)
     if deal is not None:  # the chain (step 9): the deal, then its quotes
         business_events.link(db, getattr(settings, "company", None), business_events.ref("deal", deal.id, deal.name[:60]),
                              business_events.ref("quote", record.id, record.number))
@@ -821,6 +826,11 @@ def decide_approval(access: Approve, me: CurrentUser, db: DB, settings: Settings
     decided(body)
     if finance_decides(quote):
         raise HTTPException(status.HTTP_409_CONFLICT, "This quote is at a requested price: Finance approves it, in Bishnoi One Finance.")
+    if quote_slips.connected(settings):
+        # Step 4C: approved on its slip; an administrator may still decide here, and the slip is withdrawn.
+        if not access.administrator:
+            raise HTTPException(status.HTTP_409_CONFLICT, "This quote is approved on its approval slip: open Approvals, or the slip on this quote.")
+        quote_slips.withdraw(db, settings, quote, f"Decided in the CRM by {me.full_name} (administrator).", me.email)
     apply_decision(quote, body, by_id=me.id, by_name=me.full_name)
     audit(db, me, f"quote.{quote.approval_status}", target=quote.number, target_type="quote", target_id=quote.id)
     db.commit()

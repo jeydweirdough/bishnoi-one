@@ -27,7 +27,7 @@ from modules.platform.routers.identity import Signed
 router = APIRouter(prefix="/identity/approvals", tags=["approvals"])
 
 STATUS_LABELS = {"pending": "Waiting", "approved": "Approved", "returned": "Returned", "cancelled": "Cancelled"}
-KIND_LABELS = {"sales_order": "Sales order", "price_change": "Price change"}
+KIND_LABELS = {"sales_order": "Sales order", "price_change": "Price change", "adjustment": "Inventory adjustment", "quote": "Quote"}
 
 
 def _refused(e: approvals.Refused) -> HTTPException:

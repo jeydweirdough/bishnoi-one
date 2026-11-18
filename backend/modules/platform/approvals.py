@@ -38,7 +38,9 @@ from modules.platform.models import (AccessRole, AccessRolePermission, Applicati
 MAX_MANAGERS = 2
 # What each kind's group step is, when the requester has nobody above them on the chart.
 FALLBACK = {("inventory", "sales_order"): ("Sales approver", "inventory", "sales.approve"),
-            ("crm", "price_change"): ("Price approver", "crm", "products.approve")}
+            ("crm", "price_change"): ("Price approver", "crm", "products.approve"),
+            ("inventory", "adjustment"): ("Adjustment approver", "inventory", "adjustments.approve"),
+            ("crm", "quote"): ("Quote approver", "crm", "quotes.approve")}
 FILE_TYPES = {b"%PDF": "application/pdf", b"\x89PNG": "image/png", b"\xff\xd8\xff": "image/jpeg"}
 MAX_FILE_BYTES, MAX_FILES = 5_000_000, 20
 

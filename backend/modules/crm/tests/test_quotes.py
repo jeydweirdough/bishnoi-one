@@ -351,3 +351,42 @@ def test_a_requested_price_goes_to_finance_not_the_team_lead(app, client, crew, 
     assert client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=lou).status_code == 404  # still out of another team's reach
     r = client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=crew["lia"])
     assert r.status_code == 409 and "Finance" in r.text
+
+
+def test_on_bishnoi_one_a_quote_for_its_team_lead_goes_on_a_slip(app, client, crew, ids, monkeypatch):
+    """Step 4C: connected, a quote waiting for its team lead opens a slip; the slip's end decides it; only an
+    administrator decides it here, withdrawing the slip. A quote at a requested price stays Finance's (no slip)."""
+    from sqlalchemy import select
+
+    from modules.crm import business_events
+    from modules.crm.business_events import OutboxEvent
+    from modules.crm.tests.test_platform_roles import database, note
+    from modules.crm.tests.test_platform_sign_in import PUBLIC
+
+    acme = company(client, crew["ria"])
+    monkeypatch.setitem(business_events._state, "settings", None)  # nothing sent on a thread
+    from modules.crm import quote_slips
+
+    monkeypatch.setattr(quote_slips, "connected", lambda settings: True)
+    app.state.settings.platform_public_key = PUBLIC
+
+    def asked() -> list[dict]:
+        with database(app)() as db:
+            return [e.data for e in db.scalars(select(OutboxEvent).where(OutboxEvent.kind == "approval.requested").order_by(OutboxEvent.occurred_at))]
+
+    q = save(client, crew["ria"], acme, [line(ids["ORS-SACH"], 1, discount={"kind": "percent", "value": 1500})]).json()
+    assert q["approval"]["status"] == "pending"
+    [slip] = asked()
+    assert slip["kind"] == "quote" and slip["id"] == q["id"] and slip["attachments"][0]["url"] == f"/crm/quotes/{q['id']}"
+    r = client.post(f"/quotes/{q['id']}/approval", json={"decision": "approve"}, headers=crew["lia"])
+    assert r.status_code == 409 and "approval slip" in r.text
+    event = {"id": "ev-quote-slip-1", "kind": "approval.decided", "source": "platform", "occurredAt": "2026-11-18T00:00:00+00:00", "data": {
+        "app": "crm", "kind": "quote", "id": q["id"], "number": q["number"], "approval": {"id": "a-1", "number": "AR-000003"},
+        "decision": "approved", "note": None, "by": {"identityId": None, "email": "lia@example.com", "name": "Lia"}}}
+    assert client.post("/platform/events", json={"pass": note("event", event=event)}).status_code == 204
+    got = client.get(f"/quotes/{q['id']}", headers=crew["ria"]).json()
+    assert got["approval"]["status"] == "approved"
+
+    # A requested price is Finance's: no slip.
+    save(client, crew["ria"], acme, [line(ids["AMX-500"], 1, unitPriceCentavos=100000)], price_type="SPECIAL", notes="Hospital tender")
+    assert len(asked()) == 1

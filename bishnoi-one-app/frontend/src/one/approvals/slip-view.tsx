@@ -163,7 +163,7 @@ export function SlipSummary({ slip }: { slip: SlipBrief }) {
                   {l.freeQuantity ? ` + ${fmt.count(l.freeQuantity)} free` : ""}
                   {l.soldAs && <span className="block text-meta text-ink-3">{l.soldAs}</span>}
                 </td>
-                <td className="py-1 text-right tabular-nums">{fmt.peso(l.totalCentavos)}</td>
+                <td className="py-1 text-right tabular-nums">{l.totalCentavos ? fmt.peso(l.totalCentavos) : "—"}</td>
               </tr>
             ))}
           </tbody>

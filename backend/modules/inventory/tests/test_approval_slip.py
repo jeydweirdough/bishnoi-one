@@ -91,3 +91,38 @@ def test_an_order_from_a_quote_carries_its_quote_rx_and_letter(app, client, ana,
     assert asked["attachments"][0]["url"] == "/crm/quotes/q-7"
     with database(app)() as db:
         assert db.scalar(select(SalesOrder.status).where(SalesOrder.quote_id == "q-7")) == "pending"
+
+
+def test_a_waiting_adjustment_goes_on_a_slip_and_is_posted_as_its_signer(app, client, people, ana, world, linked, monkeypatch):  # noqa: F811
+    from modules.inventory.routers import adjustments
+
+    wes = Api(client, people["wes"])
+    receive(ana, world["mnl"], [{"productId": world["gloves"], "quantity": 10}])
+    a = wes.post("/inventory/adjustments", {"warehouseId": world["mnl"], "reason": "lost", "notes": "Shelf short", "lines": [{"productId": world["gloves"], "quantity": 3}]})
+    assert a["status"] == "pending"
+    [asked] = outbox(app, "approval.requested")
+    assert asked["kind"] == "adjustment" and asked["id"] == a["id"] and asked["url"] == f"/inventory/adjustments/{a['id']}"
+    assert asked["requester"]["email"] == "wes@example.com" and asked["summary"]["lines"][0]["name"] == "Gloves M"
+
+    # While connected, only an administrator decides it here (and its slip is withdrawn).
+    monkeypatch.setattr(adjustments, "on_slip", lambda request: True)
+    with database(app)() as db:
+        role = db.scalar(select(Role).where(Role.name == "Purchasing"))
+        for permission in {"adjustments.approve", "adjustments.view"} - role.permissions:
+            db.add(RolePermission(role_id=role.id, permission=permission))
+        db.commit()
+    assert client.post(f"/inventory/adjustments/{a['id']}/approve", headers=people["pia"]).status_code == 409
+
+    event = {"id": "ev-adj-1", "kind": "approval.decided", "source": "platform", "occurredAt": "2026-11-18T00:00:00+00:00", "data": {
+        "app": "inventory", "kind": "adjustment", "id": a["id"], "number": a["number"], "approval": {"id": "a-2", "number": "AR-000002"},
+        "decision": "approved", "note": None, "by": {"identityId": None, "email": "pia@example.com", "name": "Pia"}}}
+    assert client.post("/platform/events", json={"pass": note("event", event=event)}).status_code == 204
+    got = ana.get(f"/inventory/adjustments/{a['id']}")
+    assert got["status"] == "posted"
+
+    other = wes.post("/inventory/adjustments", {"warehouseId": world["mnl"], "reason": "lost", "lines": [{"productId": world["gloves"], "quantity": 1}]})
+    event = {**event, "id": "ev-adj-2", "data": {**event["data"], "id": other["id"], "decision": "returned", "note": "Count again first"}}
+    assert client.post("/platform/events", json={"pass": note("event", event=event)}).status_code == 204
+    back = ana.get(f"/inventory/adjustments/{other['id']}")
+    assert back["status"] == "rejected" and "Count again first" in back["notes"]
+    assert ana.post(f"/inventory/adjustments/{other['id']}/approve", expect=409)

@@ -91,6 +91,10 @@ def _approval_decided(db, data: dict, slug: str) -> None:
 
     if data.get("kind") == price_slips.KIND:
         price_slips.decided(db, data)
+    elif data.get("kind") == "quote":
+        from modules.crm import quote_slips
+
+        quote_slips.decided(db, data)
 
 
 HANDLERS: dict[str, Callable] = {"organisation.changed": _organisation, "sales_order.updated": _sales_order,

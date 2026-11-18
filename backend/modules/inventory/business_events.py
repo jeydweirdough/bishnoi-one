@@ -89,6 +89,10 @@ def _approval_decided(db, data: dict, slug: str) -> None:
 
     if data.get("kind") == "sales_order":
         sales.decided_on_slip(db, data, slug)
+    elif data.get("kind") == "adjustment":
+        from modules.inventory.routers.adjustments import decided_on_slip
+
+        decided_on_slip(db, data, slug)
 
 
 HANDLERS: dict[str, Callable] = {"quote.ordered": _quote_ordered, "invoice.issued": _invoice_issued, "invoice.paid": _invoice_paid,
