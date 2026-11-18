@@ -77,7 +77,8 @@ def test_moving_a_team_or_changing_its_heads_changes_who_sees_it_at_once(app, cl
 
     assert seen_by() == ["jade@getmeds.test", "rio@getmeds.test"]  # Admin 2's head, then the Manager
     assert client.patch(f"/identity/organisation/units/{t3['id']}", json={"parentId": a1["id"]}, headers=h).status_code == 200
-    assert seen_by() == ["olive@getmeds.test", "rio@getmeds.test"]  # now Admin 1's head
+    # Now Admin 1's head too; Admin 2's head keeps watching Mia until an administrator removes them (step 4E, watchers.py).
+    assert seen_by() == ["olive@getmeds.test", "rio@getmeds.test", "jade@getmeds.test"]
     # Change the head of Admin 1 and it follows.
     client.patch(f"/identity/organisation/units/{a1['id']}", json={"headIds": [getmeds["jade"]["id"], admin1["id"]]}, headers=h)
     assert seen_by() == ["jade@getmeds.test", "olive@getmeds.test", "rio@getmeds.test"]

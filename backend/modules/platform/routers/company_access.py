@@ -608,6 +608,66 @@ def set_reporting(person_id: str, body: ReportingIn, request: Request, db: DB, m
     return {"person": person_out(p)}
 
 
+class WatcherIn(Api):
+    watcher_id: str
+
+
+def watchers_out(db: Session, p: Identity) -> list[dict]:
+    """Who can see this employee (2026-11-18, step 4E): from the chart, or added by an administrator, and since when.
+    onChart: the chart gives them today (removing them would only bring them back; change the chart instead)."""
+    from modules.platform import unit_heads, watchers as w
+    from modules.platform.models import MembershipUnit, Watcher
+
+    units = org_push._units(db, p.company_id)
+    others = list(db.scalars(select(MembershipUnit.unit_id).where(MembershipUnit.membership_id == p.id)))
+    same = {i: i for i in db.scalars(select(Identity.id).where(Identity.company_id == p.company_id, Identity.via_operator.is_(False)))}
+    now = set(unit_heads.managers_of(units, unit_heads.heads_by_unit(db, p.company_id), same, p, others))
+    rows = db.execute(select(Watcher, Identity).join(Identity, Identity.id == Watcher.watcher_id)
+                      .where(Watcher.watched_id == p.id).order_by(Watcher.added_at, Identity.full_name)).all()
+    return [{"id": who.id, "fullName": who.full_name, "email": who.email, "title": who.title, "status": who.status,
+             "source": row.source, "addedBy": row.added_by, "since": iso(row.added_at), "onChart": who.id in now} for row, who in rows]
+
+
+@router.get("/people/{person_id}/watchers")
+def list_watchers(person_id: str, db: DB, me: Admin) -> dict:
+    return {"watchers": watchers_out(db, get_person(db, me, person_id))}
+
+
+@router.post("/people/{person_id}/watchers", status_code=status.HTTP_201_CREATED)
+def add_watcher(person_id: str, body: WatcherIn, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """Someone else who may see this employee's records (within their own role's scope; never more actions)."""
+    from modules.platform.models import Watcher
+
+    p = get_person(db, me, person_id)
+    who = colleague(db, me, p, body.watcher_id, "watcher_id")
+    if db.get(Watcher, (p.id, who.id)) is None:
+        db.add(Watcher(watched_id=p.id, watcher_id=who.id, source="added", added_by=me.email))
+        audit(db, me.email, "organisation.watcher_added", target=f"{p.email} · {who.email}", target_type="identity", target_id=p.id, company_id=me.company_id)
+        db.commit()
+        org_push.push(request.app.state.sessions, settings, me.company_id)
+    return {"watchers": watchers_out(db, p)}
+
+
+@router.delete("/people/{person_id}/watchers/{watcher_id}")
+def remove_watcher(person_id: str, watcher_id: str, request: Request, db: DB, me: Admin, settings: SettingsDep) -> dict:
+    """They no longer see this employee. Refused while the chart gives them (they head a unit above, or the employee
+    reports to them): change the chart, then remove them here."""
+    from modules.platform.models import Watcher
+
+    p = get_person(db, me, person_id)
+    row = db.get(Watcher, (p.id, watcher_id))
+    if row is None:
+        raise not_found("watcher")
+    who = db.get(Identity, watcher_id)
+    if next((x for x in watchers_out(db, p) if x["id"] == watcher_id and x["onChart"]), None):
+        raise conflict(f"{who.full_name} sees {p.full_name} through the org chart. Change their place on the chart or who they report to first.")
+    db.delete(row)
+    audit(db, me.email, "organisation.watcher_removed", target=f"{p.email} · {who.email}", target_type="identity", target_id=p.id, company_id=me.company_id)
+    db.commit()
+    org_push.push(request.app.state.sessions, settings, me.company_id)
+    return {"watchers": watchers_out(db, p)}
+
+
 def change_email(db: Session, me: Identity, p: Identity, new: str) -> None:
     """A person's sign-in email, changed by their company's administrator: any address, nobody else's
     anywhere. Their account keeps its password and history; they sign in with the new one."""
@@ -720,6 +780,7 @@ def person_page(person_id: str, db: DB, me: Admin, settings: SettingsDep) -> dic
             "invitationWaiting": invited,
         },
         "activity": [entry_out(e) for e in activity],
+        "watchers": watchers_out(db, p),
     }
 
 

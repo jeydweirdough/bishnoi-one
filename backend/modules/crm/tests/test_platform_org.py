@@ -238,3 +238,37 @@ def test_everyone_the_platform_lists_as_seeing_a_person_reaches_them_even_before
         business_events._organisation(db, {"units": [], "people": [{"email": "kim@example.com", "unit": None, "otherUnits": [], "managers": []}]}, "example")
         db.commit()
         assert kim not in reachable_people(db, access_of(late))
+
+
+def test_a_head_keeps_watching_someone_who_moved_while_the_platform_lists_them(app, client, linked):
+    """Step 4E (2026-11-18): the Platform's "managers" are the chart's plus the watchers, so a head whose person moved to
+    another unit is still sent as one of their managers; the CRM reach follows that list, and drops them once it doesn't."""
+    from modules.crm import business_events
+    from modules.crm.access import access_of
+    from modules.crm.models import Role
+    from modules.crm.scope import reachable_people
+
+    team_a, team_b = "44444444-0000-4000-8000-000000000001", "44444444-0000-4000-8000-000000000002"
+    units = [{"id": team_a, "kind": "team", "name": "Team A", "parentId": None, "manager": WHO, "managers": [WHO], "areas": [], "active": True},
+             {"id": team_b, "kind": "team", "name": "Team B", "parentId": None, "manager": None, "managers": [], "areas": [], "active": True}]
+    with database(app)() as db:
+        db.add(User(email="noa@example.com", full_name="Noa", password_hash="hash", role_id=db.scalar(select(Role).where(Role.name == "Salesperson")).id))
+        db.commit()
+
+    def reached(unit, managers):
+        with database(app)() as db:
+            business_events._organisation(db, {"units": units, "people": [
+                {"email": WHO, "unit": team_a, "otherUnits": [], "managers": []},
+                {"email": "noa@example.com", "unit": unit, "otherUnits": [], "managers": managers}]}, "example")
+            db.commit()
+            boss = db.scalar(select(User).where(func.lower(User.email) == WHO))
+            boss.role = db.scalar(select(Role).where(Role.name == "Manager"))
+            db.flush()
+            noa = db.scalar(select(User).where(User.email == "noa@example.com"))
+            return noa.team_id, noa in reachable_people(db, access_of(boss))
+
+    assert reached(team_a, [WHO]) == (team_a, True)
+    # Moved to Team B; the Platform still lists the old head as watching her.
+    assert reached(team_b, [WHO]) == (team_b, True)
+    # The administrator removed the watcher: the next event no longer lists them, and the reach goes.
+    assert reached(team_b, []) == (team_b, False)

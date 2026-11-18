@@ -90,6 +90,23 @@ export async function setReporting(id: string, links: { reportsToId?: string | n
   });
 }
 
+/** Who can see an employee (2026-11-18): one more watcher, or one removed; the Platform tells the apps. */
+export async function addWatcher(personId: string, watcherId: string): Promise<Result> {
+  return attempt(async () => {
+    await accountSend("POST", `/identity/access/people/${enc(personId)}/watchers`, { watcherId });
+    refresh();
+    return null;
+  });
+}
+
+export async function removeWatcher(personId: string, watcherId: string): Promise<Result> {
+  return attempt(async () => {
+    await accountSend("DELETE", `/identity/access/people/${enc(personId)}/watchers/${enc(watcherId)}`);
+    refresh();
+    return null;
+  });
+}
+
 export async function changePerson(id: string, change: { fullName?: string; title?: string | null; email?: string; status?: "active" | "suspended"; appDetails?: AppDetails }): Promise<Result> {
   return attempt(async () => {
     await accountSend("PATCH", `/identity/access/people/${enc(id)}`, change);

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from modules.platform.access_roles import modules_of
 from modules.platform.config import Settings
-from modules.platform import unit_heads
+from modules.platform import unit_heads, watchers
 from modules.platform.models import Branch, Company, Identity, MembershipUnit, Unit
 
 log = logging.getLogger(__name__)
@@ -60,19 +60,22 @@ def manager_of(db: Session, units: dict[str, Unit], person: Identity) -> str | N
 
 
 def managers_for(db: Session, units: dict[str, Unit], person: Identity, others: list[str]) -> list[str]:
-    """Everyone who sees them: the heads of their unit and every unit above it, and who they report to by link."""
+    """Everyone who sees them: the heads of their unit and every unit above it, who they report to by link, and then
+    whoever else watches them (watchers.py: managers they had before a move, and watchers added by hand)."""
     heads = unit_heads.heads_by_unit(db, person.company_id)
     ids = {i for hs in heads.values() for i in hs} | {person.reports_to_id}
     emails = {i.id: i.email.lower() for i in db.scalars(select(Identity).where(Identity.id.in_([x for x in ids if x])))}
-    return unit_heads.managers_of(units, heads, emails, person, others)
+    return watchers.union(unit_heads.managers_of(units, heads, emails, person, others),
+                          watchers.watcher_emails(db, person.company_id).get(person.id, []), person.email)
 
 
 def placement(db: Session, person: Identity) -> dict | None:
-    """Where they sit, for their pass; None when they aren't placed anywhere."""
+    """Where they sit, for their pass; None when they aren't placed anywhere and nobody watches them."""
     units = _units(db, person.company_id)
     others = list(db.scalars(select(MembershipUnit.unit_id).where(MembershipUnit.membership_id == person.id)))
     branch = db.get(Branch, person.branch_id) if person.branch_id else None
-    if not person.main_unit_id and not others and branch is None:
+    managers = managers_for(db, units, person, others)
+    if not person.main_unit_id and not others and branch is None and not managers and not person.reports_to_id and not person.assistant_of_id:
         return None
     main = units.get(person.main_unit_id) if person.main_unit_id else None
     return {
@@ -81,7 +84,7 @@ def placement(db: Session, person: Identity) -> dict | None:
         "otherUnits": others,
         "branch": {"id": branch.id, "name": branch.name} if branch else None,
         "manager": manager_of(db, units, person),
-        "managers": managers_for(db, units, person, others),
+        "managers": managers,
         "reportsTo": email_of(db, person.reports_to_id),
         "assistantOf": email_of(db, person.assistant_of_id),
     }
@@ -97,12 +100,13 @@ def chart(db: Session, company: Company) -> dict:
         others.setdefault(m.membership_id, []).append(m.unit_id)
     people = db.scalars(select(Identity).where(Identity.company_id == company.id, Identity.via_operator.is_(False))).all()
     lower = {k: v.lower() for k, v in emails.items()}
+    watching = watchers.watcher_emails(db, company.id)
     return {
         "units": [{"id": u.id, "kind": u.kind, "name": u.name, "parentId": u.parent_id, "manager": emails.get(u.manager_id),
                    "managers": [emails[h] for h in heads.get(u.id, []) if h in emails],
                    "areas": u.areas or [], "active": u.is_active} for u in units.values()],
         "people": [{"email": p.email.lower(), "unit": p.main_unit_id, "otherUnits": others.get(p.id, []),
-                    "managers": unit_heads.managers_of(units, heads, lower, p, others.get(p.id, [])),
+                    "managers": watchers.union(unit_heads.managers_of(units, heads, lower, p, others.get(p.id, [])), watching.get(p.id, []), p.email),
                     "reportsTo": emails.get(p.reports_to_id, "").lower() or None, "assistantOf": emails.get(p.assistant_of_id, "").lower() or None} for p in people],
     }
 
@@ -111,6 +115,7 @@ def _send(sessions, settings: Settings, company_id: str) -> None:
     """The chart as a business event (step 7): kept, delivered to each app that takes it, retried."""
     from modules.platform import events
 
+    watchers.remember(sessions, company_id)
     with sessions() as db:
         company = db.get(Company, company_id)
         if company is None:
@@ -121,7 +126,9 @@ def _send(sessions, settings: Settings, company_id: str) -> None:
 
 
 def push(sessions, settings: Settings, company_id: str) -> None:
-    """Sends every application the company has its org chart, in the background."""
+    """Sends every application the company has its org chart, in the background. Who the chart now gives each person as a
+    manager is kept as their watcher first, at once (watchers.py), so a later move doesn't lose them."""
+    watchers.remember(sessions, company_id)
 
     def run() -> None:
         try:
@@ -136,6 +143,8 @@ def push_all(sessions, settings: Settings, company_id: str) -> None:
     """The roles, then the chart, one after the other in the background (2026-11-04): an app makes the people it is told
     about before it places them, so the chart has to follow the roles."""
     from modules.platform import access_roles
+
+    watchers.remember(sessions, company_id)
 
     def run() -> None:
         for what, send in (("Roles", access_roles._send), ("Org chart", _send)):

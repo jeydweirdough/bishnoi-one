@@ -274,6 +274,22 @@ class UnitHead(Base):
     identity_id: Mapped[str] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="CASCADE"), primary_key=True, index=True)
 
 
+class Watcher(Base):
+    """Who monitors whom (2026-11-18, step 4E): seeing a person's records for monitoring, separate from what anyone may do.
+    Made from the chart (source "chart": every head above them and who they report to) and never taken away by the chart,
+    so a manager keeps the people they monitored when those people move, until an administrator removes them; administrators
+    also add watchers by hand (source "added"). What a watcher may do with what they see stays with their role."""
+
+    __tablename__ = "nbpl_watchers"
+    __table_args__ = (_one_of("source", ("chart", "added"), "nbpl_watcher_source"),)
+
+    watched_id: Mapped[str] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="CASCADE"), primary_key=True)
+    watcher_id: Mapped[str] = mapped_column(ForeignKey("nbpl_identities.id", ondelete="CASCADE"), primary_key=True, index=True)
+    source: Mapped[str] = mapped_column(String(8), default="chart")
+    added_by: Mapped[str | None] = mapped_column(String(254), default=None)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class MembershipUnit(Base):
     """A unit beyond a membership's main one: widens what they see and approve;
     reports still count them under their main unit."""

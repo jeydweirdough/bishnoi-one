@@ -103,4 +103,19 @@ export type PersonPage = AccessPerson & {
     invitationWaiting: boolean;
   };
   activity: { id: string; at: string; actor: string; action: string; category: string; target: string; fields: string[] }[];
+  watchers: Watcher[];
+};
+
+/** Someone who can see this employee's records for monitoring (2026-11-18): from the org chart, or added by an administrator.
+ * onChart: the chart gives them today, so they can't be removed here. What they may do stays with their own role. */
+export type Watcher = {
+  id: string;
+  fullName: string;
+  email: string;
+  title: string | null;
+  status: string;
+  source: "chart" | "added";
+  addedBy: string | null;
+  since: string | null;
+  onChart: boolean;
 };

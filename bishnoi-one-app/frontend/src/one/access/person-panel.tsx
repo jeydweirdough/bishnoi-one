@@ -10,13 +10,13 @@ import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Pill } from "@/src/platform/ui/figures";
 import { Icon, moduleIcon } from "@/src/platform/ui/icons";
-import { Select } from "@/src/platform/ui/pickers";
+import { Combobox, Select } from "@/src/platform/ui/pickers";
 import { RowMenu } from "@/src/platform/ui/row-menu";
 import { Empty, Particulars, Sheet } from "@/src/platform/ui/sheet";
-import { setPersonAppRole, setPersonModule } from "./actions";
+import { addWatcher, removeWatcher, setPersonAppRole, setPersonModule } from "./actions";
 import { moduleLabel } from "./labels";
 import { usePersonActions } from "./person-dialogs";
-import type { AccessData, AccessPerson, PersonPage } from "./types";
+import type { AccessData, AccessPerson, PersonPage, Watcher } from "./types";
 
 // A person in a panel beside People (2026-10-31, after Zoho Directory's): who they are and every action on them
 // at the top, then Info, Applications (each app with their role in it), Security and Account activity.
@@ -26,6 +26,7 @@ export type PanelActivity = { id: string; at: string; text: string };
 const TABS = [
   ["info", "Info"],
   ["apps", "Applications"],
+  ["watchers", "Who can see them"],
   ["security", "Security"],
   ["activity", "Account activity"],
 ] as const;
@@ -155,6 +156,7 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
           />
         )}
         {tab === "apps" && <Applications row={row} data={data} />}
+        {tab === "watchers" && <Watchers person={person} colleagues={colleagues} />}
         {tab === "security" && (
           <Particulars
             items={[
@@ -277,6 +279,93 @@ function Applications({ row, data }: { row: AccessPerson; data: AccessData }) {
         </div>
       )}
       {opened.length === 0 && notYet.length === 0 && <p className="text-sm text-ink-3">Your company has no apps yet.</p>}
+    </div>
+  );
+}
+
+/** Who can see this employee's records for monitoring (2026-11-18): their managers from the org chart, kept when they move,
+ * and anyone an administrator added. Seeing never adds actions: what each may do stays with their own role. */
+function Watchers({ person, colleagues }: { person: PersonPage; colleagues: { id: string; name: string }[] }) {
+  const router = useRouter();
+  const [busy, start] = useTransition();
+  const watchers: Watcher[] = person.watchers ?? [];
+  const taken = new Set([person.id, ...watchers.map((w) => w.id)]);
+  const choices = colleagues.filter((c) => !taken.has(c.id)).map((c) => ({ value: c.id, label: c.name }));
+
+  function act(work: () => Promise<{ ok: boolean; error?: string }>, done: string) {
+    start(async () => {
+      const r = await work();
+      if (!r.ok) toast.error(r.error ?? "That didn't work.");
+      else {
+        toast.success(done);
+        router.refresh();
+      }
+    });
+  }
+
+  const source = (w: Watcher) =>
+    w.source === "added" ? `Added by ${w.addedBy ?? "an administrator"}` : w.onChart ? "From the org chart" : "From the org chart, before a move";
+  return (
+    <div className="space-y-4">
+      {watchers.length === 0 ? (
+        <Empty icon="people" title="Nobody sees them yet" compact>
+          Their managers on the org chart are added here. You can also add someone below.
+        </Empty>
+      ) : (
+        <ul className="divide-y divide-rule">
+          {watchers.map((w) => (
+            <li key={w.id} className="group flex items-center gap-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  <span className="truncate">{w.fullName}</span>
+                  {w.status !== "active" && <Pill tone="bad">Switched off</Pill>}
+                </p>
+                <p className="truncate text-meta text-ink-3">
+                  {source(w)}
+                  {w.since ? (
+                    <>
+                      {" · since "}
+                      <time dateTime={w.since} title={when(w.since)}>
+                        {day(w.since)}
+                      </time>
+                    </>
+                  ) : null}
+                </p>
+              </div>
+              {w.onChart ? (
+                <span className="text-meta text-ink-3" title="Change their place on the org chart, or who they report to, to remove this.">
+                  On the chart
+                </span>
+              ) : (
+                <ConfirmButton
+                  label={<X className="size-3.5" aria-hidden />}
+                  triggerVariant="quiet"
+                  triggerSize="sm"
+                  triggerTitle={`Remove ${w.fullName}`}
+                  title={`Remove ${w.fullName}`}
+                  body={`${w.fullName} will no longer see ${person.fullName}'s records. Their own role doesn't change.`}
+                  confirmLabel="Remove"
+                  disabled={busy}
+                  onConfirm={async () => act(() => removeWatcher(person.id, w.id), `${w.fullName} removed.`)}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="max-w-sm">
+        <p className="mb-1 text-sm font-semibold text-ink">Add someone</p>
+        <Combobox
+          aria-label={`Add someone who can see ${person.fullName}`}
+          placeholder="Choose an employee"
+          className="w-full"
+          options={choices}
+          value={undefined}
+          disabled={busy || choices.length === 0}
+          onChange={(v) => v && act(() => addWatcher(person.id, v as string), "Added.")}
+        />
+        <p className="mt-1 text-meta text-ink-3">They see this employee's records within their own role. What they may do doesn't change.</p>
+      </div>
     </div>
   );
 }
