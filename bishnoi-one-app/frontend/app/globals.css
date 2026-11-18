@@ -135,3 +135,19 @@ html body .ant-select-multiple:not(.ant-select-sm) {
 html body .ant-picker:not(.ant-picker-small) {
   padding-inline: 16px;
 }
+
+/* A report saved as a PDF document (src/platform/reports/save-as.tsx): only the document is printed. */
+#report-doc-print {
+  display: none;
+}
+@media print {
+  html.report-doc-printing body > *:not(#report-doc-print) {
+    display: none !important;
+  }
+  html.report-doc-printing #report-doc-print {
+    display: block;
+  }
+  html.report-doc-printing {
+    background: #fff;
+  }
+}

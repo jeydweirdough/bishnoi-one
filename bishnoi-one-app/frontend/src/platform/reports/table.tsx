@@ -1,9 +1,10 @@
 "use client";
 
 import { totalsOf } from "./totals";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Printer, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { SaveAs, type ReportDoc } from "./save-as";
 import type { Cell, ColumnKind } from "./types";
 
 type Col = { key: string; label: string; kind: ColumnKind };
@@ -13,9 +14,9 @@ const numeric = (k: ColumnKind) => k === "money" || k === "number" || k === "per
 /**
  * A report's rows: sort by any column (click its heading), search within them, totals at
  * the foot, a cell that leads to its record is a link. Exports what's shown (sorted and
- * searched) to CSV, which Excel opens, or prints it.
+ * searched) as a PDF document (letterhead, details, signatories; save-as.tsx) or to CSV, which Excel opens.
  */
-export function ReportTable({ title, columns, rows, totals, canExport }: { title: string; columns: Col[]; rows: Cell[][]; totals: (string | null)[] | null; canExport: boolean }) {
+export function ReportTable({ title, columns, rows, totals, canExport, doc }: { title: string; columns: Col[]; rows: Cell[][]; totals: (string | null)[] | null; canExport: boolean; doc?: ReportDoc }) {
   const [sort, setSort] = useState<{ i: number; dir: 1 | -1 } | null>(null);
   const [q, setQ] = useState("");
   const shown = useMemo(() => {
@@ -74,14 +75,16 @@ export function ReportTable({ title, columns, rows, totals, canExport }: { title
           <span className="text-meta text-ink-3">
             {shown.length === rows.length ? `${rows.length} row${rows.length === 1 ? "" : "s"}` : `${shown.length} of ${rows.length} rows`}
           </span>
-          {canExport && (
-            <button suppressHydrationWarning type="button" onClick={exportCsv} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rule bg-white px-3 text-sm text-ink hover:border-ink">
-              <Download className="size-4" aria-hidden /> Export to Excel (CSV)
-            </button>
-          )}
-          <button suppressHydrationWarning type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rule bg-white px-3 text-sm text-ink hover:border-ink">
-            <Printer className="size-4" aria-hidden /> Print
-          </button>
+          <SaveAs
+            title={title}
+            columns={columns}
+            rows={shown.map((r) => r.map((c) => c.text))}
+            totals={dynamicTotals}
+            search={q}
+            allRows={rows.length}
+            doc={doc}
+            onCsv={canExport ? exportCsv : undefined}
+          />
         </div>
       </div>
       <div className="overflow-x-auto">
