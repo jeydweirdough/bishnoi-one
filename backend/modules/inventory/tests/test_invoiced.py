@@ -17,7 +17,7 @@ def test_the_delivery_carries_the_sale_and_finance_closes_the_chain(app, client,
     sale = done["salesOrder"]
     assert sale["number"] == so["number"] and sale["customer"]["name"] == "PGH"
     assert sale["lines"] == [{"sku": sale["lines"][0]["sku"], "name": sale["lines"][0]["name"], "quantity": 3, "freeQuantity": 0,
-                              "unitPriceCentavos": 32000, "discountCentavos": 0, "vatCategory": "standard"}]
+                              "unitPriceCentavos": 32000, "discountCentavos": 0, "vatCategory": "standard", "soldAs": None}]
 
     issued = {"id": "ev-inv-1", "kind": "invoice.issued", "source": "finance", "occurredAt": "2026-10-29T00:00:00+00:00",
               "data": {"id": "inv-1", "number": "SI-000101", "totalCentavos": 96000, "deliveryId": d["id"], "salesOrderId": so["id"]}}

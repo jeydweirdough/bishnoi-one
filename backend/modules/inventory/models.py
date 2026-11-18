@@ -688,6 +688,14 @@ class SalesOrder(Stamped, Base):
     invoiced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     invoice_total: Mapped[int | None] = mapped_column(Integer, default=None)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # The invoice is the order's source of truth once issued (Step 4D, migration 0030): its figures as Finance sent
+    # them; "issued", "paid" or "voided" (waiting for its reissue: the order's own amounts show again meanwhile).
+    invoice_state: Mapped[str | None] = mapped_column(String(10), default=None)
+    invoice_gross: Mapped[int | None] = mapped_column(Integer, default=None)
+    invoice_discount: Mapped[int | None] = mapped_column(Integer, default=None)
+    invoice_tax: Mapped[int | None] = mapped_column(Integer, default=None)
+    invoice_lines: Mapped[list | None] = mapped_column(JSON, default=None)
+    invoice_note: Mapped[str | None] = mapped_column(String(300), default=None)
 
     warehouse: Mapped["Warehouse"] = relationship(lazy="joined")
     decided_by: Mapped["User | None"] = relationship(foreign_keys=[decided_by_id], lazy="joined")

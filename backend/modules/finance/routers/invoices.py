@@ -482,7 +482,23 @@ def issue_now(db: Session, settings, inv: Invoice, actor, actor_name: str, serie
     audit(db, actor, "invoice.issued", target=f"{inv.number} {inv.customer_name}", target_type="invoice", target_id=inv.id)
     # Told to the other apps (step 7): the CRM scores sales from it; the Sales app marks its order invoiced (step 13).
     business_events.emit(db, None, "invoice.issued", {"id": inv.id, "number": inv.number, "customerId": inv.customer_id, "customerName": inv.customer_name, "salespersonId": inv.salesperson_id, "divisionId": inv.division_id, "teamId": inv.team_id, "date": inv.invoice_date.isoformat(), "totalCentavos": inv.total_centavos, "taxCentavos": inv.tax_centavos,
-                                                        "deliveryId": inv.delivery_id, "salesOrderId": inv.sales_order_id})
+                                                        "deliveryId": inv.delivery_id, "salesOrderId": inv.sales_order_id,
+                                                        # Added 2026-11-18 (Step 4D, read only): what it replaces and its figures, so a sales order
+                                                        # shows the invoice's amounts. Nothing here changes how the invoice is worked out.
+                                                        "replacesId": inv.replaces_id, **figures_of(inv)})
+
+
+def figures_of(inv: Invoice) -> dict:
+    """An issued invoice's figures as it shows them: gross, discount, VAT and each line's tax and total."""
+    worked = (inv.computed or {}).get("lines") or []
+    lines = []
+    for i, line in enumerate(inv.lines or []):
+        done = worked[i] if i < len(worked) else {}
+        lines.append({"ref": line.get("ref"), "description": line.get("description"), "quantity": int(line.get("quantity") or 0),
+                      "unitPriceCentavos": int(line.get("unitPriceCentavos") or 0), "discountCentavos": int(line.get("discountCentavos") or 0),
+                      "taxCentavos": int(done.get("taxCentavos") or 0), "totalCentavos": int(done.get("totalCentavos") or 0)})
+    return {"grossCentavos": sum(x["quantity"] * x["unitPriceCentavos"] for x in lines),
+            "discountCentavos": sum(x["discountCentavos"] for x in lines), "lines": lines}
 
 
 class VoidIn(Api):

@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
 from modules.inventory import cpr
+from modules.inventory.sales import status_label, value_of
 from modules.inventory.access import CurrentAccess, allowed
 from modules.inventory.api import iso
 from modules.inventory.config import Settings
@@ -612,10 +613,10 @@ def sales_by_salesperson(p: Params):
     return [col("salesperson", "Name"), col("orderCount", "Order count", "number"), col("items", "Line items", "number"), col("quantity", "Total quantity", "number"), col("value", "Total value", "money")], rows
 
 
-SALES_STATUS = {"draft": "Draft", "pending": "Waiting for approval", "confirmed": "Confirmed", "delivered": "Delivered", "rejected": "Rejected", "cancelled": "Cancelled"}
 
 
 def _sales_orders(p: Params):
+    """The period's sales orders. Their value is the invoice's total once invoiced, the order's own otherwise (Step 4D)."""
     q = select(SalesOrder).where(SalesOrder.created_at >= p.after, SalesOrder.created_at < p.before)
     if p.warehouse:
         q = q.where(SalesOrder.warehouse_id == p.warehouse)
@@ -629,11 +630,11 @@ def sales_orders_by(key: str, label: str):
     def build(p: Params):
         by: dict[str, dict] = {}
         for o in _sales_orders(p):
-            name = {"status": SALES_STATUS[o.status], "salesperson": o.salesperson_name or o.created_by_name or "No salesperson",
+            name = {"status": status_label(o), "salesperson": o.salesperson_name or o.created_by_name or "No salesperson",
                     "division": o.division_name or "Not in a division"}[key]
             r = by.setdefault(name, {"name": name, "orders": 0, "value": 0, "approved": 0, "delivered": 0})
             r["orders"] += 1
-            r["value"] += o.total_centavos
+            r["value"] += value_of(o)
             r["approved"] += o.status in ("confirmed", "delivered")
             r["delivered"] += o.status == "delivered"
         rows = sorted(by.values(), key=lambda r: -r["value"])
@@ -677,9 +678,10 @@ def order_to_cash(p: Params):
     for o in _sales_orders(p):
         if o.status in ("draft", "pending", "rejected", "cancelled"):
             continue
-        stage = "Paid" if o.paid_at else "Invoiced" if o.invoice_id else "Delivered" if o.delivered_at else "Approved"
+        stage = ("Paid" if o.invoice_state == "paid" else "Invoiced" if o.invoice_state == "issued"
+                 else "Invoice voided" if o.invoice_state == "voided" else "Delivered" if o.delivered_at else "Approved")
         rows.append({"order": o.number, "customer": o.customer_name, "quote": o.quote_number or "", "stage": stage,
-                     "value": o.total_centavos, "invoice": o.invoice_number or "",
+                     "value": value_of(o), "invoice": o.invoice_number or "",
                      "toApprove": days(o.created_at, o.decided_at), "toDeliver": days(o.decided_at, o.delivered_at),
                      "toInvoice": days(o.delivered_at, o.invoiced_at), "toBePaid": days(o.invoiced_at, o.paid_at),
                      "orderToCash": days(o.created_at, o.paid_at)})
@@ -973,10 +975,10 @@ REPORTS: tuple[Report, ...] = (
     Report("sales-by-item", "Sales by item", "Sales", "Each product issued: quantity, average price, value and share of total.", sales_by_item, dated=True, chart=bar("product", "value")),
     Report("sales-by-salesperson", "Sales by salesperson", "Sales", "Each person who issued orders: count, quantity and value.", sales_by_salesperson, dated=True, by_warehouse=False, chart=bar("salesperson", "value")),
     # The Sales app's sales orders (step 11).
-    Report("sales-orders-by-status", "Sales orders by status", "Sales orders", "How many orders are waiting, confirmed, delivered or rejected, and what they come to.", sales_orders_by("status", "Status"), dated=True, chart=bar("name", "value")),
-    Report("sales-orders-by-salesperson", "Sales orders by salesperson", "Sales orders", "Each salesperson's orders in the period: how many, their value, approved and delivered.", sales_orders_by("salesperson", "Salesperson"), dated=True, by_warehouse=False, chart=bar("name", "value")),
-    Report("sales-orders-by-division", "Sales orders by division", "Sales orders", "Each division's orders in the period, by the salesperson's division when ordered.", sales_orders_by("division", "Division"), dated=True, by_warehouse=False, chart=bar("name", "value")),
-    Report("order-to-cash", "Order to cash", "Sales orders", "Each approved order through approval, delivery, invoice and payment, with the days between and where it is now.", order_to_cash, dated=True, by_warehouse=False),
+    Report("sales-orders-by-status", "Sales orders by status", "Sales orders", "How many orders are waiting, confirmed, delivered, invoiced, paid or rejected, and what they come to: the invoice's total once invoiced, the order's own otherwise.", sales_orders_by("status", "Status"), dated=True, chart=bar("name", "value")),
+    Report("sales-orders-by-salesperson", "Sales orders by salesperson", "Sales orders", "Each salesperson's orders in the period: how many, their value (the invoice's total once invoiced, the order's own otherwise), approved and delivered.", sales_orders_by("salesperson", "Salesperson"), dated=True, by_warehouse=False, chart=bar("name", "value")),
+    Report("sales-orders-by-division", "Sales orders by division", "Sales orders", "Each division's orders in the period, by the salesperson's division when ordered. Value is the invoice's total once invoiced, the order's own otherwise.", sales_orders_by("division", "Division"), dated=True, by_warehouse=False, chart=bar("name", "value")),
+    Report("order-to-cash", "Order to cash", "Sales orders", "Each approved order through approval, delivery, invoice and payment, with the days between and where it is now. Value is the invoice's total once invoiced, the order's own otherwise.", order_to_cash, dated=True, by_warehouse=False),
     Report("fill-rate", "Fill rate", "Sales orders", "What share of what customers ordered has gone out, per product, for the period's approved orders.", fill_rate, dated=True, chart=bar("product", "ordered", "delivered")),
     # Shipping with couriers (step 12).
     Report("deliveries-by-courier", "Deliveries by courier", "Shipping", "Each courier's deliveries in the period: delivered, failed, on time, days to deliver and shipping fees.", deliveries_by_courier, dated=True, chart=bar("name", "delivered", "failed")),

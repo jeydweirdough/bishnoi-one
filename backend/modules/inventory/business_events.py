@@ -66,6 +66,12 @@ def _invoice_paid(db, data: dict, slug: str) -> None:
     sales.paid(db, data, slug)
 
 
+def _invoice_voided(db, data: dict, slug: str) -> None:
+    from modules.inventory import sales
+
+    sales.voided(db, data, slug)
+
+
 def nightly(db) -> None:
     """This application's own work at the Platform's nightly check: refill drafts, when switched on (step 15a)."""
     from modules.inventory.replenishment import nightly as refill
@@ -76,7 +82,8 @@ def nightly(db) -> None:
         db.rollback()
 
 
-HANDLERS: dict[str, Callable] = {"quote.ordered": _quote_ordered, "invoice.issued": _invoice_issued, "invoice.paid": _invoice_paid}
+HANDLERS: dict[str, Callable] = {"quote.ordered": _quote_ordered, "invoice.issued": _invoice_issued, "invoice.paid": _invoice_paid,
+                                 "invoice.voided": _invoice_voided}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])

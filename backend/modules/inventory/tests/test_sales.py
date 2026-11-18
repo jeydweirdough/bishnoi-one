@@ -58,7 +58,7 @@ def test_a_crm_quote_becomes_an_order_once_and_the_quote_hears_back(app, client,
     assert o["salesperson"]["name"] == "Ria Santos" and o["division"] == "B2B" and o["team"] == "B2B NBD"
     assert o["lines"][0]["unitPrice"] == 30000 and o["lines"][0]["freeQuantity"] == 1 and o["totalCentavos"] == 90000
     assert "Something we don't stock" in o["notes"]  # left out, and said so
-    assert outbox(app, "sales_order.updated")[-1] == {"quoteId": "q-1", "id": o["id"], "number": o["number"], "status": "pending", "note": None, "deliveredAt": None, "delivery": None, "invoice": None}
+    assert outbox(app, "sales_order.updated")[-1] == {"quoteId": "q-1", "id": o["id"], "number": o["number"], "status": "pending", "statusLabel": "Waiting for approval", "note": None, "deliveredAt": None, "delivery": None, "invoice": None}
     assert outbox(app, "document.linked")[0]["from"]["app"] == "crm"
     # Rejected, with the reason: the quote hears it.
     assert ana.c.post(f"/inventory/sales-orders/{o['id']}/reject", headers=ana.h, json={}).status_code == 422

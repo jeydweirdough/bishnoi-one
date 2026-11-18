@@ -41,12 +41,68 @@ def told(db: Session, slug: str | None, order: SalesOrder) -> None:
     """The CRM hears what became of an order from one of its quotes, with its latest delivery's shipping (step 12)."""
     if order.quote_id:
         business_events.emit(db, slug, "sales_order.updated", {
-            "quoteId": order.quote_id, "id": order.id, "number": order.number, "status": order.status,
+            "quoteId": order.quote_id, "id": order.id, "number": order.number, "status": order.status, "statusLabel": status_label(order),
             "note": order.decision_note, "deliveredAt": order.delivered_at.isoformat() if order.delivered_at else None,
             "delivery": latest_delivery(db, order),
-            # Invoiced and paid (step 13).
-            "invoice": {"id": order.invoice_id, "number": order.invoice_number, "invoicedAt": order.invoiced_at.isoformat() if order.invoiced_at else None,
-                        "paidAt": order.paid_at.isoformat() if order.paid_at else None} if order.invoice_id else None})
+            # Invoiced and paid (step 13), with the invoice's figures (Step 4D): the quote shows what was invoiced.
+            "invoice": invoice_out(order)})
+
+
+STATUS_LABELS = {"draft": "Draft", "pending": "Waiting for approval", "confirmed": "Confirmed", "delivered": "Delivered",
+                 "rejected": "Rejected", "cancelled": "Cancelled"}
+
+
+def is_invoiced(order: SalesOrder) -> bool:
+    """An invoice stands for it (issued or paid): its amounts follow the invoice and nothing on it changes."""
+    return order.invoice_state in ("issued", "paid")
+
+
+def status_label(order: SalesOrder) -> str:
+    """What the order shows: the invoice's state once invoiced (Step 4D), else its own."""
+    if order.invoice_state == "paid":
+        return "Paid"
+    if order.invoice_state == "issued":
+        return "Invoiced"
+    if order.invoice_state == "voided":
+        return "Invoice voided — waiting for reissue"
+    return STATUS_LABELS[order.status]
+
+
+def figures(order: SalesOrder) -> dict:
+    """The order's amounts: the invoice's once invoiced, the order's own otherwise (or while its invoice is voided)."""
+    if is_invoiced(order):
+        return {"source": "invoice", "invoiceNumber": order.invoice_number,
+                "grossCentavos": order.invoice_gross if order.invoice_gross is not None else order.gross_centavos,
+                "discountCentavos": order.invoice_discount if order.invoice_discount is not None else order.discount_centavos,
+                "taxCentavos": order.invoice_tax, "totalCentavos": order.invoice_total if order.invoice_total is not None else order.total_centavos}
+    return {"source": "order", "invoiceNumber": None, "grossCentavos": order.gross_centavos, "discountCentavos": order.discount_centavos,
+            "taxCentavos": None, "totalCentavos": order.total_centavos}
+
+
+def value_of(order: SalesOrder) -> int:
+    """What the order comes to in reports: the invoice's total once invoiced, the order's own otherwise."""
+    return figures(order)["totalCentavos"] or 0
+
+
+def invoice_out(order: SalesOrder) -> dict | None:
+    if not order.invoice_id:
+        return None
+    return {"id": order.invoice_id, "number": order.invoice_number, "state": order.invoice_state,
+            "invoicedAt": order.invoiced_at.isoformat() if order.invoiced_at else None,
+            "paidAt": order.paid_at.isoformat() if order.paid_at else None,
+            "grossCentavos": order.invoice_gross, "discountCentavos": order.invoice_discount, "taxCentavos": order.invoice_tax,
+            "totalCentavos": order.invoice_total, "lines": order.invoice_lines, "voidReason": order.invoice_note}
+
+
+def invoiced_message(order: SalesOrder) -> str | None:
+    """Why an invoiced order can't change, or None when it can (Step 4D)."""
+    if is_invoiced(order):
+        return (f"This order is invoiced ({order.invoice_number}): its amounts follow the invoice. "
+                "Ask Finance to void and reissue it to change them.")
+    if order.invoice_state == "voided":
+        return (f"This order's invoice ({order.invoice_number}) was voided and waits for its reissue in Finance: "
+                "the reissued invoice sets its amounts.")
+    return None
 
 
 def for_invoice(order: SalesOrder) -> dict:
@@ -67,23 +123,64 @@ def for_invoice(order: SalesOrder) -> dict:
     }
 
 
+def _order_of_invoice(db: Session, data: dict) -> SalesOrder | None:
+    """The sales order an invoice event is about: by the order Finance names, else the order whose invoice it replaces
+    (a reissued invoice doesn't carry the order), else the order holding that invoice."""
+    if data.get("salesOrderId"):
+        order = db.get(SalesOrder, str(data["salesOrderId"]))
+        if order is not None:
+            return order
+    for invoice_id in (data.get("replacesId"), data.get("id")):
+        if invoice_id:
+            order = db.scalar(select(SalesOrder).where(SalesOrder.invoice_id == str(invoice_id)[:36]))
+            if order is not None:
+                return order
+    return None
+
+
+def _cents(value) -> int | None:
+    return int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
 def invoiced(db: Session, data: dict, slug: str | None) -> None:
-    """Finance issued the invoice for one of its deliveries (invoice.issued): the order is invoiced."""
-    order = db.get(SalesOrder, str(data.get("salesOrderId") or "")) if data.get("salesOrderId") else None
+    """Finance issued the invoice for one of its deliveries, or its reissue (invoice.issued): the order takes the
+    invoice's figures and follows them from now on (Step 4D)."""
+    order = _order_of_invoice(db, data)
     if order is None:
         return
     order.invoice_id, order.invoice_number = str(data.get("id") or "")[:36] or None, str(data.get("number") or "")[:30] or None
     order.invoice_total = int(data.get("totalCentavos") or 0)
+    order.invoice_tax = _cents(data.get("taxCentavos"))
+    order.invoice_gross, order.invoice_discount = _cents(data.get("grossCentavos")), _cents(data.get("discountCentavos"))
+    lines = data.get("lines")
+    order.invoice_lines = [{"ref": line.get("ref"), "description": str(line.get("description") or "")[:200], "quantity": _cents(line.get("quantity")) or 0,
+                            "unitPriceCentavos": _cents(line.get("unitPriceCentavos")) or 0, "discountCentavos": _cents(line.get("discountCentavos")) or 0,
+                            "taxCentavos": _cents(line.get("taxCentavos")) or 0, "totalCentavos": _cents(line.get("totalCentavos")) or 0}
+                           for line in lines[:500] if isinstance(line, dict)] if isinstance(lines, list) else None
+    order.invoice_state, order.invoice_note, order.paid_at = "issued", None, None
     order.invoiced_at = datetime.now(UTC)
+    told(db, slug, order)
+
+
+def voided(db: Session, data: dict, slug: str | None) -> None:
+    """Its invoice was voided (invoice.voided): the order's own amounts show again, marked as waiting for the reissue."""
+    invoice_id = str(data.get("id") or "")[:36]
+    order = db.scalar(select(SalesOrder).where(SalesOrder.invoice_id == invoice_id)) if invoice_id else None
+    if order is None or order.invoice_state == "voided":
+        return
+    order.invoice_state, order.invoice_note = "voided", (str(data.get("reason") or "")[:300] or None)
+    order.invoice_total = order.invoice_tax = order.invoice_gross = order.invoice_discount = None
+    order.invoice_lines, order.paid_at = None, None
     told(db, slug, order)
 
 
 def paid(db: Session, data: dict, slug: str | None) -> None:
     """Its invoice was paid in full (invoice.paid): the chain is closed."""
-    order = db.get(SalesOrder, str(data.get("salesOrderId") or "")) if data.get("salesOrderId") else None
-    if order is None or order.invoice_id != str(data.get("id") or ""):
+    order = _order_of_invoice(db, {"salesOrderId": data.get("salesOrderId"), "id": data.get("id")})
+    if order is None or order.invoice_id != str(data.get("id") or "") or order.invoice_state == "voided":
         return
     order.paid_at = datetime.fromisoformat(data["paidAt"]) if data.get("paidAt") else datetime.now(UTC)
+    order.invoice_state = "paid"
     told(db, slug, order)
 
 

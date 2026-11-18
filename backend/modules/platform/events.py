@@ -53,7 +53,8 @@ KINDS: dict[str, Kind] = {
     "invoice.paid": Kind("finance", ("crm", "inventory"), "An invoice was paid in full"),
     # What sold from a vendor's consignment, to pay them (step 15d): a draft vendor bill in Finance.
     "consignment.billed": Kind("inventory", ("finance",), "A vendor's consignment sales were settled"),
-    "invoice.voided": Kind("finance", ("crm",), "An invoice was voided"),
+    # The sales order hears it too (Step 4D): its amounts follow the invoice, so a void clears them until reissued.
+    "invoice.voided": Kind("finance", ("crm", "inventory"), "An invoice was voided"),
     "payment.recorded": Kind("finance", ("crm",), "A customer's payment was recorded"),
     "delivery.done": Kind("inventory", ("finance",), "Goods left the warehouse for a customer"),
     # The Sales app (step 11): Raise order in the CRM makes the sales order; the CRM hears what became of it.

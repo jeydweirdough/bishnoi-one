@@ -556,7 +556,9 @@ export type QuoteOrder = {
   /** Its delivery's shipping (step 12): out for delivery, delivered or failed, with the courier's tracking. */
   delivery?: { number: string; status: string; statusLabel: string | null; courier: string | null; trackingNumber: string | null; trackingUrl: string | null; deliveredAt: string | null } | null;
   /** Invoiced from its delivery, and paid (step 13). */
-  invoice?: { id: string; number: string | null; invoicedAt: string | null; paidAt: string | null } | null;
+  invoice?: { id: string; number: string | null; invoicedAt: string | null; paidAt: string | null;
+    /** The invoice's state and total (Step 4D): voided waits for its reissue. */
+    state?: "issued" | "paid" | "voided" | null; totalCentavos?: number | null } | null;
 };
 
 /** Credit status, as Finance's invoices have it (app/trade.py). Null status: Finance couldn't be asked. */

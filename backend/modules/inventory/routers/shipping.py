@@ -22,7 +22,7 @@ from modules.inventory.access import CurrentAccess, allowed, settings_allowed
 from modules.inventory.api import Api, changed, conflict, field_error, found
 from modules.inventory.audit import audit
 from modules.inventory.deps import DB, CurrentUser
-from modules.inventory.models import Courier, Order
+from modules.inventory.models import Courier, Order, SalesOrder
 
 router = APIRouter(prefix="/inventory", tags=["shipping"])
 
@@ -139,6 +139,13 @@ def set_shipping(access: CurrentAccess, me: CurrentUser, db: DB, order_id: str, 
     fee = body.fee if body.fee is not None else (courier.default_fee or 0) if courier else 0
     o.shipping_fee, o.fee_charged = fee, body.fee_charged and fee > 0
     after = (o.delivery_method, o.courier_id, o.tracking_number, o.shipping_fee, o.fee_charged)
+    # The fee charged to the customer is a line on the invoice: once invoiced it follows the invoice (Step 4D).
+    charged = lambda t: t[3] if t[4] else 0  # noqa: E731
+    if charged(before) != charged(after) and o.sales_order_id:
+        order = db.get(SalesOrder, o.sales_order_id)
+        if order is not None and (why := shipping.sales.invoiced_message(order)) is not None:
+            db.rollback()
+            raise conflict(why)
     if before != after:
         names = ("deliveryMethod", "courier", "trackingNumber", "shippingFee", "feeCharged")
         audit(db, me, "order.shipping_set", target=o.number, target_type="order", target_id=o.id,

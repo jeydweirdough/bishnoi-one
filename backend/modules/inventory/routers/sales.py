@@ -30,8 +30,7 @@ from modules.inventory.stock import next_number
 router = APIRouter(prefix="/inventory", tags=["sales"])
 
 View = allowed("sales.view")
-STATUS_LABELS = {"draft": "Draft", "pending": "Waiting for approval", "confirmed": "Confirmed", "delivered": "Delivered",
-                 "rejected": "Rejected", "cancelled": "Cancelled"}
+STATUS_LABELS = sales.STATUS_LABELS
 
 
 def company_of(request: Request) -> str | None:
@@ -40,13 +39,15 @@ def company_of(request: Request) -> str | None:
 
 def brief(o: SalesOrder) -> dict:
     return {
-        "id": o.id, "number": o.number, "status": o.status, "statusLabel": STATUS_LABELS[o.status],
+        "id": o.id, "number": o.number, "status": o.status, "statusLabel": sales.status_label(o),
+        # Once invoiced, the invoice's state and total (Step 4D): the invoice is the order's source of truth.
+        "invoiceState": o.invoice_state, "amountsFrom": sales.figures(o)["source"],
         "customer": {"id": o.customer_id, "name": o.customer_name, "address": o.customer_address, "tin": o.customer_tin},
         "quote": {"id": o.quote_id, "number": o.quote_number} if o.quote_id else None,
         "salesperson": {"id": o.salesperson_id, "name": o.salesperson_name} if o.salesperson_name else None,
         "division": o.division_name, "team": o.team_name,
         "warehouse": warehouse_ref(o.warehouse), "scheduledOn": o.scheduled_on.isoformat() if o.scheduled_on else None,
-        "totalCentavos": o.total_centavos, "currency": o.currency, "units": sum(line.quantity for line in o.lines),
+        "totalCentavos": sales.value_of(o), "currency": o.currency, "units": sum(line.quantity for line in o.lines),
         "createdAt": iso(o.created_at), "createdBy": o.created_by_name,
     }
 
@@ -56,7 +57,9 @@ def out(db: DB, o: SalesOrder) -> dict:
     return {
         **brief(o),
         "payer": o.payer, "notes": o.notes, "tax": o.tax,
-        "grossCentavos": o.gross_centavos, "discountCentavos": o.discount_centavos,
+        "grossCentavos": (shown := sales.figures(o))["grossCentavos"], "discountCentavos": shown["discountCentavos"], "taxCentavos": shown["taxCentavos"],
+        # The order's own amounts, as ordered: the invoice's take their place once invoiced.
+        "ordered": {"grossCentavos": o.gross_centavos, "discountCentavos": o.discount_centavos, "totalCentavos": o.total_centavos},
         "decidedBy": person(o.decided_by), "decidedAt": iso(o.decided_at), "decisionNote": o.decision_note, "deliveredAt": iso(o.delivered_at),
         "lines": [{"id": line.id, "product": product_ref(line.product), "quantity": line.quantity, "freeQuantity": line.free_quantity,
                    "unitPrice": line.unit_price, "discount": line.discount, "total": line.total, "delivered": line.delivered,
@@ -64,7 +67,7 @@ def out(db: DB, o: SalesOrder) -> dict:
         "purchaseOrders": purchase_orders_of(db, o),
         "deliveries": [{"id": d.id, "number": d.number, "status": d.status, "issuedAt": iso(d.issued_at), "shipping": shipping.shipping_out(d)} for d in deliveries],
         # Invoiced from its delivery, and paid (step 13).
-        "invoice": {"id": o.invoice_id, "number": o.invoice_number, "invoicedAt": iso(o.invoiced_at), "total": o.invoice_total, "paidAt": iso(o.paid_at)} if o.invoice_id else None,
+        "invoice": {**sales.invoice_out(o), "invoicedAt": iso(o.invoiced_at), "paidAt": iso(o.paid_at), "total": o.invoice_total} if o.invoice_id else None,
     }
 
 
@@ -163,6 +166,8 @@ def create_order(_: allowed("sales.create"), me: CurrentUser, db: DB, body: Orde
 @router.put("/sales-orders/{order_id}")
 def update_order(_: allowed("sales.edit"), me: CurrentUser, db: DB, order_id: str, body: OrderIn) -> dict:
     o = found(db, SalesOrder, order_id, "sales order")
+    if (why := sales.invoiced_message(o)) is not None:
+        raise conflict(why)
     if o.status not in ("draft", "rejected") or o.quote_id:
         raise conflict("Only a draft typed here can be changed; an order from a quote changes in the CRM, as a new quote.")
     fill(db, o, body)
@@ -225,6 +230,10 @@ def reject_order(_: allowed("sales.approve"), me: CurrentUser, db: DB, order_id:
 @router.post("/sales-orders/{order_id}/cancel")
 def cancel_order(_: allowed("sales.edit"), me: CurrentUser, db: DB, order_id: str, request: Request) -> dict:
     o = found(db, SalesOrder, order_id, "sales order")
+    if sales.is_invoiced(o):
+        raise conflict(f"This order is invoiced ({o.invoice_number}): it can't be cancelled. Ask Finance to void the invoice first.")
+    if (why := sales.invoiced_message(o)) is not None:
+        raise conflict(why)
     if o.status in ("delivered", "cancelled"):
         raise conflict(f"This order is already {o.status}.")
     deliveries = db.scalars(select(Order).where(Order.sales_order_id == o.id, Order.status != "cancelled")).all()

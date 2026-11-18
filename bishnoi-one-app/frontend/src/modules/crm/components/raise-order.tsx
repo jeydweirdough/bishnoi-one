@@ -4,6 +4,7 @@ import { PackageCheck, Send } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { raiseOrder } from "@/src/modules/crm/actions/quote-order";
+import { peso } from "@/src/platform/lib/format";
 import { buttonClass } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import type { Quote } from "@/src/platform/lib/types";
@@ -32,8 +33,14 @@ export function RaiseOrder({
   const order = quote.order;
   if (order) {
     // Once it ships, where the delivery is says more than the order's status (step 12).
-    // Then invoiced and paid (step 13): the end of the chain.
-    const status = order.invoice?.paidAt ? "Paid" : order.invoice?.number ? `Invoiced ${order.invoice.number}` : (order.delivery?.statusLabel ?? STATUS[order.status ?? "sent"] ?? order.status);
+    // Then invoiced and paid (step 13): the end of the chain. The invoice's own total once invoiced (Step 4D).
+    const invoice = order.invoice;
+    const invoiced = invoice?.number && invoice.state !== "voided"
+      ? `Invoiced ${invoice.number}${invoice.totalCentavos != null ? ` (${peso(invoice.totalCentavos)})` : ""}`
+      : null;
+    const status = invoice?.state === "voided"
+      ? "Invoice voided — waiting for reissue"
+      : invoice?.paidAt ? `Paid${invoice.number ? ` ${invoice.number}` : ""}` : (invoiced ?? order.delivery?.statusLabel ?? STATUS[order.status ?? "sent"] ?? order.status);
     const tracking = order.delivery?.trackingNumber ? (
       order.delivery.trackingUrl ? (
         <a href={order.delivery.trackingUrl} target="_blank" rel="noreferrer" className="text-meta text-hema hover:underline">
