@@ -103,7 +103,7 @@ export function ImportPeople() {
 
   return (
     <>
-      <Button icon={<Upload className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+      <Button size="sm" icon={<Upload className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
         Import
       </Button>
       <Modal

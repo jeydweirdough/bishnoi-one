@@ -66,7 +66,7 @@ export function PickList({
         )}
         {groups.map((group) => (
           <div key={group} className="mt-1 first:mt-0">
-            {group && <p className="px-3 pt-2 pb-1 text-meta font-semibold text-ink-3">{group}</p>}
+            {group && <p className="px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground">{group}</p>}
             <ul className="space-y-0.5" role="list">
               {items
                 .filter((i) => (i.group ?? "") === group)
@@ -78,7 +78,7 @@ export function PickList({
                         type="button"
                         onClick={() => onSelect(i.key)}
                         aria-pressed={on}
-                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left ${on ? "bg-hema-tint" : "hover:bg-bench/60"}`}
+                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left ${on ? "bg-muted" : "hover:bg-muted/50"}`}
                       >
                         <span className="min-w-0 flex-1">
                           <span className={`block text-sm ${on ? "font-semibold text-ink" : "text-ink"}`}>

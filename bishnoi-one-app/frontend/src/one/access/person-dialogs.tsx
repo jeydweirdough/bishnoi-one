@@ -151,7 +151,7 @@ export function AddPerson({ data }: { data: AccessData }) {
 
   return (
     <>
-      <Button variant="primary" icon={<UserPlus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+      <Button variant="primary" size="sm" icon={<UserPlus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
         Add employee
       </Button>
       <Modal open={open} title="Add employee" onCancel={() => !busy && setOpen(false)} onOk={save} okText="Add employee" confirmLoading={busy} width={600} destroyOnHidden>
