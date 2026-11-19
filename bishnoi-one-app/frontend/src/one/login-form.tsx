@@ -18,7 +18,7 @@ export function LoginForm({ next, email: given = "" }: { next: string; email?: s
   }, [state?.go]);
   if (state?.ticket) return <CodeForm ticket={state.ticket} email={state.email ?? email} next={next} />;
   return (
-    <form action={action} className="mt-8 space-y-5" noValidate>
+    <form action={action} className="flex flex-col gap-4" noValidate>
       <input suppressHydrationWarning type="hidden" name="next" value={next} />
       <Field label="Work email">
         {(p) => <Input {...p} name="email" type="email" autoComplete="username" value={email || state?.email || ""} onChange={(e) => setEmail(e.target.value)} autoFocus required />}
@@ -27,7 +27,7 @@ export function LoginForm({ next, email: given = "" }: { next: string; email?: s
         {(p) => <PasswordInput {...p} name="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}
       </Field>
       <div className="-mt-2 text-right">
-        <Link href={`/login/forgot${email ? `?email=${encodeURIComponent(email)}` : ""}`} className="text-meta text-ink-2 hover:text-hema hover:underline">
+        <Link href={`/login/forgot${email ? `?email=${encodeURIComponent(email)}` : ""}`} className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
           Forgot your password?
         </Link>
       </div>
@@ -49,7 +49,7 @@ function CodeForm({ ticket, email, next }: { ticket: string; email: string; next
   // The ticket ran out (five minutes): start again with the password.
   if (!state?.ticket && !state?.go) {
     return (
-      <div className="mt-8 space-y-4 text-center">
+      <div className="space-y-4 text-center">
         <FormError message={state?.error ?? "This sign-in took too long."} />
         <Button variant="primary" size="lg" className="w-full justify-center" onClick={() => window.location.reload()}>
           Sign in again
@@ -58,7 +58,7 @@ function CodeForm({ ticket, email, next }: { ticket: string; email: string; next
     );
   }
   return (
-    <form action={action} className="mt-8 space-y-5" noValidate>
+    <form action={action} className="flex flex-col gap-4" noValidate>
       <input type="hidden" name="ticket" value={state.ticket ?? ticket} />
       <input type="hidden" name="email" value={email} />
       <input type="hidden" name="next" value={next} />
