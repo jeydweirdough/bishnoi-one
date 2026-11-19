@@ -28,6 +28,8 @@ export const AREA_NAMES: Record<string, string> = { payables: "Payables", receiv
 
 const WIDE = new Set<CardKey>(["wait", "inout", "due", "zoho", "vat"]);
 export const isWide = (key: CardKey) => WIDE.has(key);
+/** Cards fed by Zoho: no Zoho integration (owner, 2026-11-20), so they aren't shown or offered. */
+export const NO_ZOHO = (key: CardKey) => key !== "zoho" && key !== "link" && key !== "due";
 
 export type Ctx = { data: OverviewData; peso: Peso; loadedAt: number; prices: ReactNode; othersOnly: boolean };
 

@@ -49,8 +49,7 @@ const FINANCE_SETTINGS: Record<string, string> = {
 //    another); every module takes the account's own session (M3), so nothing is opened on the way.
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  // OAuth codes must never enter login return URLs or the last-page cookie.
-  const next = pathname === "/finance/integrations/zoho/callback" ? pathname : pathname + search;
+  const next = pathname + search;
   // The Admin Console's Reports Center is people reports only (2026-10-30): an app's report, and Company KPIs,
   // are opened in that app; old links to them here go there.
   const appReport = pathname.match(/^\/platform\/reports\/(crm|inventory|finance|admin|pharmacy)(\/.*)?$/);
@@ -91,8 +90,10 @@ export async function proxy(request: NextRequest) {
   if (inventorySettings) return NextResponse.redirect(siteUrl(`/platform/settings/inventory/${inventorySettings[1]}${search}`, request), 308);
   const financeSettings = FINANCE_SETTINGS[pathname];
   if (financeSettings) return NextResponse.redirect(siteUrl(`/platform/settings/finance/${financeSettings}${search}`, request), 308);
-  const zoho = pathname.match(/^\/finance\/integrations\/zoho(\/deliveries)?$/);
-  if (zoho) return NextResponse.redirect(siteUrl(`/platform/company/integrations/zoho${zoho[1] ?? ""}${search}`, request), 308);
+  // No Zoho integration (owner, 2026-11-20): its pages are gone; old links land where the work is now.
+  if (/^\/(finance|platform\/company)\/integrations\/zoho(\/.*)?$/.test(pathname)) return NextResponse.redirect(siteUrl("/platform/company/integrations", request), 308);
+  if (/^\/finance\/import-(review|matching)(\/.*)?$/.test(pathname)) return NextResponse.redirect(siteUrl("/finance", request), 308);
+  if (/^\/finance\/petty-cash\/imported(\/.*)?$/.test(pathname)) return NextResponse.redirect(siteUrl("/finance/petty-cash", request), 308);
   // One activity log, the Admin Console's (2026-10-31): each app's old log lands there, filtered to that app.
   const log = pathname.match(/^\/(crm|inventory|finance|pharmacy)\/admin\/audit$/);
   if (log) return NextResponse.redirect(siteUrl(`/platform/company/activity?app=${log[1]}`, request), 308);

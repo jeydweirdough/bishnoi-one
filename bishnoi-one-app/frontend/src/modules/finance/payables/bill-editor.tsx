@@ -346,9 +346,6 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
 
       <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Zoho reference" optional error={fields.zohoRef} hint="The same bill's number in Zoho, while both are used.">
-            {(p) => <Input {...p} value={v.zohoRef} onChange={(e) => set({ zohoRef: e.target.value })} maxLength={60} />}
-          </Field>
           <Field label="Oojeema reference" optional error={fields.oojeemaRef} hint="The expense or voucher number in Oojeema.">
             {(p) => <Input {...p} value={v.oojeemaRef} onChange={(e) => set({ oojeemaRef: e.target.value })} maxLength={60} />}
           </Field>

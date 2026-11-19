@@ -13,7 +13,6 @@ import type { SignedStep } from "@/src/modules/finance/signature/types";
 import { attachVoucherFile, removeVoucherFile } from "@/src/modules/finance/vouchers/actions";
 import { VoucherEditor } from "@/src/modules/finance/vouchers/editor";
 import { VoucherSteps } from "@/src/modules/finance/vouchers/steps";
-import { ZohoImport } from "@/src/modules/finance/import-matching/zoho-import";
 import { VOUCHER_STATUS_LABELS, type Voucher, type VoucherChoices, type VoucherStatus, type VoucherSummary } from "@/src/modules/finance/vouchers/types";
 
 // Payment vouchers (app/routers/vouchers.py; Plans/Plan - Payment vouchers): prepared, then
@@ -49,16 +48,13 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
   if (q) query.set("q", q);
   if (one(sp.queue)) query.set("queue", one(sp.queue));
   const list = await load<{ items: (VoucherSummary & { queueNote?: string | null })[]; counts: Record<VoucherStatus, number>; canPrepare: boolean; queueLabel: string | null }>(`/finance/vouchers?${query}`);
-  // Importing Zoho's supplier payments: its own tick, and the testing site only for now (app/routers/imports.py).
-  const canImport = (me.permissions?.includes("imports.run") ?? false) && me.dataEnvironment === "local_test";
   return (
     <>
       <PageHeader
         title="Payment vouchers"
         actions={
-          (canImport || list.canPrepare) && (
+          list.canPrepare && (
             <>
-              {canImport && <ZohoImport kind="supplier-payments" />}
               {list.canPrepare && (
                 <LinkButton href="/finance/vouchers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
                   New payment voucher
@@ -214,7 +210,6 @@ export async function VoucherPage({ params, searchParams }: { params: Promise<{ 
         }
       >
         <StatusMark status={v.status} />
-        {v.zohoSync && <p role="status" className="mt-2 text-sm text-ink-2">Zoho: {v.zohoSync.label}. {v.zohoSync.message}</p>}
         <span className="ml-2 text-meta text-ink-2">
           {v.methodLabel} · {fmt.peso(v.totalCentavos)}
           {v.paidFrom && ` from ${v.paidFrom.code} · ${v.paidFrom.name}`}
@@ -239,7 +234,6 @@ export async function VoucherPage({ params, searchParams }: { params: Promise<{ 
               ["Pay to", <Link key="s" href={`/finance/suppliers/${v.supplier.id}`} className="text-hema hover:underline">{v.supplier.name}</Link>],
               ["Their bank", [v.supplier.bankName, v.supplier.bankAccountName, v.supplier.bankAccountNumber].filter(Boolean).join(" · ") || null],
               ["Oojeema PV", v.oojeemaRef],
-              ["Zoho", v.zohoRef],
             ]}
           />
           <Particulars

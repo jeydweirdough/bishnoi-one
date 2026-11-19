@@ -31,8 +31,6 @@ function missingOf(unset: Unset, keys: string[]): Missing {
 
 /** What each page needs, so the menu offers only what the role opens (the API checks the same). A list means any one of them. */
 const NEEDS: [string, string | string[]][] = [
-  ["/finance/import-review", "integrations.manage"],
-  ["/finance/import-matching", ["imports.propose", "imports.confirm", "imports.confirm_tax", "imports.run"]],
   ["/finance/funds", "funds.view"],
   ["/finance/invoices", "invoices.view"],
   ["/finance/sales-orders", "sales_orders.view"],
@@ -74,7 +72,6 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
     // Imported expenses (2026-10-31): read-only Zoho history, seen by whoever sees petty cash.
     { label: "Petty cash", icon: "money", steps: keep([
       { href: "/finance/petty-cash", label: "Petty cash", icon: "money", exact: true },
-      { href: "/finance/petty-cash/imported", label: "Imported expenses", icon: "lists" },
     ]) },
     {
       label: "Sales",
@@ -141,8 +138,6 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       label: "Settings",
       icon: "settings",
       steps: keep([
-        { href: "/finance/import-review", label: "Import review", icon: "lists" },
-        { href: "/finance/import-matching", label: "Import matching", icon: "lists" },
       ]),
     },
   ];

@@ -16,7 +16,6 @@ import { STATUS_LABELS, type Ageing, type Invoice, type InvoiceStatus, type Invo
 import { Amount } from "@/src/modules/finance/platform/ui/amount";
 import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Figure, type PillTone } from "@/src/platform/ui/list-layout";
 import { ExpandableTable } from "@/src/platform/ui/expandable-table";
-import { ZohoImport } from "@/src/modules/finance/import-matching/zoho-import";
 
 // Sales invoices (app/routers/invoices.py): drafts, issued with the next
 // number of the BIR's series, and voided rather than changed once issued.
@@ -107,7 +106,6 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
         title="Sales invoices"
         actions={
           <>
-            {may(me, "imports.run") && me.dataEnvironment === "local_test" && <ZohoImport kind="oojeema-sales" />}
             {may(me, "invoices.create") && (
               <LinkButton href="/finance/invoices/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
                 New invoice

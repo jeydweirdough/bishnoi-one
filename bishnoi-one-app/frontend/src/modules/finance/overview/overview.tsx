@@ -7,7 +7,7 @@ import { Modal } from "@/src/modules/finance/platform/ui/modal";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
 import { overviewFor } from "./actions";
-import { AREA_NAMES, CARD_LABELS, CardFor, isWide, LeadFor, type Ctx } from "./cards";
+import { AREA_NAMES, CARD_LABELS, CardFor, isWide, LeadFor, NO_ZOHO, type Ctx } from "./cards";
 import { HoverTip } from "./charts";
 import { MAX_CARDS, pl, place, readPicks, writePicks } from "./lib";
 import s from "./overview.module.css";
@@ -71,7 +71,7 @@ function EditPanel({ suggested }: { suggested: CardKey[] }) {
     <Modal open title="Edit my overview" width={480} footer={null} onCancel={() => setEditing(false)}>
       <p className={s.why}>Pick up to {MAX_CARDS} cards, so it all fits on one screen. Everything else stays in the area tabs. Only what you may see is offered.</p>
       <fieldset className={s.picks} aria-label="Cards you may show">
-        {data.pickable.map(({ key, area }) => {
+        {data.pickable.filter(({ key }) => NO_ZOHO(key)).map(({ key, area }) => {
           const on = chosen.includes(key);
           const off = !on && full;
           return (
@@ -115,7 +115,7 @@ export function OverviewBody({ org, prices }: { org: Org; prices: ReactNode }) {
 
   const view = data.views[tab] ?? data.views.overview!;
   const shownTab: AreaKey = data.views[tab] ? tab : "overview";
-  const keys = (shownTab === "overview" && picks ? picks.filter((k) => data.cards[k]) : view.cards).slice(0, MAX_CARDS);
+  const keys = (shownTab === "overview" && picks ? picks.filter((k) => data.cards[k]) : view.cards).filter(NO_ZOHO).slice(0, MAX_CARDS);
   const placed = place(keys.map((key) => ({ key, wide: isWide(key) })));
   const rows = keys.length > 1 ? 2 : 1;
 

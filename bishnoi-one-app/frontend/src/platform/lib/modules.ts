@@ -67,7 +67,6 @@ export function moduleOfPath(pathname: string): ModuleDef | null {
 const BORROWED: { path: string; module: ModuleKey; frame: ModuleKey }[] = [
   { path: "/crm/sales", module: "inventory", frame: "crm" },
   // Finance's Zoho Books sign-in, under the Admin Console's Integrations (2026-10-31): kept by Finance, set up there.
-  { path: "/platform/company/integrations/zoho", module: "finance", frame: "platform" },
   // Each app's settings, for company administrators only, in the Admin Console (2026-10-31): the CRM's first.
   { path: "/platform/settings/crm", module: "crm", frame: "platform" },
   { path: "/platform/settings/inventory", module: "inventory", frame: "platform" },

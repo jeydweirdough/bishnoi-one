@@ -238,9 +238,6 @@ export function VoucherEditor({ voucher, choices: first, preselect, org }: { vou
           <Field label="Oojeema PV number" optional error={fields.oojeemaRef} hint="The same voucher in Oojeema.">
             {(p) => <Input {...p} value={oojeemaRef} onChange={(e) => setOojeemaRef(e.target.value)} maxLength={60} />}
           </Field>
-          <Field label="Zoho reference" optional error={fields.zohoRef} hint="The same payment in Zoho.">
-            {(p) => <Input {...p} value={zohoRef} onChange={(e) => setZohoRef(e.target.value)} maxLength={60} />}
-          </Field>
         </div>
         <Field label="Notes" optional error={fields.notes}>
           {(p) => <Textarea {...p} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />}
