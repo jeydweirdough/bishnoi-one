@@ -1,7 +1,7 @@
 "use client";
 
 import { Camera } from "lucide-react";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { useState } from "react";
 import { PhotoPicker } from "@/src/platform/account/photo-picker";
 import { removeMyPhoto, saveMyPhoto } from "@/src/platform/actions/account";

@@ -1,6 +1,7 @@
 "use client";
 
-import { Dropdown, Modal } from "antd";
+import { Dropdown } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Bookmark, MoreHorizontal, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";

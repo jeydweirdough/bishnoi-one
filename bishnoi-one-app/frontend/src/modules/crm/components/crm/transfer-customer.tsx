@@ -1,7 +1,8 @@
 "use client";
 
 import { Input } from "@/src/platform/ui/field";
-import { Alert, Modal } from "antd";
+import { Alert } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { ArrowLeftRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";

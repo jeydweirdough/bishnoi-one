@@ -1,7 +1,7 @@
 "use client";
 
 import { KeyRound, Pencil } from "lucide-react";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";

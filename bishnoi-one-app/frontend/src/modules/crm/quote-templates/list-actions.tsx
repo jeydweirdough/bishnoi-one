@@ -2,7 +2,7 @@
 
 import { FileSpreadsheet, PenLine, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createTemplate, deleteTemplate } from "@/src/modules/crm/actions/quote-templates";

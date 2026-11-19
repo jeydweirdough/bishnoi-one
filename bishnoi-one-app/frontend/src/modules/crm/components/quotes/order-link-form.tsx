@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, FileText, LocateFixed, ShieldCheck, X } from "lucide-react";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { useCallback, useEffect, useState } from "react";
 import { Button, TextButton } from "@/src/platform/ui/button";
 import { Input } from "@/src/platform/ui/field";

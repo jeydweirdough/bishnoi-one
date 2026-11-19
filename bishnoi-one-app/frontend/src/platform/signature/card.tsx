@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { PenLine, Trash2, Upload } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";

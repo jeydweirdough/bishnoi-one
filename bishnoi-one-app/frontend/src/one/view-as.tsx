@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Eye, EyeOff, Search } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";

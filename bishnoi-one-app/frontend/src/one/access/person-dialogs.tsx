@@ -1,7 +1,7 @@
 "use client";
 
 import { Combobox } from "@/src/platform/ui/pickers";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldCheck, ShieldOff, Trash2, UserPlus, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { ArrowRight, Building2, CornerDownLeft, FileText, Handshake, Package, Plus, Search, UserRound, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";

@@ -1,6 +1,7 @@
 "use client";
 
-import { Dropdown, Modal, Tag } from "antd";
+import { Dropdown, Tag } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Combobox } from "@/src/platform/ui/pickers";
 import { DateInput } from "@/src/platform/ui/pickers";
 import { FileDrop } from "@/src/platform/ui/file-drop";

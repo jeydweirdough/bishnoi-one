@@ -1,6 +1,7 @@
 "use client";
 
-import { Alert, Modal } from "antd";
+import { Alert } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";

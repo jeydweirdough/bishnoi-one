@@ -1,7 +1,7 @@
 "use client";
 
 import { TextButton } from "@/src/platform/ui/button";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 

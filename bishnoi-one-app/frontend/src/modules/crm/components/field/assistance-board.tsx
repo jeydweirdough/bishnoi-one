@@ -1,6 +1,7 @@
 "use client";
 
-import { Dropdown, Modal } from "antd";
+import { Dropdown } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { IdCard, MoreHorizontal, Paperclip, Plus, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";

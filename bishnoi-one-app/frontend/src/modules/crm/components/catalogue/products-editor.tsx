@@ -13,7 +13,7 @@ import type { CatalogueProduct, FormFieldDef, FormLayout, Org, SalesRules, Stock
 import { ChoiceSelect, LayoutForm, extraChanges, toDraft, type ExtraDraft } from "@/src/modules/crm/components/extra/extra-fields";
 import { extraText } from "@/src/modules/crm/components/extra/extra-values";
 import { deleteProduct, proposePrices, saveProduct, type ProductInput } from "@/src/modules/crm/actions/catalogue";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { StockBadge, StockWhere } from "@/src/modules/crm/components/catalogue/stock";
 
 type PriceType = SalesRules["priceTypes"][number];

@@ -26,7 +26,8 @@ import {
   Trash2,
   Type,
 } from "lucide-react";
-import { Modal, Switch } from "antd";
+import { Switch } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";

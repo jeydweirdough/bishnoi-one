@@ -3,7 +3,8 @@
 import { ArrowRight, CalendarClock, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Dropdown, Modal } from "antd";
+import { Dropdown } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Amount } from "./amount";
