@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/src/platform/ui/pickers";
 import { Upload } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -158,14 +159,14 @@ export function ChartImport() {
                       </td>
                       <td className="px-2 py-1.5">
                         {needsType ? (
-                          <select suppressHydrationWarning
+                          <Select
                             aria-label={`Line ${r.line}: type`}
                             value={picked[r.line] ?? ""}
                             onChange={(e) => {
                               setPicked({ ...picked, [r.line]: e.target.value as AccountType });
                               if (e.target.value) tick(r.line, true);
                             }}
-                            className="h-8 w-full rounded-lg border border-danger bg-sheet px-2 text-sm"
+                            className="w-full"
                           >
                             <option value="">Pick a type…</option>
                             {(Object.keys(TYPE_LABELS) as AccountType[]).map((t) => (
@@ -173,7 +174,7 @@ export function ChartImport() {
                                 {TYPE_LABELS[t]}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         ) : r.type ? (
                           TYPE_LABELS[r.type]
                         ) : (

@@ -211,14 +211,14 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
                 {contacts.map((c, i) => (
                   <tr key={i}>
                     <td className="py-1.5 pr-2">
-                      <select suppressHydrationWarning aria-label={`Contact ${i + 1}: salutation`} value={c.salutation ?? ""} onChange={(e) => setContact(i, { salutation: e.target.value || null })} className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm">
+                      <Select aria-label={`Contact ${i + 1}: salutation`} value={c.salutation ?? ""} onChange={(e) => setContact(i, { salutation: e.target.value || null })} className="w-full">
                         <option value="" />
                         {SALUTATIONS.map((s) => (
                           <option key={s} value={s}>
                             {s}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </td>
                     {(["firstName", "lastName", "email", "phone", "designation"] as const).map((k) => (
                       <td key={k} className="px-2 py-1.5">

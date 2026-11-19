@@ -244,12 +244,12 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
               {lines.map((l, i) => (
                 <tr key={l.key} className="align-top">
                   <td className="py-1.5 pr-2">
-                    <select suppressHydrationWarning
+                    <Select
                       aria-label={`Line ${i + 1}: account`}
                       aria-invalid={fields[`lines.${i}.accountId`] ? true : undefined}
                       value={l.accountId}
                       onChange={(e) => setLine(l.key, { accountId: e.target.value })}
-                      className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm aria-[invalid=true]:border-danger"
+                      className="w-full"
                     >
                       <option value="">Pick an account…</option>
                       {(["expense", "asset"] as const).map((t) =>
@@ -263,33 +263,33 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
                           </optgroup>
                         ) : null,
                       )}
-                    </select>
+                    </Select>
                     {fields[`lines.${i}.accountId`] && <p className="mt-0.5 text-meta text-danger">{fields[`lines.${i}.accountId`]}</p>}
                   </td>
                   <td className="px-2 py-1.5">
                     <CellInput aria-label={`Line ${i + 1}: description`} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value })} maxLength={200} className="w-full !text-left" />
                   </td>
                   <td className="px-2 py-1.5">
-                    <select suppressHydrationWarning aria-label={`Line ${i + 1}: purchase type`} value={l.purchaseType} onChange={(e) => setLine(l.key, { purchaseType: e.target.value as PurchaseType })} className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm">
+                    <Select aria-label={`Line ${i + 1}: purchase type`} value={l.purchaseType} onChange={(e) => setLine(l.key, { purchaseType: e.target.value as PurchaseType })} className="w-full">
                       {choices.purchaseTypes.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
-                    </select>
+                    </Select>
                   </td>
                   <td className="px-2 py-1.5">
-                    <select suppressHydrationWarning aria-label={`Line ${i + 1}: VAT`} value={l.vat} onChange={(e) => setLine(l.key, { vat: e.target.value as VatKind })} className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm">
+                    <Select aria-label={`Line ${i + 1}: VAT`} value={l.vat} onChange={(e) => setLine(l.key, { vat: e.target.value as VatKind })} className="w-full">
                       <option value="">Choose VAT</option>
                       {choices.vatKinds.map((k) => (
                         <option key={k.key} value={k.key}>
                           {k.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td className="px-2 py-1.5">
-                    <select suppressHydrationWarning
+                    <Select
                       aria-label={`Line ${i + 1}: tax withheld`}
                       value={l.withholding}
                       onChange={(e) => setLine(l.key, { withholding: e.target.value })}
-                      className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm"
+                      className="w-full"
                     >
                       <option value="unconfirmed">Choose withholding</option><option value="">None</option>
                       {choices.withholding.map((w) => (
@@ -297,7 +297,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
                           {w.code} · {w.rateBp / 100}%
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td className="px-2 py-1.5">
                     <CellInput

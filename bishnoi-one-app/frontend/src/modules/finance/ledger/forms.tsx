@@ -129,16 +129,16 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
             {lines.map((l, i) => (
               <tr key={l.key} className="align-top">
                 <td className="py-1.5 pr-2">
-                  <select suppressHydrationWarning
+                  <Select
                     aria-label={`Line ${i + 1}: account`}
                     aria-invalid={fields[`lines.${i}.accountId`] ? true : undefined}
                     value={l.accountId}
                     onChange={(e) => set(l.key, { accountId: e.target.value })}
-                    className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm aria-[invalid=true]:border-danger"
+                    className="w-full"
                   >
                     <option value="">Select an account…</option>
                     {accountOptions(accounts)}
-                  </select>
+                  </Select>
                 </td>
                 <td className="px-2 py-1.5">
                   <CellInput aria-label={`Line ${i + 1}: description`} value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} className="w-full !text-left" />

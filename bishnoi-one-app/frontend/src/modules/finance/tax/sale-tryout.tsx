@@ -102,18 +102,18 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
                     <CellInput className="w-24" inputMode="decimal" aria-label={`Line ${n + 1}: unit price`} value={r.price} onChange={(e) => setRow(n, { price: e.target.value })} />
                   </td>
                   <td className="px-2 py-2">
-                    <select suppressHydrationWarning
+                    <Select
                       aria-label={`Line ${n + 1}: VAT category`}
                       value={r.category}
                       onChange={(e) => setRow(n, { category: e.target.value })}
-                      className="h-8 rounded-lg border border-rule-strong bg-sheet px-1.5 text-meta"
+                      className=""
                     >
                       {setup.pack.categories.map((c) => (
                         <option key={c.key} value={c.key}>
                           {c.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td className="px-2 py-2 text-center">
                     <input suppressHydrationWarning type="checkbox" aria-label={`Line ${n + 1}: covered by the SC/PWD discount`} checked={r.relief} onChange={(e) => setRow(n, { relief: e.target.checked })} className="size-4 accent-hema" />

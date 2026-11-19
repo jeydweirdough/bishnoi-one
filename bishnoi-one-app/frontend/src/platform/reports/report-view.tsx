@@ -1,3 +1,4 @@
+import { Select } from "@/src/platform/ui/pickers";
 import { hasTotals, totalsOf } from "./totals";
 import Link from "next/link";
 import { ReportChartView } from "./chart";
@@ -191,13 +192,13 @@ export async function ReportView({
             {filters.map((f) => (
               <label key={f.key} className="block">
                 <span className="mb-1 block text-meta font-medium text-ink-2">{f.label}</span>
-                <select suppressHydrationWarning name={f.key} defaultValue={search[f.key] ?? ""} className="h-9 min-w-40 rounded-lg border border-rule bg-white px-2.5 text-sm">
+                <Select name={f.key} defaultValue={search[f.key] ?? ""} className="min-w-40">
                   {f.options.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             ))}
             {savedReport && <input type="hidden" name="saved" value={savedReport.id} />}

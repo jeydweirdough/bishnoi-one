@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/src/platform/ui/pickers";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/finance/platform/ui/button";
@@ -102,13 +103,13 @@ export function RegistrationForm({ setup }: { setup: TaxSetup }) {
           </Field>
           <Field label="Fiscal year ends in" size="md" error={fields.fiscalMonthEnd} hint="December for a calendar year. The BIR returns' quarters follow it.">
             {(f) => (
-              <select suppressHydrationWarning {...f} value={v.fiscalMonthEnd} onChange={(e) => set({ fiscalMonthEnd: e.target.value })} className="h-9 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm">
+              <Select {...f} value={v.fiscalMonthEnd} onChange={(e) => set({ fiscalMonthEnd: e.target.value })} className="w-full">
                 {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
                   <option key={m} value={i + 1}>
                     {m}
                   </option>
                 ))}
-              </select>
+              </Select>
             )}
           </Field>
           <Field label="Registered address" error={fields.registeredAddress} size="full">
