@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { Toaster } from "@/src/components/ui/sonner";
 import { TooltipProvider } from "@/src/components/ui/tooltip";
 import { APP_NAME } from "../lib/labels";
-import { AntTheme } from "./ant-theme";
 
 // Geist, as Studio Admin uses it (shadcn/ui, 2026-11-19), from the geist package: kept with the app, so a
 // server whose internet is down still builds.
@@ -29,9 +28,7 @@ export function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${fontVars} antialiased`}>
       <body className="min-h-dvh font-sans">
-        <TooltipProvider>
-          <AntTheme>{children}</AntTheme>
-        </TooltipProvider>
+        <TooltipProvider>{children}</TooltipProvider>
         <Toaster position="top-center" duration={4000} />
       </body>
     </html>

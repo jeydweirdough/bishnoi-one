@@ -2,7 +2,7 @@
 import {useState} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
-import {Select as SearchSelect} from 'antd';
+import {Combobox as SearchSelect} from '@/src/platform/ui/pickers';
 import {Button} from '../platform/ui/button';
 import {Input,Select,Field,FormError} from '../platform/ui/field';
 import {Sheet,SectionTitle} from '../platform/ui/sheet';

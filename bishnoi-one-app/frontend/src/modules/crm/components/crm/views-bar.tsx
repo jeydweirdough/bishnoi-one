@@ -1,6 +1,6 @@
 "use client";
 
-import { Dropdown } from "antd";
+import { Dropdown } from "@/src/platform/ui/compat";
 import { Modal } from "@/src/platform/ui/modal";
 import { Bookmark, MoreHorizontal, Users } from "lucide-react";
 import Link from "next/link";

@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useState} from 'react';
-import {ConfigProvider,Select as SearchSelect} from 'antd';
+import {Combobox as SearchSelect} from '@/src/platform/ui/pickers';
 import {Button} from '../platform/ui/button';
 import {Input,Select,Field,FormError} from '../platform/ui/field';
 import {Modal} from '../platform/ui/modal';
@@ -67,7 +67,7 @@ export function RecordsModal({match,choices,files,onFiles,onClose}:{match:Match;
  // (antd's default) were hidden behind it, so typing picked the first match unseen. Drawn inside it.
  const inside=(node?:HTMLElement)=>node?.closest('dialog')??document.body;
  return <Modal open title={`Records using “${label}”`} onCancel={onClose} footer={null} width={1040}>
-  <ConfigProvider getPopupContainer={inside}>
+  <>
   <div className="mt-3 space-y-4">
    {!data&&!contents&&<div className="space-y-3"><p className="text-sm text-ink-2">The exports aren&apos;t stored in Finance. Choose the same file or files you loaded to see these records. Nothing is saved.</p>
     <Field label="CSV files">{props=><Input {...props} type="file" accept=".csv,text/csv" multiple disabled={busy} onChange={e=>{setPicked(Array.from(e.target.files||[]));setError(null);}}/>}</Field>
@@ -93,6 +93,6 @@ export function RecordsModal({match,choices,files,onFiles,onClose}:{match:Match;
    </>}
    <div className="flex justify-end border-t border-rule pt-4"><Button variant="primary" onClick={onClose}>Close</Button></div>
   </div>
-  </ConfigProvider>
+  </>
  </Modal>;
 }

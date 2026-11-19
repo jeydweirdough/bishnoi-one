@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert } from "antd";
+import { Alert } from "@/src/platform/ui/compat";
 import { Modal } from "@/src/platform/ui/modal";
 import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";

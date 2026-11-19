@@ -1,6 +1,6 @@
 "use client";
 
-import { Dropdown } from "antd";
+import { Dropdown } from "@/src/platform/ui/compat";
 import { Modal } from "@/src/platform/ui/modal";
 import { IdCard, MoreHorizontal, Paperclip, Plus, X } from "lucide-react";
 import { useState, useTransition } from "react";

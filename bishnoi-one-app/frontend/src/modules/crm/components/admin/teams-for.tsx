@@ -1,6 +1,6 @@
 "use client";
 
-import { Segmented } from "antd";
+import { Segmented } from "@/src/platform/ui/compat";
 import { Combobox } from "@/src/platform/ui/pickers";
 import { useState } from "react";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Tabs } from "antd";
+import { Tabs } from "@/src/platform/ui/compat";
 import { Modal } from "@/src/platform/ui/modal";
 import {
   ArrowDown,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Dropdown } from "antd";
+import { Dropdown } from "@/src/platform/ui/compat";
 import { Modal } from "@/src/platform/ui/modal";
 import { ChevronDown, Download, FileText, Plus, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";

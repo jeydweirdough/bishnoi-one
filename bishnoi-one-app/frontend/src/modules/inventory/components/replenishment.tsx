@@ -1,6 +1,6 @@
 "use client";
 
-import { Checkbox } from "antd";
+import { Checkbox } from "@/src/platform/ui/compat";
 import { ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

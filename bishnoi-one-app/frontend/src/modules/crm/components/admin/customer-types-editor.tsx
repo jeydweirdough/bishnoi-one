@@ -1,6 +1,6 @@
 "use client";
 
-import { Popover } from "antd";
+import { Popover } from "@/src/platform/ui/compat";
 import { ArrowDown, ArrowUp, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";

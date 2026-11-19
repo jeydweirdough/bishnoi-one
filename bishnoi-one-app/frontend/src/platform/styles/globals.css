@@ -278,12 +278,11 @@ These serve as the fallback; there is no separate default.css file. */
     background: rgb(20 22 30 / 0.35);
   }
 
-  /* Ant's own pieces are left out: Ant switches its motion off itself (ant-theme.tsx), and the
-     near-zero duration kept its dropdowns from ever showing on a PC with animations off. */
+  /* Less motion for those who ask for it. */
   @media (prefers-reduced-motion: reduce) {
-    *:not([class*="ant-"]),
-    *:not([class*="ant-"])::before,
-    *:not([class*="ant-"])::after {
+    *,
+    *::before,
+    *::after {
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
@@ -369,10 +368,10 @@ a[data-nav-pending] {
   }
 }
 
-/* Ant Design's table head on every table: a light grey row, dark headings in
-   normal case. (Set over the utilities each table gives its <th>.) */
+/* Every table's head as shadcn/ui's: muted headings in normal case, no fill.
+   (Set over the utilities each table gives its <th>.) */
 table > thead > tr > th {
-  background: #fbfbfa;
+  background: transparent;
   color: var(--color-ink-3) !important;
   font-weight: 500 !important;
   text-transform: none !important;
@@ -421,10 +420,6 @@ table > thead > tr {
   }
 }
 
-/* Buttons: the UI kit's icon gap (8 px, small 6, large 10), whatever icon library sits inside. */
-.ant-btn { gap: 8px; }
-.ant-btn.ant-btn-sm { gap: 6px; }
-.ant-btn.ant-btn-lg { gap: 10px; }
 
 /* Amber as text reads in its darker ink (see --color-due-today-ink); unlayered, so it wins
    over the utility while bg-due-today, ring-due-today and fills keep the bright amber. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { InputNumber } from "antd";
+import { InputNumber } from "@/src/platform/ui/compat";
 import { Combobox } from "@/src/platform/ui/pickers";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";

@@ -1,7 +1,7 @@
 "use client";
 
 import { MENU_ROW } from "@/src/platform/ui/more-menu";
-import { Switch } from "antd";
+import { Switch } from "@/src/platform/ui/compat";
 import { Modal } from "@/src/platform/ui/modal";
 import { Share2 } from "lucide-react";
 import { useState, useTransition } from "react";

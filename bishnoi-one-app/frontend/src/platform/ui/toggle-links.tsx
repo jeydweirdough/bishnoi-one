@@ -1,6 +1,6 @@
 "use client";
 
-import { Segmented } from "antd";
+import { Segmented } from "@/src/platform/ui/compat";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 

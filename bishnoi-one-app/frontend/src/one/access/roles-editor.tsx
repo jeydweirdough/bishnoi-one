@@ -1,6 +1,6 @@
 "use client";
 
-import { Switch } from "antd";
+import { Switch } from "@/src/platform/ui/compat";
 import { ChevronRight, Plus, ShieldCheck, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

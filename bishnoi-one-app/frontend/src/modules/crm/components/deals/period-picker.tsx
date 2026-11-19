@@ -1,6 +1,6 @@
 "use client";
 
-import { DatePicker, Segmented } from "antd";
+import { DatePicker, Segmented } from "@/src/platform/ui/compat";
 import { Combobox } from "@/src/platform/ui/pickers";
 import dayjs, { type Dayjs } from "dayjs";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";

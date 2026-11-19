@@ -1,6 +1,6 @@
 "use client";
 
-import { Spin } from "antd";
+import { Spin } from "@/src/platform/ui/compat";
 import { Modal } from "@/src/platform/ui/modal";
 import {
   FileText,

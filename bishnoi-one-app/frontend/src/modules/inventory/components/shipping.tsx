@@ -1,6 +1,6 @@
 "use client";
 
-import { Checkbox } from "antd";
+import { Checkbox } from "@/src/platform/ui/compat";
 import { Modal } from "@/src/platform/ui/modal";
 import { Check, ExternalLink, Pencil, RotateCcw, Truck, X } from "lucide-react";
 import { useRouter } from "next/navigation";
