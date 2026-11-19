@@ -266,7 +266,7 @@ These serve as the fallback; there is no separate default.css file. */
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-sage-deep);
+    outline: 2px solid color-mix(in oklch, var(--ring) 60%, transparent);
     outline-offset: 2px;
   }
 
