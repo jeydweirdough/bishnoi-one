@@ -247,6 +247,11 @@ These serve as the fallback; there is no separate default.css file. */
 }
 
 @layer base {
+  /* shadcn/ui: every line takes the theme border colour unless told otherwise. */
+  * {
+    @apply border-border outline-ring/50;
+  }
+
   html {
     color-scheme: light;
     background: var(--color-bench);
