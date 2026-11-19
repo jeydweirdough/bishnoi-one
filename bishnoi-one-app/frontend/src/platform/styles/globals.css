@@ -154,10 +154,11 @@ These serve as the fallback; there is no separate default.css file. */
    *   text-tick     chart axis numbers
    * Headings are never grey caps: caps mean "a column or group label", nothing else.
    */
-  --text-title: clamp(1.5rem, 1.2rem + 1vw, 2rem);
+  /* Studio Admin's page title: text-3xl tracking-tight (2026-11-19). */
+  --text-title: 1.875rem;
   --text-title--line-height: 1.2;
-  --text-title--letter-spacing: -0.015em;
-  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.025em;
+  --text-title--font-weight: 400;
   --text-heading: 1.125rem;
   --text-heading--line-height: 1.35;
   --text-heading--letter-spacing: -0.005em;

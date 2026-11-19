@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 
 /** The frame the list sits in: a white panel with a light border, nothing nested inside it. */
 export function ListFrame({ children }: { children: ReactNode }) {
-  return <section className="overflow-hidden rounded-2xl border border-rule bg-white">{children}</section>;
+  return <section className="overflow-hidden rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10">{children}</section>;
 }
 
 export type Figure = { label: string; value: string; icon?: ReactNode; change?: { text: string; tone: "up" | "down" | "flat"; good?: "up" | "down" } };
@@ -22,10 +22,10 @@ export function FigureStrip({ figures }: { figures: Figure[] }) {
       {figures.map((f) => {
         // Up is good for sales and collections; a list can say down is good (overdue, DSO).
         const good = f.change && f.change.tone !== "flat" && f.change.tone === (f.change.good ?? "up");
-        const tone = !f.change || f.change.tone === "flat" ? "text-ink-3" : good ? "text-sage-deep" : "text-danger";
+        const tone = !f.change || f.change.tone === "flat" ? "text-muted-foreground" : good ? "text-emerald-700" : "text-destructive";
         return (
           <div key={f.label} className="flex items-center gap-3 px-5 py-4">
-            {f.icon && <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-mint text-sage-deep">{f.icon}</span>}
+            {f.icon && <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-foreground">{f.icon}</span>}
             <div className="min-w-0">
               <p className="text-meta text-ink-3">{f.label}</p>
               <p className="flex flex-wrap items-baseline gap-x-2">
@@ -56,10 +56,10 @@ export function UnderlineTabs({ tabs, label = "Show" }: { tabs: Tab[]; label?: s
           key={t.href}
           href={t.href}
           aria-current={t.current ? "page" : undefined}
-          className={`-mb-px shrink-0 border-b-2 py-3 text-sm ${t.current ? "border-sage-deep font-semibold text-ink" : "border-transparent text-ink-3 hover:text-ink"}`}
+          className={`-mb-px shrink-0 border-b-2 py-3 text-sm font-medium ${t.current ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
           {t.label}
-          {t.count ? <span className={`ml-1.5 rounded-full px-1.5 text-meta tabular-nums ${t.current ? "bg-mint-2 text-sage-deep" : "bg-bench text-ink-3"}`}>{t.count}</span> : null}
+          {t.count ? <span className="ml-1.5 rounded-md bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">{t.count}</span> : null}
         </Link>
       ))}
     </nav>
@@ -72,14 +72,14 @@ export function ListToolbar({ q, placeholder, keep = {}, children }: { q: string
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
       <form className="relative w-full max-w-xs">
         {Object.entries(keep).map(([k, v]) => (v ? <input suppressHydrationWarning key={k} type="hidden" name={k} value={v} /> : null))}
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
+        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <input
           suppressHydrationWarning
           name="q"
           defaultValue={q}
           placeholder={placeholder}
           aria-label={placeholder}
-          className="h-9 w-full rounded-xl border border-rule bg-bench pr-3 pl-9 text-sm outline-none focus:border-sage-deep focus:bg-white"
+          className="h-8 w-full rounded-lg border border-input bg-transparent pr-2.5 pl-8 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
       </form>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
@@ -90,14 +90,14 @@ export function ListToolbar({ q, placeholder, keep = {}, children }: { q: string
 export type PillTone = "good" | "warn" | "bad" | "info" | "plain";
 
 const PILL: Record<PillTone, string> = {
-  good: "bg-mint-2 text-sage-deep",
-  warn: "bg-[#fff4e0] text-[#8a5a00]",
-  bad: "bg-danger-tint text-danger",
-  info: "bg-[#eef2fb] text-[#3b5bb5]",
-  plain: "bg-bench text-ink-2",
+  good: "border-emerald-600/20 bg-emerald-500/10 text-emerald-700",
+  warn: "border-amber-600/20 bg-amber-500/10 text-amber-800",
+  bad: "border-destructive/20 bg-destructive/10 text-destructive",
+  info: "border-blue-600/20 bg-blue-500/10 text-blue-700",
+  plain: "border-border bg-secondary text-secondary-foreground",
 };
 
 /** A status, as a soft pill: read at a glance by colour, said in words. */
 export function StatusPill({ tone, children }: { tone: PillTone; children: ReactNode }) {
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.6875rem] font-semibold tracking-[0.02em] uppercase ${PILL[tone]}`}>{children}</span>;
+  return <span className={`inline-flex h-5 items-center rounded-md border px-1.5 text-xs font-medium whitespace-nowrap ${PILL[tone]}`}>{children}</span>;
 }

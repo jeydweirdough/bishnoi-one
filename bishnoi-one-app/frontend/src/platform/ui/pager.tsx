@@ -20,7 +20,8 @@ function numbers(page: number, last: number): (number | "gap")[] {
   return out;
 }
 
-const CELL = "inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-meta tabular-nums transition-colors";
+// shadcn/ui's pagination, as Studio Admin draws it: ghost page numbers, the current one outlined.
+const CELL = "inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-transparent px-2 text-sm tabular-nums transition-colors";
 
 /**
  * The way through a table's pages. `base` for a list paged by its address (the
@@ -34,7 +35,7 @@ export function Pager({ total, page, size = PAGE_SIZE, base, onPage, noun }: { t
   const from = (page - 1) * size + 1;
   const to = Math.min(total, page * size);
   const go = (n: number, label: ReactNode, aria: string, current = false) => {
-    const className = `${CELL} ${current ? "bg-ink font-semibold text-white" : "text-ink-2 hover:bg-sheet hover:text-ink"}`;
+    const className = `${CELL} ${current ? "border-border bg-background font-medium text-foreground shadow-xs" : "text-foreground hover:bg-muted"}`;
     if (base !== undefined) {
       return (
         <Link key={aria} href={withPage(base, n)} scroll={false} aria-label={aria} aria-current={current ? "page" : undefined} className={className}>
@@ -49,12 +50,12 @@ export function Pager({ total, page, size = PAGE_SIZE, base, onPage, noun }: { t
     );
   };
   const off = (label: ReactNode, aria: string) => (
-    <span key={aria} aria-hidden className={`${CELL} text-ink-3/50`}>
+    <span key={aria} aria-hidden className={`${CELL} pointer-events-none opacity-50`}>
       {label}
     </span>
   );
   return (
-    <nav aria-label="Pages" className="mt-4 flex flex-wrap items-center justify-between gap-3 text-meta text-ink-3">
+    <nav aria-label="Pages" className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-sm text-muted-foreground">
       <span className="tabular-nums">
         {last > 1 ? `${from}–${to} of ${total}` : `All ${total}`}
         {noun ? ` ${noun}` : ""}
