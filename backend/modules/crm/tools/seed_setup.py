@@ -14,15 +14,18 @@ the copy's test rows ("Sample ...").
 
     1. uv run python -m modules.crm.tools.seed_setup export --from sqlite:///.data/crm-getmeds.db --out seed.json
     2. on the server:  uv run python -m modules.crm.tools.seed_setup apply --company <slug> --file seed.json [--apply]
+       (--file getmeds: Getmeds' set-up kept beside this tool, getmeds_setup_seed.json.gz)
 
 `apply` only says what it would do unless --apply is given.
 """
 
 import argparse
 import base64
+import gzip
 import json
 import re
 import sys
+from pathlib import Path
 from datetime import date, datetime
 from typing import Any
 
@@ -257,7 +260,9 @@ def main() -> int:
     if args.cmd == "export":
         return export(args.source, args.out)
 
-    data = json.load(open(args.file, encoding="utf-8"))
+    # Getmeds' own set-up ships beside this file (2026-11-19): --file getmeds takes it.
+    path = Path(__file__).with_name("getmeds_setup_seed.json.gz") if args.file == "getmeds" else Path(args.file)
+    data = json.load(gzip.open(path, "rt", encoding="utf-8") if path.suffix == ".gz" else open(path, encoding="utf-8"))
     engine = make_engine(args.platform_db or database_url(get_settings().database_url, args.company))
     with Session(engine) as db:
         said, notes = apply(db, data)
