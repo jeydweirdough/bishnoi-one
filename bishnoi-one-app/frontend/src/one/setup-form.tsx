@@ -14,7 +14,7 @@ export function SetupForm() {
   const v = state?.values ?? {};
   const err = state?.fields ?? {};
   return (
-    <form action={action} className="mt-8 space-y-5" noValidate>
+    <form action={action} className="flex flex-col gap-4" noValidate>
       <Field label="Setup code" hint="Shown in the Platform server's log when it starts, like ABCD-EFGH-JKLM." error={err.code}>
         {(p) => <Input {...p} name="code" defaultValue={v.code} autoComplete="off" autoFocus required />}
       </Field>
