@@ -1,5 +1,6 @@
 """This app's database. Its tables come from migrations (app/migrate.py)."""
 
+import re
 from collections.abc import Iterator
 
 from pathlib import Path
@@ -29,7 +30,10 @@ def make_engine(url: str) -> Engine:
             cursor.close()
 
         return engine
-    engine = create_engine(url, pool_size=2, max_overflow=3, pool_timeout=10, pool_recycle=1800)  # coming-soon module: little use
+    # Providers hand out postgres:// or postgresql://; the driver installed here is psycopg 3.
+    url = re.sub(r"^postgres(ql)?://", "postgresql+psycopg://", url)
+    engine = create_engine(url, pool_size=2, max_overflow=3, pool_timeout=10, pool_recycle=1800,  # coming-soon module: little use
+                           connect_args={"prepare_threshold": None, "connect_timeout": 10})
     _ping_when_idle(engine)
     return engine
 
