@@ -175,7 +175,7 @@ export function TransferMap({ transfers, warehouses, mayLocate }: { transfers: S
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Search transfers"
-                  className="block h-9 w-full rounded-lg border border-control bg-sheet pr-3 pl-10 text-sm text-ink placeholder:text-ink-3/80 hover:border-ink-3 focus:border-ink focus:outline-none"
+                  className="block h-9 w-full rounded-lg border border-control bg-sheet pr-3 pl-10 text-sm text-ink placeholder:text-muted-foreground hover:border-ink-3 focus:border-ring focus:outline-none"
                 />
               </label>
               <Combobox

@@ -165,7 +165,7 @@ export function CreateReportModal({
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             placeholder="Search templates..."
-            className="h-8 rounded-lg border border-rule bg-white px-3 text-xs outline-none focus:border-ink w-52"
+            className="h-8 rounded-lg border border-rule bg-white px-3 text-xs outline-none focus:border-ring w-52"
           />
         </div>
 

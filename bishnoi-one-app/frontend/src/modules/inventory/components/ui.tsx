@@ -101,13 +101,13 @@ export function Filters({ children, q, placeholder = "Search", keep = {} }: { ch
       {q !== undefined && (
         <label className="relative min-w-[14rem] flex-1">
           <span className="sr-only">{placeholder}</span>
-          <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <input suppressHydrationWarning
             type="search"
             name="q"
             defaultValue={q}
             placeholder={placeholder}
-            className="block h-10 w-full rounded-lg border border-control bg-sheet pr-4 pl-11 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] focus:outline-none"
+            className="block h-8 w-full rounded-lg border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           />
         </label>
       )}
@@ -123,7 +123,7 @@ export function Filters({ children, q, placeholder = "Search", keep = {} }: { ch
 export function FilterSelect({ name, value, label, options }: { name: string; value: string; label: string; options: { value: string; label: string }[] }) {
   return (
     <label className="block min-w-[10rem]">
-      <span className="mb-1 block text-meta font-medium text-ink-2">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium">{label}</span>
       <Select name={name} defaultValue={value}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -149,9 +149,9 @@ export function Figures({ items }: { items: { label: string; value: ReactNode; f
   return (
     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {items.map((f) => (
-        <div key={f.label} className={`flex flex-col-reverse justify-end rounded-xl border bg-sheet px-5 py-4 ${f.flag ? "border-danger/40" : "border-rule"}`}>
-          <dt className="mt-1 text-sm font-medium text-ink">{f.flag ? <Flag letter="!">{f.label}</Flag> : f.label}</dt>
-          <dd className="text-[1.625rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">
+        <div key={f.label} className={`flex flex-col gap-1 rounded-xl bg-card px-4 py-4 ring-1 ${f.flag ? "ring-destructive/40" : "ring-foreground/10"}`}>
+          <dt className="text-sm text-muted-foreground">{f.flag ? <Flag letter="!">{f.label}</Flag> : f.label}</dt>
+          <dd className="text-2xl leading-tight font-semibold tabular-nums">
             {f.href ? (
               <Link href={f.href} className="hover:text-ink">
                 {typeof f.value === "string" ? <Amount text={f.value} /> : f.value}

@@ -143,13 +143,13 @@ function TypeRow({
         value={name}
         onChange={(e) => setName(e.target.value)}
         onBlur={() => name.trim() && name.trim() !== type.name && onSave({ name: name.trim() }, "Renamed")}
-        className="h-9 min-w-40 flex-1 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-hema focus:outline-none"
+        className="h-9 min-w-40 flex-1 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-ring focus:outline-none"
       />
       <Select
         aria-label={`Colour of ${type.name}`}
         value={type.color}
         onChange={(e) => onSave({ color: e.target.value as CustomerTypeColor }, "Colour changed")}
-        className="h-9 border-0 border-b border-control bg-transparent text-sm focus:border-hema focus:outline-none"
+        className="h-9 border-0 border-b border-control bg-transparent text-sm focus:border-ring focus:outline-none"
       >
         {COLORS.map(([value, c]) => (
           <option key={value} value={value}>

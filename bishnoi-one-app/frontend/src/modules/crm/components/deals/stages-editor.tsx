@@ -13,7 +13,7 @@ import { deleteDealStage, saveDealLists, saveDealStage, type DealStageChange } f
 import { CATEGORY_LABELS, OPEN_CATEGORIES } from "@/src/modules/crm/components/deals/words";
 
 type OpenCategory = Exclude<ForecastCategory, "closed">;
-const cell = "h-9 border-0 border-b border-control bg-transparent text-sm focus:border-hema focus:outline-none";
+const cell = "h-9 border-0 border-b border-control bg-transparent text-sm focus:border-ring focus:outline-none";
 
 /** The deal stages: add, rename, reorder, set their probability and forecast, switch off, delete an unused one. */
 export function DealStagesEditor({ stages }: { stages: DealStage[] }) {

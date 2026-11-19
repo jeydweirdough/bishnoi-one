@@ -186,7 +186,7 @@ These serve as the fallback; there is no separate default.css file. */
   --color-ink-3: var(--muted-foreground);
   --color-rule: var(--border);
   --color-rule-strong: oklch(0.87 0 0);
-  --color-control: #8a8a8a;
+  --color-control: var(--input);
   /* The action colour: ink. Its tint is mint (hover, the current page, selected rows). */
   --color-hema: var(--primary);
   --color-hema-hover: oklch(0.3 0 0);

@@ -166,7 +166,7 @@ export function ImportWizard({ kind, back }: { kind: ImportKind; back: string })
                           aria-label={`Column for ${f.label}`}
                           value={col ?? ""}
                           onChange={(e) => map(f.key, e.target.value)}
-                          className={`h-9 w-full border-0 border-b bg-transparent text-sm focus:border-hema focus:outline-none ${f.required && (col === null || col === undefined) ? "border-danger" : "border-control"}`}
+                          className={`h-9 w-full border-0 border-b bg-transparent text-sm focus:border-ring focus:outline-none ${f.required && (col === null || col === undefined) ? "border-danger" : "border-control"}`}
                         >
                           <option value="">— Not in the file —</option>
                           {file.headers.map((h, i) => (

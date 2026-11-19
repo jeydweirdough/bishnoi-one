@@ -105,7 +105,7 @@ export function MedicineSearch({
         <h2 id="find" className="text-heading text-ink">
           Find a medicine
         </h2>
-        <label className="mt-3 flex h-12 items-center gap-3 rounded-lg border border-control bg-sheet px-5 focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)]">
+        <label className="mt-3 flex h-12 items-center gap-3 rounded-lg border border-control bg-sheet px-5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
           <Search className="size-4 text-ink-3" aria-hidden />
           <input suppressHydrationWarning value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type its name, generic name or code" aria-label="Find a medicine" autoFocus className="w-full bg-transparent text-sm outline-none" />
         </label>
@@ -197,7 +197,7 @@ export function MedicineSearch({
                         <TextButton onClick={() => setAsking((a) => ({ ...a, [id]: "" }))}>Ask for another price</TextButton>
                       ) : (
                         <span className="mt-1.5 flex items-center gap-2">
-                          <span className="inline-flex h-8 items-center gap-1 rounded-lg border border-control px-3 focus-within:border-ink">
+                          <span className="inline-flex h-8 items-center gap-1 rounded-lg border border-control px-3 focus-within:border-ring">
                             <span className="text-meta text-ink-3">₱</span>
                             <input suppressHydrationWarning
                               value={asking[id]}

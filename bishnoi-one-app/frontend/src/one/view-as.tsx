@@ -57,7 +57,7 @@ export function ViewAsButton({ roles }: { roles: ViewAsRole[] }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Find a person or role"
-            className="h-10 w-full rounded-lg border border-rule bg-bench pr-3 pl-9 text-sm outline-none focus:border-ink focus:bg-white"
+            className="h-10 w-full rounded-lg border border-rule bg-bench pr-3 pl-9 text-sm outline-none focus:border-ring focus:bg-white"
           />
         </label>
         <div className="mt-3 max-h-[55dvh] space-y-4 overflow-y-auto pr-1">

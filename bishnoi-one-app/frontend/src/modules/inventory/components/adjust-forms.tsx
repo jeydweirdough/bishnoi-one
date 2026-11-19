@@ -15,7 +15,7 @@ import { QuickAdd, WithAdd, type Added, type CanAdd } from "@/src/modules/invent
 
 type Row = { productId: string; locationId: string; batchId: string; batchNo: string; expiresOn: string; quantity: string; serials: string };
 const blank = (): Row => ({ productId: "", locationId: "", batchId: "", batchNo: "", expiresOn: "", quantity: "", serials: "" });
-const cell = "h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
+const cell = "h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-ring focus:outline-none";
 
 /**
  * Writing up an adjustment: where, why, and what changes. Someone who may

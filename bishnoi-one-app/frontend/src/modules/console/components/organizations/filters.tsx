@@ -37,13 +37,13 @@ export function Filters({ search, selects = [] }: { search?: string; selects?: {
       {search && (
         <label className="relative min-w-[min(14rem,100%)] flex-1">
           <span className="sr-only">Search</span>
-          <Search className="pointer-events-none absolute top-1/2 left-0 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <input suppressHydrationWarning
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={search}
-            className="block h-9 w-full border-0 border-b border-control bg-transparent pl-6 text-sm text-ink placeholder:text-ink-3/80 focus:border-hema focus:shadow-[inset_0_-1px_0_var(--color-hema)] focus:outline-none"
+            className="block h-8 w-full rounded-lg border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           />
         </label>
       )}

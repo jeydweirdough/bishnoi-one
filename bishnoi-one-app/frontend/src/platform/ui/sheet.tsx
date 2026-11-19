@@ -3,7 +3,7 @@ import { ArrowDownToLine as Inbound, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
-import { EmptyDrawing } from "./empty-drawings";
+import { Empty as ShadEmpty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/src/components/ui/empty";
 
 export type Crumb = { href: string; label: string };
 
@@ -112,27 +112,28 @@ export function Empty({
    *  so nobody wonders whom it waits on. A small line at the foot. */
   source?: ReactNode;
 }) {
+  // shadcn/ui's Empty, as Studio Admin shows an empty list (2026-11-19): the icon in a soft square, the title,
+  // a line saying what to do, and the next step.
   return (
-    <div className={compact ? "px-3 py-4 text-center" : "px-5 py-10 text-center"}>
-      <EmptyDrawing icon={art ?? icon} className={`mx-auto ${compact ? "h-[70px] w-[92px]" : "h-[92px] w-[120px]"}`} />
-      <p className={`${compact ? "mt-2 text-sm" : "mt-3 text-base"} font-semibold text-ink`}>{title}</p>
-      {children && <div className={`mx-auto mt-1 max-w-sm text-ink-3 ${compact ? "text-meta" : "text-sm"}`}>{children}</div>}
-      {actions && !compact && (
-        // The first action is the next step: solid, whatever the screen passed.
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 empty:hidden [&>.ant-btn:first-child]:!border-ink [&>.ant-btn:first-child]:!bg-ink [&>.ant-btn:first-child]:!text-white [&>:first-child_.ant-btn]:!border-ink [&>:first-child_.ant-btn]:!bg-ink [&>:first-child_.ant-btn]:!text-white">
-          {actions}
-        </div>
-      )}
+    <ShadEmpty className={compact ? "gap-2 p-3" : "p-6 md:p-10"}>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon name={icon} className="size-4" />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        {children && <EmptyDescription>{children}</EmptyDescription>}
+      </EmptyHeader>
+      {actions && !compact && <EmptyContent className="flex-row flex-wrap justify-center">{actions}</EmptyContent>}
       {source && (
-        <p className={`mx-auto flex max-w-md items-start justify-center gap-1.5 border-t border-rule text-left text-ink-3 ${compact ? "mt-3 pt-2 text-stamp" : "mt-6 pt-3 text-meta"}`}>
+        <p className="flex max-w-md items-start justify-center gap-1.5 border-t pt-3 text-left text-xs text-muted-foreground">
           <Inbound className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           <span>
-            <span className="font-medium text-ink-2">Comes from: </span>
+            <span className="font-medium text-foreground">Comes from: </span>
             {source}
           </span>
         </p>
       )}
-    </div>
+    </ShadEmpty>
   );
 }
 

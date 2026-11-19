@@ -67,7 +67,7 @@ export default async function FieldDoctorsPage({ searchParams }: { searchParams:
           defaultValue={search}
           placeholder="Search by name"
           aria-label={`Search ${lower(terms.visited.many)} by name`}
-          className="h-9 w-64 rounded-lg border border-rule-strong bg-sheet px-3 text-sm hover:border-control focus:border-hema focus:outline-none"
+          className="h-9 w-64 rounded-lg border border-rule-strong bg-sheet px-3 text-sm hover:border-control focus:border-ring focus:outline-none"
         />
         <label className="flex items-center gap-2 text-sm">
           <input suppressHydrationWarning type="checkbox" name="owed" value="1" defaultChecked={onlyOwed} className="size-4 accent-hema" />

@@ -357,7 +357,7 @@ export function ReportsIndex({
             <label className="relative w-full max-w-xs">
               <span className="sr-only">Search reports</span>
               <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3"
+                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                 aria-hidden
               />
               <input
@@ -367,7 +367,7 @@ export function ReportsIndex({
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search reports"
-                className="h-9 w-full rounded-lg border border-rule bg-bench pr-9 pl-9 text-sm outline-none focus:border-ink focus:bg-white"
+                className="block h-8 w-full rounded-lg border border-input bg-transparent pr-8 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
               />
               <kbd className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded border border-rule bg-white px-1.5 text-[11px] text-ink-3">
                 /
