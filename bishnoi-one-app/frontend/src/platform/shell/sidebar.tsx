@@ -1,24 +1,30 @@
 "use client";
 
-import { hiddenByFeature } from "@/src/platform/lib/features";
-import { useFeatures, useOperatorCompanies } from "@/src/platform/shell/features";
+import { useOperatorCompanies } from "@/src/platform/shell/features";
 import { switchCompany } from "@/src/one/actions";
-import { Check, ChevronDown, ChevronsUpDown, LayoutGrid, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { Check, ChevronDown, ChevronsUpDown, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
-import { MODULES, type ModuleKey } from "@/src/platform/lib/modules";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
+import type { ModuleKey } from "@/src/platform/lib/modules";
 import type { MyModule } from "@/src/one/module-switcher";
 import { Breadcrumbs } from "./crumbs";
+import { useOneMenu } from "@/src/one/menu/context";
+import { Icon, type IconName } from "@/src/platform/ui/icons";
+import { APP_NAME } from "@/src/platform/lib/labels";
 
 // Every module's sidebar (decided 2026-10-24, benchmarks/surpass.md §1, pattern P15), laid out
 // as Bishnoi One Inventory's was (the user's pick) and named the way Zoho names things: the
-// module switcher at the top (only the modules you were given), then
+// Bishnoi One and the company at the top, then
 // Home and the main areas, in the order the work goes and with no headings, as Zoho lays it out,
 // each opening in place to its pages. Only the area you're in stays open, so the menu stays short;
 // closed, an area carries its pages' counts. An area with one page is a plain row. Each module
 // builds its menu (src/modules/<module>/.../shell/nav.tsx) and hands it here: fix the sidebar
 // here, a menu there.
+//
+// One menu by work (M4, 2026-11-18): inside the signed-in app the menu is the one built from the account
+// (src/one/menu/one-menu.ts, given by app/(app)/layout.tsx), the same on every page whichever module keeps
+// it, with no module switcher. A module's own menu only lends its red "not set up" marks, matched by address.
 
 /** What isn't set up yet on a page: how many, and the sentence saying what. */
 export type Missing = { count: number; says: string };
@@ -34,7 +40,8 @@ export type Step = { href: string; label: string; icon?: string; count?: number;
 export type Process = { label: string; steps: Step[]; icon?: string; section?: string; flow?: boolean };
 
 type Props = {
-  module: ModuleKey;
+  /** The module keeping the page; none on the one app's own pages (Home, Reports). */
+  module?: ModuleKey;
   company?: string | null;
   /** The modules this person was given (src/one/mine.ts), for the switcher. */
   mine: MyModule[];
@@ -205,112 +212,77 @@ function Leaves() {
 
 const PANEL_W = 264;
 
-/** The module you're in, and the others you were given, one click away. */
-function Switcher({ module, company, mine }: { module: ModuleKey; company?: string | null; mine: MyModule[] }) {
-  const pathname = usePathname();
-  const button = useRef<HTMLButtonElement>(null);
-  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
-  const here = MODULES.find((m) => m.key === module)!;
-  // An operator works in any company: they switch here (decided 2026-10-29). Everyone else has one company.
+/** The top of the one menu (M4): Bishnoi One and the company; an operator switches company here. */
+function OneHeader({ company }: { company?: string | null }) {
   const companies = useOperatorCompanies();
-  // The consoles first (the Admin Console, then Operations), for those who have them: where they start.
-  const rank = (k: string) => (k === "platform" ? 0 : k === "operations" ? 1 : 2);
-  const list = MODULES.filter((m) => mine.some((x) => x.key === m.key)).sort((a, b) => rank(a.key) - rank(b.key));
-
-  useEffect(() => setAt(null), [pathname]);
-  useEffect(() => {
-    if (!at) return;
-    const shut = () => setAt(null);
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && (setAt(null), button.current?.focus());
-    window.addEventListener("resize", shut);
-    document.addEventListener("keydown", esc);
-    return () => {
-      window.removeEventListener("resize", shut);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [at]);
-
-  function toggle() {
-    if (at) return setAt(null);
-    const r = button.current?.getBoundingClientRect();
-    if (!r) return;
-    const narrow = r.width < 120; // collapsed to icons: beside it, not under it
-    setAt(narrow ? { top: r.top, left: r.right + 8 } : { top: r.bottom + 6, left: Math.max(8, r.left) });
-  }
-
-  const Mod = here.icon;
-  return (
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  useEffect(() => setOpen(false), [pathname]);
+  const many = Boolean(companies && companies.length > 1);
+  const body = (
     <>
-      <button
-        suppressHydrationWarning
-        ref={button}
-        type="button"
-        onClick={toggle}
-        aria-expanded={at !== null}
-        aria-haspopup="menu"
-        title={companies && companies.length > 1 ? "Switch module or company" : "Switch module"}
-        className="flex w-full min-w-0 items-center gap-2.5 rounded-xl p-1.5 text-left hover:bg-sheet group-data-[rail=true]/side:justify-center"
-      >
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg" style={{ background: here.tint, color: here.ink }}>
-          <Mod className="size-[1.125rem]" aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1 group-data-[rail=true]/side:sr-only">
-          <span className="block truncate text-sm leading-tight font-semibold text-ink">{here.label}</span>
-          {company && <span className="block truncate text-meta text-ink-3">{company}</span>}
-        </span>
+      <img src="/brand/bishnoi-one-mark.png" alt="" width={36} height={36} className="size-9 shrink-0" />
+      <span className="min-w-0 flex-1 group-data-[rail=true]/side:sr-only">
+        <span className="block truncate text-sm leading-tight font-semibold text-ink">{APP_NAME}</span>
+        {company && <span className="block truncate text-meta text-ink-3">{company}</span>}
+      </span>
+    </>
+  );
+  if (!many) {
+    return (
+      <Link href="/" className="flex w-full min-w-0 items-center gap-2.5 rounded-xl p-1.5 text-left hover:bg-sheet group-data-[rail=true]/side:justify-center">
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <div className="relative">
+      <button suppressHydrationWarning type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" title="Switch company"
+        className="flex w-full min-w-0 items-center gap-2.5 rounded-xl p-1.5 text-left hover:bg-sheet group-data-[rail=true]/side:justify-center">
+        {body}
         <ChevronsUpDown className="size-4 shrink-0 text-ink-3 group-data-[rail=true]/side:hidden" aria-hidden />
       </button>
-      {at && (
+      {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setAt(null)} aria-hidden />
-          <div role="menu" aria-label="Your modules" style={{ top: at.top, left: at.left, width: PANEL_W }} className="animate-reshape fixed z-50 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-rule bg-white p-1.5 shadow-lg">
-            <p className="px-2.5 pt-1.5 pb-1 text-caps text-ink-3 uppercase">Your modules</p>
-            {list.map((m) => {
-              const Ico = m.icon;
-              const given = mine.find((x) => x.key === m.key);
-              const href = m.status === "live" ? m.path : (given?.oldUrl ?? m.path);
-              const on = m.key === module;
-              return (
-                <Link key={m.key} role="menuitem" href={href} aria-current={on ? "true" : undefined} className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 ${on ? "bg-hema-tint" : "hover:bg-sheet"}`}>
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg" style={{ background: m.tint, color: m.ink }}>
-                    <Ico className="size-4" aria-hidden />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-ink">{m.label}</span>
-                    <span className="block truncate text-meta text-ink-3">{m.status === "soon" ? "Coming soon" : m.blurb}</span>
-                  </span>
-                  {on && <Check className="size-4 shrink-0 text-sage-deep" aria-hidden />}
-                </Link>
-              );
-            })}
-            <Link href="/" role="menuitem" className="mt-1 flex items-center gap-2.5 border-t border-rule px-2.5 pt-2.5 pb-1.5 text-meta text-ink-2 hover:text-ink">
-              <LayoutGrid className="size-4" aria-hidden /> All modules
-            </Link>
-            {companies && companies.length > 1 && (
-              <div className="mt-1 border-t border-rule pt-1">
-                <p className="px-2.5 pt-1.5 pb-1 text-caps text-ink-3 uppercase">Company</p>
-                {companies.map((c) =>
-                  c.current ? (
-                    <div key={c.slug} className="flex items-center gap-2 rounded-lg bg-hema-tint px-2.5 py-2 text-sm text-ink" aria-current="true">
-                      <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                      <Check className="size-4 shrink-0 text-sage-deep" aria-hidden />
-                    </div>
-                  ) : (
-                    <form key={c.slug} action={switchCompany}>
-                      <input suppressHydrationWarning type="hidden" name="company" value={c.slug} />
-                      <button suppressHydrationWarning type="submit" role="menuitem" className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-sm text-ink hover:bg-sheet">
-                        <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                      </button>
-                    </form>
-                  ),
-                )}
-              </div>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
+          <div role="menu" aria-label="Company" style={{ width: PANEL_W }} className="animate-reshape absolute top-12 left-0 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-xl border border-rule bg-white p-1.5 shadow-lg">
+            <p className="px-2.5 pt-1.5 pb-1 text-caps text-ink-3 uppercase">Company</p>
+            {companies!.map((c) =>
+              c.current ? (
+                <div key={c.slug} className="flex items-center gap-2 rounded-lg bg-hema-tint px-2.5 py-2 text-sm text-ink" aria-current="true">
+                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  <Check className="size-4 shrink-0 text-sage-deep" aria-hidden />
+                </div>
+              ) : (
+                <form key={c.slug} action={switchCompany}>
+                  <input suppressHydrationWarning type="hidden" name="company" value={c.slug} />
+                  <button suppressHydrationWarning type="submit" role="menuitem" className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-sm text-ink hover:bg-sheet">
+                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  </button>
+                </form>
+              ),
             )}
           </div>
         </>
       )}
-    </>
+    </div>
   );
+}
+
+/** The one menu in place of a module's own, keeping that module's red "not set up" marks by address. */
+function withOneMenu(props: Props, one: ReturnType<typeof useOneMenu>): Props {
+  if (!one) return props;
+  const marks = new Map<string, Missing>();
+  for (const st of [...props.processes, ...(props.foot ?? [])].flatMap((p) => p.steps)) if (st.missing?.count) marks.set(st.href, st.missing);
+  const lend = (p: { label: string; icon: string; steps: Step[] }): Process => ({ ...p, steps: p.steps.map((st) => (marks.has(st.href) ? { ...st, missing: marks.get(st.href) } : st)) });
+  return {
+    ...props,
+    home: one.home,
+    processes: one.processes.map(lend),
+    foot: one.foot.map(lend),
+    footLabel: one.foot.length > 0 ? "Administration" : undefined,
+    icon: (name, className) => <Icon name={name as IconName} className={className} />,
+  };
 }
 
 function Menu_({ props, current }: { props: Props; current: Step | undefined }) {
@@ -338,10 +310,8 @@ function Menu_({ props, current }: { props: Props; current: Step | undefined }) 
 }
 
 function SidebarBody(given: Props) {
-  // Pages the company switched off in its app catalogue aren't shown (step 6, src/platform/lib/features.ts).
-  const features = useFeatures();
-  const drop = (ps: Process[] | undefined) => (ps ?? []).map((p) => ({ ...p, steps: p.steps.filter((s) => !hiddenByFeature(s.href, features)) }));
-  const props: Props = { ...given, processes: drop(given.processes), foot: given.foot && drop(given.foot) };
+  const one = useOneMenu();
+  const props = withOneMenu(given, one);
   const pathname = usePathname();
   const search = useSearchParams();
   const [rail, setRail] = useState(props.rail ?? false);
@@ -363,14 +333,14 @@ function SidebarBody(given: Props) {
   return (
     <>
       {/* Company / App / Area / Page at the top of the page (2026-11-01), into the frame's slot. */}
-      <Breadcrumbs module={props.module} company={props.company} companies={companies} mine={props.mine} area={group} page={current} home={props.home} />
+      <Breadcrumbs module={one ? undefined : props.module} company={props.company} companies={companies} mine={props.mine} area={group} page={current} home={props.home} />
       <aside data-rail={rail} className="group/side sticky top-0 hidden h-dvh w-[16.5rem] overflow-x-hidden overflow-y-auto p-3 transition-[width] duration-200 data-[rail=true]:w-[4.75rem] data-[rail=true]:p-2 lg:block print:!hidden">
        <div className="relative flex min-h-full flex-col justify-between overflow-hidden rounded-2xl border border-mint-2 bg-linear-to-b from-mint via-white to-white px-2.5 pt-3 pb-40 shadow-[0_1px_3px_rgba(20,20,20,0.05)] group-data-[rail=true]/side:px-1.5 group-data-[rail=true]/side:pb-4">
         <Leaves />
         <div className="relative">
           <div className="flex items-start gap-1 group-data-[rail=true]/side:flex-col group-data-[rail=true]/side:items-center">
             <div className="min-w-0 flex-1 group-data-[rail=true]/side:w-full">
-              <Switcher module={props.module} company={props.company} mine={props.mine} />
+              <OneHeader company={props.company} />
             </div>
             <button
               suppressHydrationWarning
@@ -393,7 +363,7 @@ function SidebarBody(given: Props) {
       <div className="sticky top-0 z-30 bg-bench/95 backdrop-blur lg:hidden print:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="w-44 min-w-0 shrink">
-            <Switcher module={props.module} company={props.company} mine={props.mine} />
+            <OneHeader company={props.company} />
           </div>
           <div className="flex min-w-0 items-center gap-1">
             {props.actions}

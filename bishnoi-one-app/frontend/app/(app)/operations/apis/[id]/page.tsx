@@ -134,7 +134,9 @@ function Overview({ app }: { app: ApplicationDetail }) {
               [
                 "Connected",
                 <span key="c">
-                  {app.connected ? (app.connectedAt ? `Yes, last contact ${ago(app.connectedAt)}` : "Key created, not connected yet") : "No"}
+                  {app.inBackend
+                    ? "Built in: part of the one backend, connected to the other modules without keys"
+                    : app.connected ? (app.connectedAt ? `Yes, last contact ${ago(app.connectedAt)}` : "Key created, not connected yet") : "No"}
                 </span>,
               ],
               ["Health check URL", app.healthUrl ? <span className="font-mono text-meta break-all">{app.healthUrl}</span> : "None (not monitored)"],

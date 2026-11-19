@@ -9,9 +9,12 @@ import type { Reference } from "@/src/modules/inventory/lib/types";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { SalesOrderForm, SalesOrderSteps } from "./components";
-import { DropshipSwitch, SaleDocuments } from "@/src/modules/inventory/components/supply";
+import { SaleDocuments } from "@/src/modules/inventory/components/supply";
 import type { ProductDocument } from "@/src/modules/inventory/lib/types";
 import type { SalesOrder, SalesOrderBrief, SalesStatus } from "./types";
+import { loadRecordSlip } from "@/src/one/approvals/load";
+import { SlipActions } from "@/src/one/approvals/slip-actions";
+import { SlipCard } from "@/src/one/approvals/slip-view";
 
 // The Sales app's screens (feature plan step 11): sales orders, made from approved CRM quotes or typed here at the
 // price list's prices; each waits for approval, and approving makes its delivery in Inventory.
@@ -31,8 +34,10 @@ const TONE: Record<SalesStatus, string> = {
   delivered: "border-sage-deep text-sage-deep", rejected: "border-danger text-danger", cancelled: "border-ink-3 text-ink-3",
 };
 
-function Stamp({ status, label }: { status: SalesStatus; label: string }) {
-  return <span className={`inline-flex h-5 items-center rounded-full border px-2 text-stamp whitespace-nowrap uppercase ${TONE[status]}`}>{label}</span>;
+function Stamp({ status, label, invoiceState }: { status: SalesStatus; label: string; invoiceState?: SalesOrderBrief["invoiceState"] }) {
+  // Once invoiced the invoice's state shows (Step 4D): a voided invoice waits for its reissue.
+  const tone = invoiceState === "voided" ? "border-due-today text-due-today" : invoiceState ? "border-sage-deep text-sage-deep" : TONE[status];
+  return <span className={`inline-flex h-5 items-center rounded-full border px-2 text-stamp whitespace-nowrap uppercase ${tone}`}>{label}</span>;
 }
 
 export async function SalesOrdersPage({ searchParams }: { searchParams: Search }) {
@@ -74,7 +79,7 @@ export async function SalesOrdersPage({ searchParams }: { searchParams: Search }
                   {o.salesperson?.name ?? "—"}
                   {o.division && <span className="block text-meta text-ink-3">{[o.division, o.team].filter(Boolean).join(" › ")}</span>}
                 </Td>
-                <Td><Stamp status={o.status} label={o.statusLabel} /></Td>
+                <Td><Stamp status={o.status} label={o.statusLabel} invoiceState={o.invoiceState} /></Td>
                 <Td>{day(o.scheduledOn)}</Td>
                 <Td num>{fmt.peso(o.totalCentavos)}</Td>
               </tr>
@@ -92,18 +97,34 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
   if (!may("sales.view")) return <NoAccess what="sales orders" />;
   const o = await load<SalesOrder>(`/inventory/sales-orders/${encodeURIComponent(id)}`);
   const docs = await load<(ProductDocument & { product: { name: string } })[]>(`/inventory/sales-orders/${encodeURIComponent(id)}/documents`);
+  // Its approval slip (Step 4C), signed up the chart on the Platform: while it waits, it is approved there, not here.
+  const slips = await loadRecordSlip("inventory", "sales_order", id);
+  const slip = slips?.slip ?? null;
+  // The lines as ordered keep the order's own totals; the invoice's figures show above them once invoiced (Step 4D).
+  const own = o.ordered ?? { discountCentavos: o.discountCentavos, totalCentavos: o.totalCentavos };
   return (
     <>
       <PageHeader
         crumbs={[{ href: "/crm/sales", label: "Sales orders" }]}
         title={o.number}
-        actions={<SalesOrderSteps order={o} may={{ create: may("sales.create"), edit: may("sales.edit"), approve: may("sales.approve") }} />}
+        actions={<SalesOrderSteps order={o} may={{ create: may("sales.create"), edit: may("sales.edit"), approve: may("sales.approve") && slip?.status !== "pending" }} />}
       >
-        <Stamp status={o.status} label={o.statusLabel} /> <span className="ml-1">for <strong>{o.customer.name}</strong>, from {o.warehouse.name}{o.scheduledOn && <>, due {day(o.scheduledOn)}</>}</span>
+        <Stamp status={o.status} label={o.statusLabel} invoiceState={o.invoiceState} /> <span className="ml-1">for <strong>{o.customer.name}</strong>, from {o.warehouse.name}{o.scheduledOn && <>, due {day(o.scheduledOn)}</>}</span>
       </PageHeader>
+      {slip && (
+        <SlipCard
+          slip={slip}
+          actions={slip.status === "pending" ? <SlipActions id={slip.id} number={slip.number} canSign={slip.canSign} actingAs={slip.actingAs} canAddFiles={slip.canAddFiles} /> : null}
+        />
+      )}
       {o.status === "rejected" && o.decisionNote && (
         <p className="mb-4 rounded-[3px] bg-danger-tint px-4 py-2 text-sm text-ink">
           Rejected by {o.decidedBy?.name ?? "an approver"}: {o.decisionNote}
+        </p>
+      )}
+      {o.invoiceState === "voided" && o.invoice && (
+        <p className="mb-4 rounded-[3px] bg-promo-tint px-4 py-2 text-sm text-ink">
+          Invoice {o.invoice.number} was voided{o.invoice.voidReason ? `: ${o.invoice.voidReason}` : ""}. The order&apos;s own amounts show until Finance issues its replacement.
         </p>
       )}
       <div className="mb-5 grid gap-5 lg:grid-cols-3">
@@ -152,13 +173,12 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
           ) : null}
         </Sheet>
       </div>
-      {/* Dropship (15c), the purchase orders it raised (15b, 15c), and the documents to send with it (15e). */}
-      {(["draft", "pending", "rejected"].includes(o.status) && may("sales.edit")) || o.dropship || (o.purchaseOrders ?? []).length > 0 || docs.length > 0 ? (
+      {/* The purchase orders it raised (15b), and the documents to send with it (15e). */}
+      {(o.purchaseOrders ?? []).length > 0 || docs.length > 0 ? (
         <Sheet className="mb-5 space-y-3 px-5 py-4">
-          {["draft", "pending", "rejected"].includes(o.status) && may("sales.edit") ? <DropshipSwitch orderId={o.id} on={Boolean(o.dropship)} /> : o.dropship && <p className="text-sm text-ink">Dropship: the vendor delivers straight to the customer.</p>}
           {(o.purchaseOrders ?? []).length > 0 && (
             <p className="text-sm">
-              <span className="text-ink-3">{o.dropship ? "Vendor orders: " : "Ordered for it (not enough stock): "}</span>
+              <span className="text-ink-3">Ordered for it (not enough stock): </span>
               {o.purchaseOrders!.map((po, i) => (
                 <span key={po.id}>
                   {i > 0 && ", "}
@@ -171,7 +191,9 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
           <SaleDocuments documents={docs} send={{ kind: "sales-orders", id: o.id }} />
         </Sheet>
       ) : null}
+      {o.amountsFrom === "invoice" && o.invoice && <InvoiceAmounts order={o} peso={fmt.peso} count={fmt.count} />}
       <Sheet>
+        {o.amountsFrom === "invoice" && <p className="px-5 pt-4 text-caps text-ink-3 uppercase">As ordered</p>}
         <Table head={["Product", " Quantity", " Free", " Unit price", " Discount", " Amount", " Delivered"]} min="48rem">
           {o.lines.map((l) => (
             <tr key={l.id}>
@@ -179,7 +201,8 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
                 <span className="font-medium">{l.product.name}</span>
                 <span className="block text-meta text-ink-3">{l.product.sku} · {l.product.unit}</span>
               </Td>
-              <Td num>{fmt.count(l.quantity)}</Td>
+              {/* In the base unit, with the unit sold (step 4A): "2 Boxes of 10". */}
+              <Td num>{fmt.count(l.quantity)}{l.unit?.soldAs && <span className="block text-meta text-ink-3">{l.unit.soldAs}</span>}</Td>
               <Td num>{l.freeQuantity ? fmt.count(l.freeQuantity) : "—"}</Td>
               <Td num>{fmt.peso(l.unitPrice)}</Td>
               <Td num>{l.discount ? fmt.peso(l.discount) : "—"}</Td>
@@ -188,8 +211,8 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
             </tr>
           ))}
           <tr className="border-t-2 border-rule-strong font-semibold">
-            <Td>Total</Td><Td num>{fmt.count(o.units)}</Td><Td>{""}</Td><Td>{""}</Td><Td num>{o.discountCentavos ? fmt.peso(o.discountCentavos) : "—"}</Td>
-            <Td num>{fmt.peso(o.totalCentavos)}</Td><Td>{""}</Td>
+            <Td>Total</Td><Td num>{fmt.count(o.units)}</Td><Td>{""}</Td><Td>{""}</Td><Td num>{own.discountCentavos ? fmt.peso(own.discountCentavos) : "—"}</Td>
+            <Td num>{fmt.peso(own.totalCentavos)}</Td><Td>{""}</Td>
           </tr>
         </Table>
       </Sheet>
@@ -209,5 +232,51 @@ export async function NewSalesOrderPage() {
       </PageHeader>
       <SalesOrderForm org={me.org} reference={ref} />
     </>
+  );
+}
+
+/** Once invoiced, the invoice is the order's source of truth (Step 4D): its figures and lines, read only. To change
+ *  them, Finance voids and reissues the invoice. */
+function InvoiceAmounts({ order: o, peso, count }: { order: SalesOrder; peso: (v: number) => string; count: (v: number) => string }) {
+  const inv = o.invoice!;
+  const figures: [string, number | null | undefined][] = [
+    ["Gross", o.grossCentavos], ["Discount", o.discountCentavos], ["VAT", o.taxCentavos], ["Total", o.totalCentavos],
+  ];
+  const lines = inv.lines ?? [];
+  return (
+    <Sheet className="mb-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-4">
+        <p className="text-sm">
+          Amounts from invoice{" "}
+          <Link href={`/finance/invoices/${inv.id}`} className="font-semibold text-hema hover:underline">{inv.number ?? "Invoice"}</Link>
+        </p>
+        <p className="text-meta text-ink-3">Read only: Finance voids and reissues the invoice to change them.</p>
+      </div>
+      <dl className="grid grid-cols-2 gap-4 px-5 py-4 sm:grid-cols-4">
+        {figures.map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-caps text-ink-3 uppercase">{label}</dt>
+            <dd className={`tabular-nums ${label === "Total" ? "font-semibold text-ink" : "text-ink-2"}`}>{value == null ? "—" : label === "Discount" && !value ? "—" : peso(value)}</dd>
+          </div>
+        ))}
+      </dl>
+      {lines.length > 0 && (
+        <Table head={["Invoice line", " Quantity", " Unit price", " Discount", " VAT", " Amount"]} min="40rem">
+          {lines.map((l, i) => (
+            <tr key={i}>
+              <Td>
+                <span className="font-medium">{l.description}</span>
+                {l.ref && <span className="block text-meta text-ink-3">{l.ref}</span>}
+              </Td>
+              <Td num>{count(l.quantity)}</Td>
+              <Td num>{peso(l.unitPriceCentavos)}</Td>
+              <Td num>{l.discountCentavos ? peso(l.discountCentavos) : "—"}</Td>
+              <Td num>{peso(l.taxCentavos)}</Td>
+              <Td num>{peso(l.totalCentavos)}</Td>
+            </tr>
+          ))}
+        </Table>
+      )}
+    </Sheet>
   );
 }

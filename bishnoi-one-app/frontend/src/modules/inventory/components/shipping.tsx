@@ -5,10 +5,11 @@ import { Check, ExternalLink, Pencil, RotateCcw, Truck, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { markDelivered, markFailed, saveCourier, sendAgain, setShipping } from "@/src/modules/inventory/actions/inventory";
+import { addPhoto, markDelivered, markFailed, saveCourier, sendAgain, setShipping } from "@/src/modules/inventory/actions/inventory";
+import { AddPhoto, sendPhotos } from "@/src/platform/ui/photo-field";
 import type { Courier, DeliveryMethod, Shipping } from "@/src/modules/inventory/lib/types";
 import { Button } from "@/src/platform/ui/button";
-import { Choice, Field, FileInput, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
+import { Choice, Field, FormError, Input, Select, Textarea } from "@/src/platform/ui/field";
 import { Empty } from "@/src/platform/ui/sheet";
 
 // Shipping with couriers (feature plan step 12): how a delivery goes (courier, our delivery, pick-up), the
@@ -24,15 +25,6 @@ const METHODS: { value: DeliveryMethod; label: string }[] = [
 const TONE: Record<string, string> = { out: "border-due-today text-due-today", delivered: "border-sage-deep text-sage-deep", failed: "border-danger text-danger" };
 
 const pesos = (centavos: number) => (centavos / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-function readFile(file: File): Promise<string> {
-  return new Promise((done, fail) => {
-    const r = new FileReader();
-    r.onload = () => done(String(r.result));
-    r.onerror = () => fail(r.error);
-    r.readAsDataURL(file);
-  });
-}
 
 /** The delivery's shipping, with its steps: set how it goes, then delivered, failed or sent again. */
 export function ShippingCard({ orderId, issued, shipping, couriers, may, signedFor }: {
@@ -52,7 +44,8 @@ export function ShippingCard({ orderId, issued, shipping, couriers, may, signedF
     fee: shipping.fee ? String(shipping.fee / 100) : "", feeCharged: shipping.feeCharged,
   });
   const [receivedBy, setReceivedBy] = useState("");
-  const [photo, setPhoto] = useState<File | null>(null);
+  // Proof-of-delivery photos (optional, Step 4B): sent to the delivery's photos once it's marked delivered.
+  const [photos, setPhotos] = useState<File[]>([]);
   const [reason, setReason] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -89,9 +82,11 @@ export function ShippingCard({ orderId, issued, shipping, couriers, may, signedF
   function deliver() {
     if (receivedBy.trim().length < 2) return setFields({ receivedBy: "Who received it, as the courier reports." });
     start(async () => {
-      const r = await markDelivered(orderId, receivedBy.trim(), photo ? await readFile(photo) : null);
+      const r = await markDelivered(orderId, receivedBy.trim(), null);
       if (!r.ok) return fail(r);
-      done("Delivered", photo ? "The courier's photo is kept as proof of delivery." : undefined);
+      const unsent = photos.length ? await sendPhotos(photos, (form) => addPhoto("delivery", orderId, form)) : 0;
+      setPhotos([]);
+      done("Delivered", unsent ? `${unsent === 1 ? "A photo" : `${unsent} photos`} couldn't be sent: add them under Photos.` : photos.length ? "The photos are kept as proof of delivery." : undefined);
     });
   }
 
@@ -180,7 +175,11 @@ export function ShippingCard({ orderId, issued, shipping, couriers, may, signedF
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Courier" error={fields.courierId}>
                 {(p) => (
-                  <Select {...p} value={form.courierId} onChange={(e) => setForm({ ...form, courierId: e.target.value })} placeholder="Pick the courier">
+                  <Select {...p} value={form.courierId} onChange={(e) => {
+                    // The courier's usual fee fills in (2026-11-18); still changeable below.
+                    const picked = active.find((c) => c.id === e.target.value);
+                    setForm({ ...form, courierId: e.target.value, fee: picked?.defaultFee ? String(picked.defaultFee / 100) : form.fee });
+                  }} placeholder="Pick the courier">
                     {active.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
@@ -193,7 +192,7 @@ export function ShippingCard({ orderId, issued, shipping, couriers, may, signedF
             </div>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Shipping fee" optional error={fields.fee}>
+            <Field label="Shipping fee" optional error={fields.fee} hint={form.method === "courier" && active.find((c) => c.id === form.courierId)?.defaultFee ? "The courier's usual fee; change it for this delivery if it differs." : undefined}>
               {(p) => <Input {...p} inputMode="decimal" prefix="₱" value={form.fee} onChange={(e) => setForm({ ...form, fee: e.target.value })} placeholder="0.00" />}
             </Field>
             <div className="flex items-end pb-2">
@@ -213,9 +212,7 @@ export function ShippingCard({ orderId, issued, shipping, couriers, may, signedF
           <Field label="Received by" error={fields.receivedBy}>
             {(p) => <Input {...p} value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} maxLength={120} autoFocus />}
           </Field>
-          <Field label="Courier's proof-of-delivery photo" optional error={fields.photo} hint="PNG or JPEG, up to 3 MB.">
-            {(p) => <FileInput {...p} accept="image/png,image/jpeg" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />}
-          </Field>
+          <AddPhoto onChange={setPhotos} max={5} label="Proof-of-delivery photo (optional)" disabled={busy} />
           <FormError message={error} />
         </div>
       </Modal>
@@ -236,19 +233,33 @@ export function ShippingCard({ orderId, issued, shipping, couriers, may, signedF
 export function CouriersEditor({ couriers, mayManage }: { couriers: Courier[]; mayManage: boolean }) {
   const router = useRouter();
   const [busy, start] = useTransition();
-  const [form, setForm] = useState({ code: "", name: "", trackingUrl: "" });
+  const [form, setForm] = useState({ code: "", name: "", trackingUrl: "", defaultFee: "" });
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  // A courier's usual fee, changed in its row (2026-11-18).
+  const [feeOf, setFeeOf] = useState<{ id: string; value: string } | null>(null);
+  const centavos = (value: string) => Math.round((Number(value.replace(/,/g, "")) || 0) * 100);
+
+  function saveFee(c: Courier) {
+    if (!feeOf) return;
+    start(async () => {
+      const r = await saveCourier(c.id, { defaultFee: centavos(feeOf.value) });
+      if (!r.ok) return void toast.error(r.error);
+      toast.success(`${c.name}'s usual fee saved`);
+      setFeeOf(null);
+      router.refresh();
+    });
+  }
 
   function add() {
     start(async () => {
-      const r = await saveCourier(null, { code: form.code.trim(), name: form.name.trim(), trackingUrl: form.trackingUrl.trim() || null });
+      const r = await saveCourier(null, { code: form.code.trim(), name: form.name.trim(), trackingUrl: form.trackingUrl.trim() || null, defaultFee: centavos(form.defaultFee) });
       if (!r.ok) {
         setFields(r.fields ?? {});
         return setError(r.fields ? null : r.error);
       }
       toast.success(`${form.name.trim()} added`);
-      setForm({ code: "", name: "", trackingUrl: "" });
+      setForm({ code: "", name: "", trackingUrl: "", defaultFee: "" });
       setFields({});
       setError(null);
       router.refresh();
@@ -275,8 +286,21 @@ export function CouriersEditor({ couriers, mayManage }: { couriers: Courier[]; m
               <Truck className="size-4 text-ink-3" aria-hidden />
               <span className="min-w-0 flex-1">
                 <span className={`block text-sm font-semibold ${c.isActive ? "text-ink" : "text-ink-3 line-through"}`}>{c.name}</span>
-                <span className="block truncate text-meta text-ink-3">{c.code}{c.trackingUrl ? ` · ${c.trackingUrl}` : " · no tracking page"}</span>
+                <span className="block truncate text-meta text-ink-3">
+                  {c.code} · {c.defaultFee ? `usual fee ₱${pesos(c.defaultFee)}` : "no usual fee"}{c.trackingUrl ? ` · ${c.trackingUrl}` : " · no tracking page"}
+                </span>
               </span>
+              {mayManage && feeOf?.id === c.id ? (
+                <form noValidate onSubmit={(e) => (e.preventDefault(), saveFee(c))} className="flex items-center gap-2">
+                  <Input aria-label={`${c.name}'s usual fee`} inputMode="decimal" prefix="₱" value={feeOf.value} onChange={(e) => setFeeOf({ id: c.id, value: e.target.value })} placeholder="0.00" className="w-32" autoFocus />
+                  <Button type="submit" size="sm" loading={busy}>Save</Button>
+                  <Button type="button" size="sm" variant="quiet" onClick={() => setFeeOf(null)}>Cancel</Button>
+                </form>
+              ) : mayManage && (
+                <Button size="sm" variant="quiet" disabled={busy} onClick={() => setFeeOf({ id: c.id, value: c.defaultFee ? String(c.defaultFee / 100) : "" })}>
+                  Usual fee
+                </Button>
+              )}
               {mayManage && (
                 <Button size="sm" variant="quiet" disabled={busy} onClick={() => flip(c)}>
                   {c.isActive ? "Switch off" : "Switch on"}
@@ -289,9 +313,12 @@ export function CouriersEditor({ couriers, mayManage }: { couriers: Courier[]; m
       {mayManage && (
         <form noValidate onSubmit={(e) => (e.preventDefault(), add())} className="border-t border-rule pt-4">
           <p className="mb-3 text-sm font-medium text-ink">Add a courier</p>
-          <div className="grid gap-4 sm:grid-cols-[8rem_1fr_2fr]">
+          <div className="grid gap-4 sm:grid-cols-[8rem_1fr_8rem_2fr]">
             <Field label="Code" error={fields.code}>{(p) => <Input {...p} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} maxLength={20} placeholder="GRAB" />}</Field>
             <Field label="Name" error={fields.name}>{(p) => <Input {...p} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={80} placeholder="Grab Express" />}</Field>
+            <Field label="Usual fee" optional error={fields.defaultFee}>
+              {(p) => <Input {...p} inputMode="decimal" prefix="₱" value={form.defaultFee} onChange={(e) => setForm({ ...form, defaultFee: e.target.value })} placeholder="0.00" />}
+            </Field>
             <Field label="Tracking page" optional error={fields.trackingUrl} hint="With {number} where the tracking number goes.">
               {(p) => <Input {...p} value={form.trackingUrl} onChange={(e) => setForm({ ...form, trackingUrl: e.target.value })} maxLength={300} placeholder="https://…?tracking={number}" />}
             </Field>

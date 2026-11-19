@@ -1,0 +1,316 @@
+"""Signing in and out of this app.
+
+Its own accounts, in its own database: an account here signs in to this app
+only. Accounts are made with the users tool (see README.md).
+"""
+
+import secrets
+import threading
+import time
+from collections import defaultdict, deque
+from datetime import UTC, datetime, timedelta
+
+from modules import one_session
+from fastapi import Depends, APIRouter, HTTPException, Response, status
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
+
+from modules.finance import business_events, platform_pass, platform_roles
+from modules.finance.access import access_of
+from modules.finance.audit import audit
+from modules.finance.demo import DEMO_ACCOUNTS, DEMO_PASSWORD
+from modules.finance.deps import DB, CurrentSession, CurrentUser, SettingsDep
+from modules.finance.identity import me_out
+from modules.finance.models import PlatformPass, Role, SignInSession, User
+from modules.finance.permissions import ACTION_LABELS, ADMINISTRATOR, AREAS, FINANCE_STAFF
+from modules.finance.security import (
+    DUMMY_HASH,
+    MAX_PASSWORD,
+    hash_password,
+    new_token,
+    token_hash,
+    verify_password,
+)
+
+router = APIRouter(prefix="/auth", tags=["sign-in"])
+
+WRONG = "That email and password don't match an account here."
+
+
+class Api(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", str_strip_whitespace=True)
+
+
+class LoginIn(Api):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD)
+
+
+class Attempts:
+    """Wrong passwords per email, in memory. Enough to stop guessing; a restart forgets."""
+
+    def __init__(self) -> None:
+        self._failures: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def wait_seconds(self, email: str, limit: int, window: float) -> int:
+        with self._lock:
+            recent = self._prune(email, window)
+            return int(window - (time.monotonic() - recent[0])) + 1 if len(recent) >= limit else 0
+
+    def failed(self, email: str, window: float) -> None:
+        with self._lock:
+            self._prune(email, window).append(time.monotonic())
+
+    def clear(self, email: str | None = None) -> None:
+        with self._lock:
+            self._failures.pop(email, None) if email else self._failures.clear()
+
+    def _prune(self, email: str, window: float) -> deque[float]:
+        recent = self._failures[email]
+        while recent and time.monotonic() - recent[0] > window:
+            recent.popleft()
+        return recent
+
+
+attempts = Attempts()
+
+
+@router.post("/login", dependencies=[Depends(platform_roles.signs_in_here)])
+def login(body: LoginIn, db: DB, settings: SettingsDep, response: Response) -> dict:
+    email = body.email.lower()
+    window = settings.login_lockout_minutes * 60
+    wait = attempts.wait_seconds(email, settings.login_attempts, window)
+    if wait:
+        # A long Retry-After, so the screens don't quietly try again.
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Too many wrong passwords. Try again in {max(1, wait // 60)} minute(s).",
+            headers={"Retry-After": str(wait)},
+        )
+    user = db.scalar(select(User).where(func.lower(User.email) == email))
+    ok = verify_password(body.password, user.password_hash if user else DUMMY_HASH)
+    if user is None or not ok or not user.is_active:
+        attempts.failed(email, window)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, WRONG)
+    attempts.clear(email)
+
+    token = new_token()
+    now = datetime.now(UTC)
+    expires_in = settings.session_hours * 3600
+    db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
+    db.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}
+
+
+# --- signing in with a Bishnoi One account (the platform) -----------------------------------
+
+APP_KEY = "finance"  # this application's key on the platform
+
+
+class PlatformIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    token: str = Field(alias="pass", min_length=20, max_length=8000)
+
+
+def role_from(db: DB, claims: dict) -> Role:
+    """The role the platform gives them here: an application admin is the
+    Administrator; a role Finance has by that name is that role; any other
+    role, or none, is Finance Staff. So nobody is turned away for a role this
+    app doesn't have, as before roles, when there were only admin and member."""
+    wanted = ADMINISTRATOR if claims.get("appAdmin") else str(claims.get("role") or "").strip()
+    if wanted.lower() == "admin":
+        wanted = ADMINISTRATOR
+    found = db.scalar(select(Role).where(func.lower(Role.name) == wanted.lower())) if wanted else None
+    return found or db.scalar(select(Role).where(Role.name == FINANCE_STAFF))
+
+
+def user_from_claims(db, claims: dict, now: datetime) -> User:
+    """The person a pass (or, in the one backend, the Platform's answer about an account session,
+    modules/one_session.py) is about: found by their Bishnoi One account, or by email the first time,
+    added with their role from the Platform when new, and brought in step (name, email, role).
+    Refuses someone switched off here."""
+    email = str(claims["email"]).strip().lower()
+    # Their role as the Platform keeps it (app/platform_roles.py), kept here before it is matched by name.
+    if isinstance(claims.get("roleDef"), dict):
+        platform_roles.keep(db, claims["roleDef"])
+    role = role_from(db, claims)
+    user = db.scalar(select(User).where(User.platform_identity_id == claims["sub"]))
+    if user is None:
+        user = db.scalar(select(User).where(func.lower(User.email) == email))
+        # Linked to an account that's gone (it was deleted and added again): the Platform vouches
+        # for this email, which is one person at one company there, so it's re-linked below
+        # rather than refused (decided 2026-10-27, when ai4 was locked out that way).
+    if user is None:
+        user = User(
+            email=email,
+            full_name=str(claims.get("name") or email)[:120],
+            # never used: they sign in with their Bishnoi One account
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            role=role,
+            platform_identity_id=claims["sub"],
+            # the session opened below starts at the same moment, so it counts
+            password_changed_at=now,
+        )
+        db.add(user)
+        db.flush()
+        audit(db, email, "user.created", target=email, target_type="user", target_id=user.id, fields=["from the platform"])
+    else:
+        if not user.is_active:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Your account in this application is switched off. Ask your administrator.")
+        changed = []
+        if user.platform_identity_id != claims["sub"]:
+            user.platform_identity_id = claims["sub"]
+            changed.append("platformIdentity")
+        if claims.get("name") and user.full_name != claims["name"]:
+            user.full_name = str(claims["name"])[:120]
+            changed.append("fullName")
+        if user.email != email and db.scalar(select(User.id).where(func.lower(User.email) == email)) is None:
+            user.email = email
+            changed.append("email")
+        # the platform decides the role
+        if user.role_id != role.id:
+            user.role = role
+            user.legacy_role = "admin" if role.is_system else "member"
+            changed.append("role")
+        if changed:
+            audit(db, email, "user.updated", target=email, target_type="user", target_id=user.id, fields=changed)
+    return user
+
+
+def account_session(db, settings, token: str, found: dict, fresh: bool) -> SignInSession:
+    """One sign-in (stage M3, modules/one_session.py): the session row kept here for a Bishnoi One
+    account token the Platform vouches for, the person found or added as a pass would."""
+
+    def opened(user: User) -> None:
+        audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id, fields=["with a Bishnoi One account"])
+
+    row = one_session.session_row(db, SignInSession, token, found, fresh, lambda now: user_from_claims(db, found, now), opened)
+    if fresh:
+        business_events.remember_company(settings, found.get("companySlug"))
+    return row
+
+
+@router.post("/platform")
+def sign_in_with_platform(body: PlatformIn, db: DB, settings: SettingsDep, response: Response) -> dict:
+    """Takes a pass from the platform (app/platform_pass.py) and opens a session
+    here, as /auth/login does. The person is found by their Bishnoi One account, or
+    by email the first time; someone new is added. Their role comes from the
+    platform every time (see role_from), and nobody is turned away for a role
+    this app doesn't have. The platform decides who may open this application;
+    this only refuses someone switched off here."""
+    try:
+        claims = platform_pass.check_for(settings, body.token, APP_KEY)
+    except platform_pass.PassRefused as e:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from None
+    if claims.get("kind") is not None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This pass is not a sign-in pass.")
+    now = datetime.now(UTC)
+    db.execute(delete(PlatformPass).where(PlatformPass.expires_at < now))
+    db.add(PlatformPass(jti=str(claims["jti"])[:64], expires_at=platform_pass.expires(claims)))
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This sign-in link was already used. Sign in again from the start.") from None
+    user = user_from_claims(db, claims, now)
+    token = new_token()
+    expires_in = settings.session_hours * 3600
+    db.add(SignInSession(token_hash=token_hash(token), user_id=user.id, created_at=now, expires_at=now + timedelta(seconds=expires_in)))
+    audit(db, user, "auth.signed_in", target=user.email, target_type="user", target_id=user.id, fields=["with a Bishnoi One account"])
+    db.commit()
+    # Which company this database is, for the events it sends (app/business_events.py). Only now,
+    # after the commit: it's written through its own connection, and on SQLite that waited for the
+    # write lock this request still held, so every sign-in timed out (2026-10-29).
+    business_events.remember_company(settings, claims.get("companySlug"))
+    response.headers["Cache-Control"] = "no-store"
+    return {"accessToken": token, "tokenType": "bearer", "expiresIn": expires_in}
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(record: CurrentSession, db: DB) -> Response:
+    record.revoked_at = datetime.now(UTC)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/me")
+def me(user: CurrentUser, settings: SettingsDep) -> dict:
+    return me_out(user, settings)
+
+
+@router.get("/account")
+def account(user: CurrentUser, record: CurrentSession, db: DB) -> dict:
+    """Everything about the person signed in, for their account page: the role,
+    what it allows, and their sign-ins."""
+    previous = db.scalar(
+        select(SignInSession.created_at)
+        .where(SignInSession.user_id == user.id, SignInSession.id != record.id)
+        .order_by(SignInSession.created_at.desc())
+        .limit(1)
+    )
+
+    def at(when: datetime) -> str:  # SQLite hands times back without their zone: they're UTC
+        return (when if when.tzinfo else when.replace(tzinfo=UTC)).isoformat()
+
+    access = access_of(user)
+    return {
+        "role": {"name": user.role.name, "description": user.role.description, "scope": "all"},
+        "team": None,
+        "memberSince": at(user.created_at),
+        "passwordChangedAt": at(user.password_changed_at),
+        "signedInAt": at(record.created_at),
+        "previousSignIn": at(previous) if previous else None,
+        # What their role allows, area by area, as the roles screen lists it.
+        "areas": [
+            {"key": a.key, "name": a.name, "group": a.group, "actions": [ACTION_LABELS[x] for x in a.actions if access.can(f"{a.key}.{x}")]}
+            for a in AREAS
+            if any(access.can(p) for p in a.permissions())
+        ],
+    }
+
+
+@router.get("/demo-accounts")
+def demo_accounts(db: DB, settings: SettingsDep) -> dict:
+    """The demo accounts that exist here, for the sign-in page. Development only."""
+    if settings.is_production:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+    emails = [d.email for d in DEMO_ACCOUNTS]
+    active = set(db.scalars(select(User.email).where(User.email.in_(emails), User.is_active)))
+    return {
+        "password": DEMO_PASSWORD,
+        "items": [{"group": d.group, "email": d.email, "who": d.name, "role": d.role} for d in DEMO_ACCOUNTS if d.email in active],
+    }
+
+
+@router.post("/switch-org")
+@router.post("/leave")
+def not_here() -> None:
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "This app has one company and its own accounts, so there's nothing to switch to.")
+
+
+# ---- View as (app/platform_roles.py says how) --------------------------------------------------
+
+
+@router.get("/view-as")
+def view_as_people(user: CurrentUser, db: DB) -> dict:
+    """Whom an administrator may view as: everyone switched on, by role, most permissions first."""
+    if not platform_roles.may_view_as(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only administrators can view as someone else.")
+    return {"roles": platform_roles.people_by_role(db)}
+
+
+@router.post("/view-as")
+def start_view_as(body: dict, user: CurrentUser, db: DB) -> dict:
+    """Starting to view as someone: checked, and kept in the activity log (who, as whom)."""
+    if not platform_roles.may_view_as(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only administrators can view as someone else.")
+    other = db.get(User, str(body.get("userId") or ""))
+    if other is None or not other.is_active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That person isn't here, or is switched off.")
+    audit(db, user, "auth.viewed_as", target=other.email, target_type="user", target_id=other.id)
+    db.commit()
+    return {"id": other.id, "fullName": other.full_name, "role": other.role.name}

@@ -1,8 +1,10 @@
+import { clientAddressFrom } from "@/src/platform/lib/client-address";
 import "server-only";
 import { sendToErrorPage } from "./fail";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { moduleApiAddress } from "./backend";
 import { moduleByKey, type ModuleDef, type ModuleKey } from "./modules";
 import { ACCOUNT_COOKIE, COMPANY_COOKIE, COMPANY_HEADER, FRAME_HEADER, MODULE_HEADER, VIEW_AS_HEADER, moduleCookie, viewAsCookie } from "./session-cookie";
 import type { Me, Org } from "./types";
@@ -11,39 +13,15 @@ import type { Me, Org } from "./types";
 // the Next server with the token kept in an httpOnly cookie, so the token
 // never reaches browser scripts.
 //
-// One app, eight APIs (decided 2026-10-23): a request is for the module its
+// One app, one backend with a module per path (2026-11-17): a request is for the module its
 // path belongs to (the proxy sets MODULE_HEADER from the path, never the
 // browser), so `api.get("/deals")` on a /crm page goes to the CRM's API with
 // the CRM session, and module code needs no change. `apiFor("finance")` names
 // another module's API outright.
 
-// Each module's API address, as the Platform's Applications says (decided
-// 2026-10-27): so this site needs only PLATFORM_API_URL. Asked again as often
-// as the Platform says; while it can't be reached, the last answer stands.
-let addresses: { apis: Record<string, string>; until: number } | null = null;
-
-async function addressesOnPlatform(): Promise<Record<string, string>> {
-  if (addresses && addresses.until > Date.now()) return addresses.apis;
-  const platform = (process.env.PLATFORM_API_URL || "http://127.0.0.1:8305").replace(/\/$/, "");
-  try {
-    const r = await fetch(`${platform}/public/applications`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
-    if (r.ok) {
-      const body = (await r.json()) as { apis?: Record<string, string>; askAgainIn?: number };
-      addresses = { apis: body.apis ?? {}, until: Date.now() + (body.askAgainIn ?? 300) * 1000 };
-      return addresses.apis;
-    }
-  } catch {
-    // Not answering yet: the last answer, or this computer's addresses, until the next try.
-  }
-  addresses = { apis: addresses?.apis ?? {}, until: Date.now() + 30_000 };
-  return addresses.apis;
-}
-
-/** A module's API address: its setting (CRM_API_URL...) when set, else the Platform's Applications, else the one on this computer. */
+/** A module's API address: BACKEND_URL + its path, in the one backend (src/platform/lib/backend.ts). */
 export async function moduleApi(m: ModuleDef): Promise<string> {
-  const set = process.env[m.apiEnv];
-  if (set || m.accountOnly) return (set || m.apiLocal).replace(/\/$/, "");
-  return ((await addressesOnPlatform())[m.appKey] || m.apiLocal).replace(/\/$/, "");
+  return moduleApiAddress(m);
 }
 
 /** The module this request is for (from its path, via the proxy), or null outside any module. */
@@ -68,14 +46,9 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Who is asking, for the API's per-address limits on sign-in. It's what the
- * reverse proxy in front of this server says; in production that proxy must
- * overwrite X-Forwarded-For, or a browser could claim any address.
- */
+/** Who is asking, for the API's per-address limits on sign-in (src/platform/lib/client-address.ts). */
 async function clientAddress(): Promise<string | null> {
-  const incoming = await headers();
-  return incoming.get("x-forwarded-for")?.split(",")[0].trim() || incoming.get("x-real-ip") || null;
+  return clientAddressFrom(await headers());
 }
 
 type Extra = Record<string, string>;
@@ -84,17 +57,20 @@ async function send(method: string, path: string, body?: unknown, extra: Extra =
   const [jar, address, here] = await Promise.all([cookies(), clientAddress(), named ? Promise.resolve(named) : currentModule()]);
   if (!here) throw new ApiError(500, "This page isn't part of a module, so there's no API to ask.");
   const API_URL = await moduleApi(here);
-  // A module on the Bishnoi One account itself (the Admin Console) asks with the account's own sign-in.
-  const token = jar.get(here.accountOnly ? ACCOUNT_COOKIE : moduleCookie(here.key))?.value;
-  // Before signing in, which company: the one last signed in to here. Signed
-  // in, the token says (it starts with the company), so nothing is added.
-  const company = token ? undefined : jar.get(COMPANY_COOKIE)?.value;
+  // One sign-in (stage M3, 2026-11-18): every module of the one backend takes the Bishnoi One account's own
+  // session (it asks the Platform who it is, backend/modules/one_session.py), so the account token goes to
+  // every module. A module's own session (its cookie, opened by app/auth/enter) is only the fallback, for a
+  // module that refuses the account token as ended (a backend not yet upgraded); never kept otherwise.
+  const account = jar.get(ACCOUNT_COOKIE)?.value;
+  const own = here.accountOnly ? undefined : jar.get(moduleCookie(here.key))?.value;
   // An administrator viewing this module as someone: every request answered as them, read-only (src/one/view-as.tsx).
   const viewAs = here.accountOnly ? undefined : jar.get(viewAsCookie(here.key))?.value?.split("|")[0];
   // FormData (a file upload) sets its own multipart Content-Type; everything else is JSON.
   const form = body instanceof FormData;
-  try {
-    return await fetch(`${API_URL}${path}`, {
+  const ask = (token: string | undefined) => {
+    // Before signing in, which company: the one last signed in to here. Signed in, the token says, so nothing is added.
+    const company = token ? undefined : jar.get(COMPANY_COOKIE)?.value;
+    return fetch(`${API_URL}${path}`, {
       method,
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -107,6 +83,13 @@ async function send(method: string, path: string, body?: unknown, extra: Extra =
       body: body === undefined ? undefined : form ? body : JSON.stringify(body),
       cache: "no-store",
     });
+  };
+  try {
+    const first = await ask(account ?? own);
+    // A 401 is answered before anything is done, so asking again with the module's own session is safe for saves too.
+    if (first.status !== 401 || !account || !own || own === account) return first;
+    await first.body?.cancel();
+    return await ask(own);
   } catch {
     throw new ApiError(503, "Can't reach the server just now. Try again in a moment.");
   }

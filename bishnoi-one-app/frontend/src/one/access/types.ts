@@ -60,7 +60,7 @@ export type AccessPerson = {
 export type AppDetails = { crm?: { employeeId?: string }; pharmacy?: { licenseNo?: string }; finance?: { calendarOn?: boolean } };
 
 export type AccessData = {
-  company: { id: string; name: string; emailDomain?: string | null };
+  company: { id: string; name: string };
   modules: AccessModule[];
   roles: AccessRole[];
   people: AccessPerson[];
@@ -70,7 +70,20 @@ export type AccessData = {
   meId: string;
   /** How many people are in the recycle bin (2026-10-30). */
   inBin: number;
+  /** The one looking may open employees' HR records (step 4I). */
+  hrRecords?: boolean;
 };
+
+/** An employee's HR records (step 4I): labelled details and documents, for HR and administrators only. */
+export type HrDocument = { id: string; label: string; fileName: string; contentType: string; size: number; uploadedBy: string; uploadedAt: string; expiresOn: string | null };
+export type HrRecords = {
+  id: string;
+  details: { label: string; value: string }[];
+  documents: HrDocument[];
+  suggestedDetails: string[];
+  suggestedDocuments: string[];
+};
+export type HrPerson = { id: string; fullName: string; email: string; title: string | null; status: string };
 
 /** A person in the recycle bin: deleted, switched off, restorable. */
 export type BinPerson = { id: string; fullName: string; email: string; title: string | null; status: string; deletedAt: string; deletedBy: string | null; operator?: boolean };
@@ -103,4 +116,19 @@ export type PersonPage = AccessPerson & {
     invitationWaiting: boolean;
   };
   activity: { id: string; at: string; actor: string; action: string; category: string; target: string; fields: string[] }[];
+  watchers: Watcher[];
+};
+
+/** Someone who can see this employee's records for monitoring (2026-11-18): from the org chart, or added by an administrator.
+ * onChart: the chart gives them today, so they can't be removed here. What they may do stays with their own role. */
+export type Watcher = {
+  id: string;
+  fullName: string;
+  email: string;
+  title: string | null;
+  status: string;
+  source: "chart" | "added";
+  addedBy: string | null;
+  since: string | null;
+  onChart: boolean;
 };

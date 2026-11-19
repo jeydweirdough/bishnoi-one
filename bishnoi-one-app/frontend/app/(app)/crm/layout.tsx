@@ -24,8 +24,6 @@ function menuActions(me: Me): MenuAction[] {
     { group: "Go to", label: "Home", href: "/crm", keywords: "dashboard", allowed: true },
     { group: "Go to", label: "Customers", href: "/crm/customers", keywords: "companies accounts", allowed: may("customers.view") },
     { group: "Go to", label: "Contacts", href: "/crm/contacts", keywords: "people", allowed: may("customers.view") },
-    { group: "Go to", label: "Lead inbox", href: "/crm/inbox", keywords: "facebook messenger whatsapp viber tawk website enquiries", allowed: may("customers.inbox") },
-    { group: "Go to", label: "Find leads with AI", href: "/crm/customers/find", keywords: "chatgpt claude deepseek prospects", allowed: may("customers.create") },
     { group: "Go to", label: "Deals", href: "/crm/deals", keywords: "pipeline opportunities", allowed: may("deals.view") },
     { group: "Go to", label: "Quotes", href: "/crm/quotes", keywords: "quotations", allowed: may("quotes.view") },
     { group: "Go to", label: "Sales orders", href: "/crm/sales", keywords: "orders approval delivery", allowed: may("quotes.view") },

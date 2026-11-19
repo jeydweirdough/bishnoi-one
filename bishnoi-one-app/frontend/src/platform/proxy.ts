@@ -1,10 +1,38 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { borrowedOf, isPublicPath, moduleOfPath, moduleByKey } from "./lib/modules";
-import { ACCOUNT_COOKIE, FRAME_HEADER, HERE_COOKIE, MODULE_HEADER, cookieOptions, moduleCookie } from "./lib/session-cookie";
+import { ACCOUNT_COOKIE, FRAME_HEADER, HERE_COOKIE, MODULE_HEADER, cookieOptions } from "./lib/session-cookie";
 import { siteUrl } from "./lib/site";
 
 // Where each app's old people pages went (the Admin Console).
 const ADMIN_CONSOLE = { users: "/platform/roles/people", roles: "/platform/roles", teams: "/platform/organisation" } as const;
+// The CRM's dropped pages (2026-11-17, owner decision) and where their bookmarks land.
+const DROPPED_CRM: readonly (readonly [string, string])[] = [
+  ["/crm/inbox", "/crm/customers"],
+  ["/crm/customers/find", "/crm/customers"],
+  ["/crm/email", "/crm/activities"],
+  ["/crm/account/mailbox", "/crm/account"],
+  ["/crm/admin/settings/emails", "/platform/settings/crm"],
+  ["/platform/settings/crm/emails", "/platform/settings/crm"],
+];
+// Inventory features the owner dropped (2026-11-17): wave picking, and the sale typed in Inventory (every sale
+// is a CRM sales order, approved first). Dropshipping had no page of its own.
+const DROPPED_INVENTORY: readonly (readonly [string, string])[] = [
+  ["/inventory/waves", "/inventory/orders"],
+  ["/inventory/print/waves", "/inventory/orders"],
+  ["/inventory/orders/new/customer", "/crm/sales/orders/new"],
+];
+// Finance's read-only Zoho lists, dropped by the owner (2026-11-17): Finance's own sales orders and invoices stay.
+// (Foreign-currency bills and exchange rates went too; they had no page of their own.)
+const DROPPED_FINANCE: readonly (readonly [string, string])[] = [
+  ["/finance/sales-orders/zoho", "/finance/sales-orders/local"],
+  ["/finance/invoices/zoho", "/finance/invoices"],
+];
+// Bishnoi One features the owner removed (2026-11-17): the "Ask Bishnoi" assistant and the Admin Console's
+// "Apps and features" switches (every company runs everything it has as one operation).
+const DROPPED_PLATFORM: readonly (readonly [string, string])[] = [
+  ["/assistant", "/"],
+  ["/platform/company/apps", "/platform"],
+];
 // Finance's setup pages, now the Admin Console's (2026-10-31): their old addresses and where they went.
 const FINANCE_SETTINGS: Record<string, string> = {
   "/finance/tax": "taxes",
@@ -18,7 +46,7 @@ const FINANCE_SETTINGS: Record<string, string> = {
 //    anyway; this only saves a page that would bounce);
 //  - a page of a module whose screens are here: the request is marked with
 //    that module (MODULE_HEADER, from the path only, so the browser can't pick
-//    another), and the module's session is opened on first use (app/auth/enter).
+//    another); every module takes the account's own session (M3), so nothing is opened on the way.
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   // OAuth codes must never enter login return URLs or the last-page cookie.
@@ -46,8 +74,12 @@ export async function proxy(request: NextRequest) {
   if (moved) return NextResponse.redirect(siteUrl(`/operations/${moved[1]}${moved[2] ?? ""}${search}`, request), 308);
   // Sales orders moved from their own app into the CRM (2026-10-30): old links and stored ones still land.
   if (pathname === "/sales" || pathname.startsWith("/sales/")) return NextResponse.redirect(siteUrl(`/crm${pathname}${search}`, request), 308);
+  // CRM features the owner dropped (2026-11-17): the lead inbox, finding leads with AI, email through
+  // your own mailbox and its approved email templates. Bookmarks land on the nearest page still there.
+  const dropped = [...DROPPED_CRM, ...DROPPED_INVENTORY, ...DROPPED_FINANCE, ...DROPPED_PLATFORM].find(([from]) => pathname === from || pathname.startsWith(`${from}/`));
+  if (dropped) return NextResponse.redirect(siteUrl(dropped[1], request), 308);
   // People, roles and teams are kept only in the Admin Console (2026-10-31): each app's old pages land there.
-  const kept = pathname.match(/^\/(?:crm|inventory|finance|pharmacy|admin)\/admin\/(users|roles|teams)(?:\/.*)?$/);
+  const kept = pathname.match(/^\/(?:crm|inventory|finance|pharmacy)\/admin\/(users|roles|teams)(?:\/.*)?$/);
   if (kept) return NextResponse.redirect(siteUrl(ADMIN_CONSOLE[kept[1] as keyof typeof ADMIN_CONSOLE], request), 308);
   // Integrations are set up only in the Admin Console (2026-10-31): the CRM's Connections and Finance's Zoho
   // sign-in land there. Zoho's callback stays where Zoho was told to send people.
@@ -62,13 +94,13 @@ export async function proxy(request: NextRequest) {
   const zoho = pathname.match(/^\/finance\/integrations\/zoho(\/deliveries)?$/);
   if (zoho) return NextResponse.redirect(siteUrl(`/platform/company/integrations/zoho${zoho[1] ?? ""}${search}`, request), 308);
   // One activity log, the Admin Console's (2026-10-31): each app's old log lands there, filtered to that app.
-  const log = pathname.match(/^\/(crm|inventory|finance|pharmacy|admin)\/admin\/audit$/);
+  const log = pathname.match(/^\/(crm|inventory|finance|pharmacy)\/admin\/audit$/);
   if (log) return NextResponse.redirect(siteUrl(`/platform/company/activity?app=${log[1]}`, request), 308);
   // One data clean-up and recycle bin, the Admin Console's (2026-10-31): each app's old page lands there, on that app.
-  const cleanup = pathname.match(/^\/(crm|inventory|finance|pharmacy|admin)\/admin\/data-cleanup$/);
+  const cleanup = pathname.match(/^\/(crm|inventory|finance|pharmacy)\/admin\/data-cleanup$/);
   if (cleanup) return NextResponse.redirect(siteUrl(`/platform/company/data-cleanup?app=${cleanup[1]}`, request), 308);
-  // Executive Admin's "Settings" only ever led to its users (2026-10-31).
-  if (pathname === "/admin/settings" || pathname.startsWith("/admin/settings/")) return NextResponse.redirect(siteUrl("/platform/roles/people", request), 308);
+  // Office administration left Bishnoi One for an app of its own (2026-11-19): its old pages go Home.
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return NextResponse.redirect(siteUrl("/", request), 308);
   const headers = new Headers(request.headers);
   headers.delete(MODULE_HEADER);
   headers.delete(FRAME_HEADER);
@@ -90,14 +122,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request: { headers } });
   }
 
-  // The frame's session first (its sidebar is drawn around the page), then the page's own. The Admin Console
-  // works on the account itself, so as a frame it needs no session of its own.
-  for (const m of frame && !frame.accountOnly ? [frame, here] : [here]) {
-    if (request.cookies.get(moduleCookie(m.key))?.value) continue;
-    const enter = siteUrl(`/auth/enter/${m.key}`, request);
-    enter.searchParams.set("next", next);
-    return NextResponse.redirect(enter);
-  }
+  // One sign-in (stage M3, 2026-11-18): every module takes the Bishnoi One account's session (src/platform/lib/api.ts),
+  // so no module session is opened on the way. A module that refuses it sends the page to app/auth/renew, which
+  // opens that module's own session (app/auth/enter) as the fallback.
   headers.set(MODULE_HEADER, here.key);
   if (frame) headers.set(FRAME_HEADER, frame.key);
   const response = NextResponse.next({ request: { headers } });

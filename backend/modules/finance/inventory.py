@@ -1,0 +1,31 @@
+"""Bishnoi One Inventory, as Finance uses it: what each product costs, so an invoice books its cost
+of goods sold (decided 2026-10-28, feature plan step 3). Read with the key Inventory gave Finance,
+at Finance's company (CRM_COMPANY). Coded product invoices are held until their costs and posting accounts are available.
+"""
+
+import json
+import urllib.error
+import urllib.parse
+import urllib.request
+
+from modules import inprocess
+from modules.finance.config import Settings
+
+TIMEOUT = 10  # seconds
+
+
+def unit_costs(settings: Settings, skus: list[str]) -> dict[str, int] | None:
+    """Each known SKU's cost per unit, in centavos (keys upper-cased); None when Inventory can't be asked."""
+    wanted = sorted({s.strip() for s in skus if s and s.strip()})
+    if not wanted or not settings.inventory_linked:
+        return None if not settings.inventory_linked else {}
+    headers = {**inprocess.key_header(settings.inventory_api_key), "Accept": "application/json"}
+    if settings.crm_company:
+        headers["X-Bishnoi-Company"] = settings.crm_company
+    url = f"{settings.inventory_api_url}/integration/costs?{urllib.parse.urlencode({'skus': ','.join(wanted)})}"
+    try:
+        with inprocess.urlopen("finance", urllib.request.Request(url, headers=headers), timeout=TIMEOUT) as response:
+            items = json.loads(response.read()).get("items", {})
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return None
+    return {sku.upper(): v["unitCost"] for sku, v in items.items() if isinstance(v, dict) and type(v.get("unitCost")) is int and v["unitCost"] >= 0}

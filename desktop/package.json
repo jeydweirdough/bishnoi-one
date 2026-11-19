@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Opens one Bishnoi One app in a window of its own, for trying it as a desktop app: npm run bishnoi-crm:app (from the top of the repo).",
+  "description": "Opens Bishnoi One (the one app, with the one backend behind it) in a window of its own, for trying it as a desktop app: npm run bishnoi-one-app:app (from the top of the repo).",
   "main": "main.mjs",
   "scripts": {
     "icons": "electron make-icons.mjs"

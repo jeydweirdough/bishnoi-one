@@ -1,13 +1,15 @@
+import { clientAddressFrom } from "@/src/platform/lib/client-address";
 import { NextResponse, type NextRequest } from "next/server";
-import { AccountError, accountCall, oneAppUrl } from "@/src/platform/lib/account";
-import { moduleApi } from "@/src/platform/lib/api";
+import { oneAppUrl } from "@/src/platform/lib/account";
+import { openModuleSession } from "@/src/platform/lib/module-session";
 import { moduleByKey } from "@/src/platform/lib/modules";
 import { markUnavailable } from "@/src/platform/lib/enter";
 import { siteUrl } from "@/src/platform/lib/site";
 import { ACCOUNT_COOKIE, COMPANY_COOKIE, companyOfToken, cookieOptions, moduleCookie } from "@/src/platform/lib/session-cookie";
 
-// Opens a module's session from the Bishnoi One account, the first time
-// someone opens that module (the proxy sends them here; decided 2026-10-23):
+// Opens a module's session from the Bishnoi One account when it has none (the proxy sends them here;
+// decided 2026-10-23). Since one sign-in (M3, 2026-11-18) every part opens at sign-in
+// (src/platform/lib/module-session.ts), so this is the fallback for a session that ran out:
 // the Platform hands a pass for the module (it decides who may open it), the
 // module's API turns the pass into a session (its /auth/platform), and the
 // session is kept in that module's cookie. Then back to the page they asked for.
@@ -33,30 +35,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return response;
   };
   if (!account) return toLogin();
-  const address = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
+  const address = clientAddressFrom(request.headers);
 
-  let pass: string;
-  try {
-    pass = (await accountCall<{ pass: string }>("/identity/pass", { app: m.appKey, returnTo: `${oneAppUrl(request.headers, request.url)}/auth/platform` }, account, address)).pass;
-  } catch (error) {
-    if (error instanceof AccountError && error.status === 401) return toLogin();
-    return home(error instanceof Error ? error.message : `${m.label} couldn't be opened.`);
-  }
-
-  let session: { accessToken: string; expiresIn: number };
-  try {
-    const response = await fetch(`${await moduleApi(m)}/auth/platform`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(address ? { "X-Forwarded-For": address } : {}) },
-      body: JSON.stringify({ pass }),
-      cache: "no-store",
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok) return home(typeof data?.detail === "string" ? data.detail : `${m.label} didn't open (error ${response.status}).`);
-    session = data;
-  } catch {
-    return home(`${m.label} can't be reached just now. Try again in a minute.`);
-  }
+  const opened = await openModuleSession(m, account, oneAppUrl(request.headers, request.url), address);
+  if (!opened.ok) return opened.signedOut ? toLogin() : home(opened.message);
+  const session = { accessToken: opened.token, expiresIn: opened.expiresIn };
 
   const response = NextResponse.redirect(siteUrl(next, request));
   response.cookies.set(moduleCookie(m.key), session.accessToken, cookieOptions(session.expiresIn));

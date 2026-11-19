@@ -141,7 +141,6 @@ function Overview({ company }: { company: CompanyDetail }) {
                 ["Status", company.status === "suspended" ? `Suspended since ${when(company.suspendedAt)}` : "Active"],
                 ["Currency", company.currency],
                 ["Time zone", company.timezone],
-                ["Email domain", company.emailDomain ? `@${company.emailDomain}` : "Not set"],
                 ["Contact email", company.contactEmail ? <a href={`mailto:${company.contactEmail}`} className="text-hema hover:underline">{company.contactEmail}</a> : null],
                 ["Departments", company.units.filter((u) => u.kind === "department").length],
                 ["Branches", company.units.filter((u) => u.kind === "branch").length],
@@ -246,7 +245,6 @@ async function Applications({ company, canChange }: { company: CompanyDetail; ca
  */
 async function People({ company }: { company: CompanyDetail }) {
   const { users } = await load<{ users: PlatformUser[] }>(`/platform/users?company_id=${enc(company.id)}`);
-  const domain = company.emailDomain;
   return (
     <Sheet>
       <div className="px-5 pt-4 pb-2">
@@ -264,7 +262,6 @@ async function People({ company }: { company: CompanyDetail }) {
         ) : (
           <ul className="divide-y divide-rule">
             {users.map((u) => {
-              const off = Boolean(domain) && !u.email.toLowerCase().endsWith(`@${domain}`) && u.status === "active";
               return (
                 <li key={u.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5">
                   <span className="min-w-0 flex-1">
@@ -274,7 +271,6 @@ async function People({ company }: { company: CompanyDetail }) {
                   <span className="flex flex-wrap gap-1.5 text-meta">
                     {u.isCompanyAdmin && <span className="rounded-full bg-hema-tint px-2 py-0.5 text-hema">Administrator</span>}
                     {u.status !== "active" && <span className="rounded-full border border-rule px-2 py-0.5 text-ink-3">Suspended</span>}
-                    {off && <span className="rounded-full bg-danger-tint px-2 py-0.5 text-danger" title={`Not at @${domain}: can't sign in until it's changed`}>Email to change</span>}
                   </span>
                 </li>
               );

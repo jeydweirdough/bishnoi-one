@@ -9,6 +9,8 @@ import type { Where } from "@/src/modules/crm/components/field/where";
 // Field work: logging visits, and the month's goals. The API checks who may.
 
 export type VisitInput = {
+  /** The phone's own id (Step 4H): the same visit sent twice is kept once. */
+  clientId?: string;
   companyId: string;
   outcome: VisitOutcome;
   /** The company's local time ("2026-09-24T10:30"). */
@@ -164,5 +166,24 @@ export async function removeAssistanceFile(id: string, n: number): Promise<Resul
     const a = await api.del<Assistance>(`/assistance/${enc(id)}/files/${n}`);
     refresh();
     return a;
+  });
+}
+
+// Optional photos on a visit (Step 4B). Shrunk in the browser before they come here.
+export type VisitPhoto = { id: string; href: string; takenBy: { id: string; name: string } | null; createdAt: string; canRemove: boolean };
+export async function addVisitPhoto(visitId: string, form: FormData): Promise<Result<VisitPhoto>> {
+  form.set("targetType", "visit");
+  form.set("targetId", visitId);
+  return attempt(async () => {
+    const out = await api.upload<VisitPhoto>("/photos", form);
+    refresh();
+    return out;
+  });
+}
+export async function removeVisitPhoto(id: string): Promise<Result> {
+  return attempt(async () => {
+    await api.del(`/photos/${enc(id)}`);
+    refresh();
+    return null;
   });
 }

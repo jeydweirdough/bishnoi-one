@@ -53,7 +53,6 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       steps: keep([
         // Deliveries (step 11): what the Sales app's approved orders make, and orders typed here.
         { href: "/inventory/orders", label: "Deliveries", icon: "issuance", sees: ["orders.view"] },
-        { href: "/inventory/waves", label: "Waves", icon: "lists", sees: ["orders.view"] },
         { href: "/inventory/reservations", label: "Reservations", icon: "reservations", sees: ["orders.view"] },
       ]),
     },

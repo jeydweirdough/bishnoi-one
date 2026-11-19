@@ -5,6 +5,9 @@ import type { OrderKind } from "@/src/modules/inventory/lib/types";
 // for it, rather than one form that asks what it is. What differs is who it's
 // for (a customer, a department, a project), whether it's priced, and how it
 // reads. Stock goes out the same way for all of them: reserved, picked, issued.
+//
+// A sale is never typed here (2026-11-17): it starts as a sales order in the CRM and its delivery
+// appears here once the order is approved. Its New button goes to the CRM's New sales order.
 
 export type KindInfo = {
   kind: OrderKind;
@@ -24,6 +27,8 @@ export type KindInfo = {
   notes: { label: string; hint?: string };
   /** Customer orders carry a selling price per line. */
   priced: boolean;
+  /** Made somewhere else, not with an Inventory form: where its New button goes, and who may use it. */
+  elsewhere?: { href: string; permission: string };
 };
 
 export const KINDS: KindInfo[] = [
@@ -33,11 +38,12 @@ export const KINDS: KindInfo[] = [
     plural: "Sales orders",
     one: "sales order",
     newLabel: "New sales order",
-    intro: "Stock sold to a customer: hospitals, pharmacies, clinics and doctors. Priced per line.",
+    intro: "Stock sold to a customer: hospitals, pharmacies, clinics and doctors. Written as a sales order in the CRM; its delivery appears here once approved.",
     icon: "issuance",
     recipient: { label: "Customer", placeholder: "St. Luke's Family Clinic", hint: "The customer buying the stock." },
     notes: { label: "Notes" },
     priced: true,
+    elsewhere: { href: "/crm/sales/orders/new", permission: "sales.create" },
   },
   {
     kind: "internal",
@@ -92,4 +98,6 @@ export const KINDS: KindInfo[] = [
 export const kindOf = (k: string | null | undefined) => KINDS.find((x) => x.kind === k);
 export const kindBySlug = (slug: string) => KINDS.find((x) => x.slug === slug);
 export const listHref = (k: KindInfo) => `/inventory/orders?kind=${k.kind}`;
-export const newHref = (k: KindInfo) => `/inventory/orders/new/${k.slug}`;
+export const newHref = (k: KindInfo) => k.elsewhere?.href ?? `/inventory/orders/new/${k.slug}`;
+/** The permission its New button needs: a sales order's own for a sale, else creating orders. */
+export const newPermission = (k: KindInfo | undefined) => k?.elsewhere?.permission ?? "orders.create";

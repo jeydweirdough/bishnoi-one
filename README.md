@@ -1,14 +1,15 @@
 # Bishnoi One
 
-Bishnoi One is a set of separate business apps (Admin, CRM, Finance, Inventory,
-and more) kept in one GitHub repo. Each app has its own API; every app's
-screens are in one web app, with one sign-in. This page shows you how to:
+Bishnoi One is a set of business modules (CRM, Inventory, Finance, Pharmacy
+and more; office administration is another app, apart from this repo since 2026-11-19) kept in one GitHub repo: **one backend** with every
+module's API, and **one web app** with every module's screens and one sign-in.
+This page shows you how to:
 
 - get the code onto your computer
 - keep it up to date
 - share your changes
-- run an app
-- add a new app
+- run it
+- add a new module
 
 Repo: **https://github.com/jeydweirdough/nabhi**
 
@@ -23,10 +24,10 @@ The rest of this page walks through them.
 2. [Before you start (once per computer)](#2-before-you-start-once-per-computer)
 3. [Clone: download the code](#3-clone-download-the-code)
 4. [Pull and push: everyday work](#4-pull-and-push-everyday-work)
-5. [Run an app](#5-run-an-app)
-6. [Settings (`.env`) for every app](#6-settings-env-for-every-app)
+5. [Run it](#5-run-it)
+6. [Settings (`backend/.env`)](#6-settings-backendenv)
 7. [Benchmarks: what we build to](#7-benchmarks-what-we-build-to)
-8. [Add a new app](#8-add-a-new-app)
+8. [Add a new module](#8-add-a-new-module)
 9. [What happens after you push](#9-what-happens-after-you-push)
 10. [Rules](#10-rules)
 11. [Cheat sheet](#11-cheat-sheet)
@@ -35,44 +36,57 @@ The rest of this page walks through them.
 
 ## 1. How the repo is laid out
 
-Each app's API lives in its own folder, in **`backend/`** (Python, FastAPI).
-The APIs don't depend on each other. Each one has its own settings and
-database.
+Bishnoi One is **one backend** and **one app**:
 
-Every app's screens are in **one** Next.js app, `bishnoi-one-app/frontend`,
-with each module under its own path. One Bishnoi One sign-in (a Platform
-account) opens every module. See
-[bishnoi-one-app/README.md](bishnoi-one-app/README.md).
+- **`backend/`**: one Python (FastAPI) server, on port **8300**, with every
+  module's API in it. Each module is a folder in `backend/modules/` with its own
+  routes, permissions, tables (each module's names start with its own prefix)
+  and migrations, and answers under its own path: `/platform`, `/crm`,
+  `/inventory`, `/finance`, `/admin`, `/pharmacy`, `/in-licensing`,
+  `/regulatory`. So `/crm/customers` is the CRM's customers. `GET /health`
+  says which modules started. One settings file, `backend/.env`.
+- **`bishnoi-one-app/frontend`**: one Next.js app with every module's screens,
+  each under its path, on port **4301**. One Bishnoi One sign-in (a Platform
+  account) opens every module. See
+  [bishnoi-one-app/README.md](bishnoi-one-app/README.md).
 
 ```
 bishnoi/
-├── bishnoi-one-app/        screens :4301   (every module, one sign-in)
-├── bishnoi-admin/          API :8300
-├── bishnoi-crm/            API :8302
-├── bishnoi-finance/        API :8303
-├── bishnoi-inventory/      API :8304
-├── bishnoi-platform/       API :8305
-├── bishnoi-in-licensing/   API :8306
-├── bishnoi-pharmacy/       API :8307
-└── bishnoi-regulatory/     API :8308
+├── backend/                the one backend :8300 (uv run main.py)
+│   ├── main.py             starts every module, each under its path
+│   ├── pyproject.toml      one set of Python packages (uv.lock)
+│   └── modules/
+│       ├── platform/       /platform      accounts, companies, roles, the Admin Console
+│       ├── crm/            /crm
+│       ├── inventory/      /inventory
+│       ├── finance/        /finance
+│       ├── pharmacy/       /pharmacy
+│       ├── in_licensing/   /in-licensing
+│       └── regulatory/     /regulatory
+├── bishnoi-one-app/        the one app :4301 (every module's screens)
+├── desktop/                the one app in a window of its own
+└── scripts/                run, set up, back up
 ```
 
-| Module | Path in the one app |
-|---|---|
-| CRM | `/crm` |
-| Inventory | `/inventory` |
-| Finance | `/finance` |
-| Executive Admin | `/admin` |
-| Pharmacy | `/pharmacy` |
-| Platform: company administrators (people, roles, modules) | `/platform/access` |
-| Platform: Bishnoi One staff console (own staff sign-in) | `/platform/console` |
-| In-Licensing, Regulatory | `/in-licensing`, `/regulatory` ("Coming soon") |
+| Module | Screens in the one app | API in the backend |
+|---|---|---|
+| CRM | `/crm` | `/crm` |
+| Inventory | `/inventory` | `/inventory` |
+| Finance | `/finance` | `/finance` |
+| Pharmacy | `/pharmacy` | `/pharmacy` |
+| Admin Console (company administrators) | `/platform` | `/platform` |
+| Operations (Bishnoi One's operators) | `/operations` | `/platform` |
+| In-Licensing, Regulatory | `/in-licensing`, `/regulatory` ("Coming soon") | `/in-licensing`, `/regulatory` |
+
+The modules still talk to each other the way they did when each was its own
+server (over HTTP, with keys the Platform hands out), now at the backend's own
+address: `BACKEND_URL` + the module's path ([section 6](#6-settings-backendenv)).
 
 ### Work on `main`
 
-Every app and the one app are in one repo. Everyone works on `main`: clone
-the whole repo, pull, and push. Want a branch for a change? Branch from
-`main`, but never name it `bishnoi-…`.
+Everything is in one repo. Everyone works on `main`: clone the whole repo,
+pull, and push. Want a branch for a change? Branch from `main`, but never name
+it `bishnoi-…`.
 
 ---
 
@@ -124,21 +138,21 @@ git clone https://github.com/jeydweirdough/nabhi.git bishnoi
 cd bishnoi
 ```
 
-You get `main`, with every app and the one app, each in its own folder.
+You get `main`, with the backend and the one app.
 
 ### Then: create your settings files
 
-Passwords and other secrets are never stored in Git. Each app includes
-example files instead. `npm run <app>` copies them for you
-([section 5](#5-run-an-app)); to do it by hand, copy them once per app:
+Passwords and other secrets are never stored in Git. Example files stand in
+for them. `npm run one` copies them for you ([section 5](#5-run-it)); to do it
+by hand, copy them once:
 
 | Copy this… | …to this |
 |---|---|
-| `backend/.env.example` | `backend/.env` (in each app's folder) |
+| `backend/.env.example` | `backend/.env` (the one backend, every module) |
 | `bishnoi-one-app/frontend/.env.example` | `bishnoi-one-app/frontend/.env.local` (the screens) |
 
-What each setting means, and a complete file for every app, is in
-[section 6](#6-settings-env-for-every-app). You're ready. See [Run an app](#5-run-an-app).
+What each setting means is in [section 6](#6-settings-backendenv). You're
+ready. See [Run it](#5-run-it).
 
 ---
 
@@ -226,42 +240,31 @@ pulled, and you can ask for help.
 
 ---
 
-## 5. Run an app
+## 5. Run it
 
 ### The quick way
 
-From the top of the repo, one command runs the Platform, CRM, Inventory,
-Finance, Admin and Pharmacy APIs together with the one app's screens:
+From the top of the repo, one command runs the backend (every module's API)
+and the one app's screens:
 
 ```
 npm run one
 ```
 
 Then open **http://localhost:4301** and sign in with your Bishnoi One
-account. **Ctrl+C** stops everything. `npm run one -- --setup` gets it all
-ready and starts nothing.
+account. **Ctrl+C** stops everything. The backend starts first; the screens
+start once it answers.
 
 The first time, it gets each part ready by itself: it copies the `.env`
-example files, makes each API's Python environment (`backend/.venv`, with
+example files, makes the backend's Python environment (`backend/.venv`, with
 `uv sync`) and installs the screens' packages (`npm install`). After that it
 only redoes what changed.
 
-To run one API alone, use its name. These run the API only: the screens are
-all in the one app.
-
-```
-npm run bishnoi-crm
-```
-
-Every app has one: `npm run bishnoi-admin`, `bishnoi-crm`, `bishnoi-finance`,
-`bishnoi-inventory`, `bishnoi-pharmacy`, `bishnoi-platform`, `bishnoi-in-licensing`
-and `bishnoi-regulatory`.
-
 | Also | Does |
 |---|---|
-| `npm run bishnoi-one-app` | The one app's screens only |
-| `npm run bishnoi-crm -- --setup` | Gets that API ready, starts nothing |
-| `npm run setup` | Gets **every** app ready |
+| `npm run backend` | The backend only (every module's API, port 8300) |
+| `npm run bishnoi-one-app` | The screens only (the backend must be running) |
+| `npm run one -- --setup` / `npm run setup` | Gets everything ready, starts nothing |
 
 It needs only Node.js and uv (step 2): the root `package.json` has no
 packages of its own to install.
@@ -274,62 +277,59 @@ To try the one app the way it will be used on a PC, in a window of its own:
 npm run bishnoi-one-app:app
 ```
 
-The first time, it installs what the window needs (in `desktop/`). The APIs
-it uses must be running (for example with `npm run one` in another terminal,
-or each API on its own). The per-app `:app` commands are gone: every module
-opens in this one window. See [bishnoi-one-app/README.md](bishnoi-one-app/README.md).
-
-This is for trying the app on your own computer. Installers for other PCs
-come later.
+It starts the backend and the screens, then opens them in a window (the first
+time, it installs what the window needs, in `desktop/`). Closing the window
+stops everything. This is for trying the app on your own computer; installers
+for other PCs come later.
 
 ### By hand
-
-Every API runs the same way. First go into the app's folder
-(`cd bishnoi-crm`).
 
 ```
 cd backend
 uv sync
-uv run main.py
+uv run main.py          # every module's API on http://127.0.0.1:8300, reloading on code changes
 ```
 
-The screens are the one app, in `bishnoi-one-app/frontend`; how to
-run it by hand is in [bishnoi-one-app/README.md](bishnoi-one-app/README.md).
-Each module is at its path on http://localhost:4301
-([section 1](#1-how-the-repo-is-laid-out)).
+`GET http://127.0.0.1:8300/health` lists the modules and whether each started.
+Each module answers under its path: the CRM's API at
+`http://127.0.0.1:8300/crm`, its interactive docs at
+`http://127.0.0.1:8300/crm/docs`, and so on for `/platform`, `/inventory`,
+`/finance`, `/admin`, `/pharmacy`, `/in-licensing` and `/regulatory`.
 
-| App | API |
-|---|---|
-| Admin | http://127.0.0.1:8300 |
-| CRM | http://127.0.0.1:8302 |
-| Finance | http://127.0.0.1:8303 |
-| Inventory | http://127.0.0.1:8304 |
-| Platform | http://127.0.0.1:8305 |
-| In-Licensing | http://127.0.0.1:8306 |
-| Pharmacy | http://127.0.0.1:8307 |
-| Regulatory | http://127.0.0.1:8308 |
+The screens are the one app, in `bishnoi-one-app/frontend`; how to run it by
+hand is in [bishnoi-one-app/README.md](bishnoi-one-app/README.md).
 
 ### Your first account
 
 One Bishnoi One sign-in (a Platform account) opens every module in the one
-app, and roles are managed centrally in `/platform/access`. There's no
-sign-up page. Accounts are made with the users tool, run from an app's
-`backend/` folder (for your Bishnoi One account, `bishnoi-platform/backend`):
+app. On a new database, the one app's `/setup` page makes the company and its
+first administrator (the setup code is in the backend's log). Or use the users
+tool, from `backend/`:
 
 ```
-uv run python -m app.tools.users add --email you@example.com --name "Your Name" --admin
+uv run python -m modules.platform.tools.users add --email you@example.com --name "Your Name" --admin
 ```
 
-Later, `list`, `password`, `disable` and `enable` manage accounts.
+Later, `list`, `password`, `disable` and `enable` manage accounts. Every
+module's tools run the same way, from `backend/`:
+`uv run python -m modules.<module>.tools.<tool> …`.
 
 ### Good to know
 
-- The database is set by `DATABASE_URL` in `backend/.env`. By default it's a
-  local SQLite file in `backend/.data/`. Every setting is in
-  [section 6](#6-settings-env-for-every-app).
-- Every API has interactive docs at `/docs`
-  (e.g. http://127.0.0.1:8302/docs).
-- Run an API's tests with `uv run pytest` in its `backend/` folder.
+- The database is set by `DATABASE_URL` in `backend/.env`. By default each
+  module keeps a local SQLite file in `backend/.data/`. Every setting is in
+  [section 6](#6-settings-backendenv).
+- Each module runs its own migrations when the backend starts. To make a new
+  one: `uv run alembic -c modules/<module>/alembic.ini revision -m "what changed"`
+  in `backend/`.
+- Run one module's tests at a time, in `backend/`:
+  `uv run pytest modules/crm/tests` (or one test:
+  `uv run pytest modules/crm/tests/test_deals.py::test_name -q`). If
+  `uv run pytest` complains about a trampoline, use
+  `uv run python -m pytest …`.
+- If a module can't start (a setting, its database), only that module answers
+  `503` naming the setting to check; the others run. The full error is in the
+  backend's log.
 - On Windows, if the screens stop with
   `listen EACCES: permission denied 0.0.0.0:4301`, Windows has set that port
   aside (Hyper-V, WSL and Docker do this, and it changes from one restart to
@@ -342,454 +342,136 @@ Later, `list`, `password`, `disable` and `enable` manage accounts.
   netsh int ipv6 set dynamicport tcp start=49152 num=16384
   ```
 
-### Put an app online (Vercel)
+### Put it online (Coolify)
 
-Each app is **one Vercel project** from this repo, for its API, plus **one
-project for the one app's screens** (every module). When you import the repo,
-set the project's **Root Directory** to the app's `backend/` folder, or to
-`bishnoi-one-app/frontend` for the screens.
+Bishnoi One runs on the office server, in Coolify, as **two applications**
+built from this repo: the backend and the one app. **Pushing doesn't deploy**:
+press **Redeploy** in Coolify when you're ready, the backend first. The full
+steps, with every setting, are in [MAINTAINING.md](MAINTAINING.md), "Putting
+it online".
 
-Ready for Vercel today: **CRM, Inventory, Pharmacy, Platform**. Admin,
-Finance, In-Licensing and Regulatory don't have the Postgres driver, the
-Vercel entry point (`app/server.py`) or the first-admin settings yet, so they
-run on your computer only.
+| Coolify application | Base directory | Start | Port | Settings |
+|---|---|---|---|---|
+| Backend | `backend` | `uv run uvicorn main:app --host 0.0.0.0 --port 8300` | 8300 | `DATABASE_URL`, `BACKEND_URL` |
+| The one app | `bishnoi-one-app/frontend` | `npm run start` | 4301 | `BACKEND_URL`, `ONE_APP_URL` |
 
-In each project: **Settings → Environment Variables**. Paste a block like the
-ones below into the first field, and Vercel splits it into one variable per
-line.
-
-**Every API project:**
-
-```
-DATABASE_URL=postgresql://postgres.<project>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
-ENVIRONMENT=production
-ALLOWED_HOSTS=["<this API's address>.vercel.app"]
-FIRST_ADMIN_EMAIL=you@yourcompany.com
-FIRST_ADMIN_NAME=Your Name
-FIRST_ADMIN_PASSWORD=<at least 8 characters>
-```
-
-- `DATABASE_URL`: on Supabase, the **Transaction pooler** address (Connect →
-  Transaction pooler, port 6543). The direct `db.<project>.supabase.co`
-  address doesn't work from Vercel. In the password, write `#` as `%23`, `@`
-  as `%40` and `/` as `%2F`. Don't put quotes around it.
-- The apps can share one database: every app's tables start with its own
-  prefix (`nbcm_`, `nbin_`, `nbph_`, `nbpl_`…), so they never collide.
-- `ALLOWED_HOSTS`: the API's own address, as JSON. A request to any other
-  address is refused.
-- `FIRST_ADMIN_*`: makes the first administrator on start, but only when that
-  app has no accounts yet; after that it's ignored. Remove
-  `FIRST_ADMIN_PASSWORD` once you've signed in, and add everyone else from
-  the app itself.
-
-**The CRM and Inventory on Neon** (decided 2026-10-05; Supabase works the same way):
-
-1. At neon.com (free, no card), make **one project per app**: `bishnoi-crm` and
-   `bishnoi-inventory`, region **Singapore** (closest to the Philippines). Set
-   the compute to **0.25 CU, autoscaling up to 0.5 CU**: the free plan's 100
-   compute-hours a month then cover office hours. Each project gets its own
-   1 GB and hours, and the two apps only talk through their APIs anyway.
-2. In each project: **Connect**, pooled connection (the address with
-   `-pooler`), and copy it. That's the API project's `DATABASE_URL` on Vercel.
-3. Copy this computer's data into it, once, from the app's `backend/` folder:
-   `uv run python -m app.tools.copy_database --to "<the pooled address>"`.
-   It makes the tables, copies every row, and checks every table matches. A
-   database that already has people in it is refused unless `--replace`.
-   `--setup` copies only the setup (people, roles, teams, settings, products,
-   prices, KPIs, taxes, warehouses, stock) and leaves customers, deals,
-   quotes, activities, visits, orders, invoices, the audit log and sign-ins
-   behind (CRM, Inventory and Finance).
-4. Backups: put the same address in the app's `backend/.env` as `BACKUP_FROM`
-   (this computer keeps its own SQLite file for trying things), and run
-   `scripts/backup-online-databases.cmd` by hand or nightly with Task
-   Scheduler (the command is in the file). The last 30 days stay in
-   `backend/.data/backups/`.
+- The backend's `BACKEND_URL` and the one app's `BACKEND_URL` are the
+  backend's **internal** address (e.g. `http://10.0.1.1:8300`); only the one
+  app is public (`ONE_APP_URL=https://one.bishnoi.ai`).
+- One `DATABASE_URL` serves every module: each module's tables start with its
+  own prefix ([below](#table-prefixes)) and each keeps its own migration
+  history. CRM and Inventory make a database per company beside it
+  (`bishnoione` → `bishnoione_getmeds`).
 
 **Several companies, one CRM (and one Inventory)** (since 2026-10-05). Each
 company has a database of its own, beside `DATABASE_URL` with the company's
-short name added: `neondb` → `neondb_getmeds`, `neondb_northwind`; on this
-computer `crm.db` → `crm-getmeds.db`. So `DATABASE_URL` on Vercel stays the
-**base** address (`…/neondb`): the app makes each company's database the first
-time that company signs in, once the company is registered on Bishnoi One
-Platform and given the app. Which company a request is for comes from the
-sign-in (the session's token starts with it). The tools take
-`--company getmeds` (default on this computer: `DEFAULT_COMPANY`), and the
-backup copies every company, one file each. Someone who works for two
-companies has a Platform account row at each, under one email and one
-password, and uses **Switch company** in the app's menu.
+short name added: `bishnoione` → `bishnoione_getmeds`; on this computer
+`crm.db` → `crm-getmeds.db`. The module makes each company's database the
+first time that company signs in, once the company is registered on Bishnoi
+One Platform and given the module. Which company a request is for comes from
+the sign-in (the session's token starts with it). The tools take
+`--company getmeds` (default on this computer: `DEFAULT_COMPANY`).
 
-**The screens project (the one app):**
-
-```
-ONE_APP_URL=https://one.bishnoi.ai
-PLATFORM_API_URL=https://<the Platform's API address>
-CRM_API_URL=https://<the CRM's API address>
-INVENTORY_API_URL=https://<Inventory's API address>
-FINANCE_API_URL=https://<Finance's API address>
-ADMIN_API_URL=https://<Admin's API address>
-PHARMACY_API_URL=https://<Pharmacy's API address>
-```
-
-- `ONE_APP_URL` must match the Platform's `ONE_APP_URL`.
-- `INLICENSING_API_URL` and `REGULATORY_API_URL` are there too, for when
-  those modules have screens.
-- Every setting is explained in `bishnoi-one-app/frontend/.env.example` and
-  [bishnoi-one-app/README.md](bishnoi-one-app/README.md).
-
-**Linked apps:** the CRM's API also needs `INVENTORY_API_URL`/`KEY` and
-`FINANCE_API_URL`/`KEY` for the apps it uses, and each of those APIs needs
-the matching `INTEGRATION_KEYS` ([Linking apps](#linking-apps)).
-
-| Project | Root directory |
-|---|---|
-| CRM API | `bishnoi-crm/backend` |
-| Inventory API | `bishnoi-inventory/backend` |
-| Pharmacy API | `bishnoi-pharmacy/backend` |
-| Platform API | `bishnoi-platform/backend` |
-| The one app (every module's screens) | `bishnoi-one-app/frontend` |
-
-Use the addresses Vercel actually gives your projects (e.g.
-`bishnoi-one-inventory-backend.vercel.app`): the API's `ALLOWED_HOSTS` and the
-one app's matching `<APP>_API_URL` must both name it.
-
-**Pushing doesn't deploy.** To put an app online, deploy it by hand, the
-Platform first: on the office Coolify server press **Redeploy**, or run
-`vercel --prod` in the app's `backend` folder; then deploy the one app from
-`bishnoi-one-app/frontend` (MAINTAINING.md, "Deploying by hand").
-
-If an API can't start, every request to it answers `503` with what's wrong
-and which setting to check (`"problem": "database"` → `DATABASE_URL`). The
-full error is in the project's logs.
+**Backups of an online database:** put its address in `backend/.env` as
+`<MODULE>_BACKUP_FROM` (`CRM_BACKUP_FROM`, `INVENTORY_BACKUP_FROM`,
+`ADMIN_BACKUP_FROM`, `PLATFORM_BACKUP_FROM`) and run
+`scripts/backup-online-databases.cmd` by hand or nightly with Task Scheduler
+(the command is in the file). The last 30 days stay in
+`backend/.data/backups/`. To copy this computer's data into an online
+database once: `uv run python -m modules.<module>.tools.copy_database --to "<address>"`
+in `backend/` (`--setup` copies only the setup, not the day-to-day records).
 
 ---
 
-## 6. Settings (`.env`) for every app
+## 6. Settings (`backend/.env`)
 
-Each app's API reads its settings from one file, and the one app's screens
-from another. Git never stores them:
+The backend reads its settings from one file, and the one app's screens from
+another. Git never stores them:
 
 | File | Read by | Starts from |
 |---|---|---|
-| `bishnoi-<app>/backend/.env` | that app's API | `backend/.env.example` |
+| `backend/.env` | the backend (every module) | `backend/.env.example` |
 | `bishnoi-one-app/frontend/.env.local` | the screens (every module) | `bishnoi-one-app/frontend/.env.example` |
 
-On your computer, **every setting has a default that works**, so the
-copied example files are enough to run an app. Change a setting only when
-you need what it does. Online (Vercel), set the same names under
-**Settings → Environment Variables**
-([Put an app online](#put-an-app-online-vercel)).
+On your computer, **every setting has a default that works**, so the copied
+example files are enough. Change a setting only when you need what it does.
+Online (Coolify), set the same names under the application's **Environment
+Variables**. Lists are written as JSON: `["a", "b"]`. Restart the backend (or
+`npm run dev`) after you change a file.
 
-Lists are written as JSON: `["a", "b"]`. Restart the API (or `npm run dev`)
-after you change a file.
+**A setting is for every module, or for one.** `DATABASE_URL` in
+`backend/.env` (or the environment) applies to every module that has it.
+`<MODULE>_<SETTING>` applies to one module and wins over it: `CRM_DATABASE_URL`,
+`FINANCE_INTEGRATION_KEYS`… The prefixes are `PLATFORM_`, `CRM_`,
+`INVENTORY_`, `FINANCE_`, `ADMIN_`, `PHARMACY_`, `IN_LICENSING_` and
+`REGULATORY_` (`backend/modules/module_settings.py`). Every module's settings
+are described in its own `backend/modules/<module>/.env.example`.
 
-### Backend settings every app has
+### The backend's main settings
 
 | Setting | Default | What it does |
 |---|---|---|
-| `ENVIRONMENT` | `development` | Set `production` online. Production hides the API docs (`/docs`) and turns off demo accounts. |
-| `DATABASE_URL` | `sqlite:///.data/<app>.db` | The app's database. A local SQLite file by default; a `postgresql://…` address for Postgres (Supabase, Neon). Apps may share one database: each app's tables have its own prefix ([below](#table-prefixes)). |
+| `ENVIRONMENT` | `development` | `production` on a server (worked out by itself on Coolify). Production hides the API docs and turns off demo accounts. |
+| `DATABASE_URL` | each module's SQLite file in `backend/.data/` | The database. One `postgresql://…` address on the server serves every module ([table prefixes](#table-prefixes)). |
+| `BACKEND_URL` | `http://127.0.0.1:8300` | The backend's own address, as the modules reach each other: every module is at `BACKEND_URL` + its path. `PLATFORM_API_URL`, `CRM_API_URL`, `INVENTORY_API_URL`, `FINANCE_API_URL` and `PHARMACY_API_URL` follow it unless set, and the Platform reports these addresses to the modules and the one app (Applications). On the server: its internal address, e.g. `http://10.0.1.1:8300`. |
+| `ONE_APP_URL` | `http://localhost:4301` | The one app's address (sign-in redirects, links in emails). Online, `https://one.bishnoi.ai`. |
+| `PASS_SIGNING_KEY` | kept in the database | The key the Platform signs passes with. Unset: made on the first start and kept in the database. |
 | `SESSION_HOURS` | `10` | How long a sign-in lasts. |
-| `LOGIN_ATTEMPTS` | `5` | Wrong passwords in a row before an account is locked for a while. |
-| `LOGIN_LOCKOUT_MINUTES` | `15` | How long that lock lasts. |
-| `ORG_NAME` | `Bishnoi One` | The company name the screens show. |
-| `ORG_CURRENCY` | `PHP` | The currency amounts are shown in. |
-| `ORG_MINOR_UNITS` | `2` | Decimal places of that currency (centavos). |
-| `ORG_LOCALE` | `en-PH` | How numbers and dates are written. |
-| `ORG_TIMEZONE` | `Asia/Manila` | The company's time zone: what counts as "today". |
-| `ALLOWED_HOSTS` | `["localhost", "127.0.0.1"]` | Addresses the API answers to. Online: its own Vercel address. |
-| `CORS_ORIGINS` | `[]` | Browser addresses allowed to call the API directly. Leave it empty: the screens' server calls the API, not the browser. |
-| `DISCORD_ENABLED` | `false` | `true` sends this app's log to Discord (and, in Platform, keeps announcements there). See MAINTAINING.md, "Connecting Discord". |
-| `DISCORD_MODE` | `mock` | `live` really posts; `mock` keeps everything on this machine. |
-| `DISCORD_BOT_TOKEN` | not set | The Discord bot: reads the channels back and starts the threads. The same in every app. |
-| `DISCORD_LOGS_WEBHOOK_URL` | not set | A webhook in the logs channel. This app's log goes there, a thread a day (`LOG-CRM-20260926`). |
-| `DISCORD_MAX_PER_MINUTE` | `30` | Most Discord messages a minute; more wait their turn. |
+| `LOGIN_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES` | `5`, `15` | Wrong passwords in a row before an account waits, and for how long. |
+| `ORG_NAME`, `ORG_CURRENCY`, `ORG_MINOR_UNITS`, `ORG_LOCALE`, `ORG_TIMEZONE` | `Bishnoi One`, `PHP`, `2`, `en-PH`, `Asia/Manila` | The company as the screens show it, until the Platform's Company profile says. |
+| `ALLOWED_HOSTS` | this computer's names; any name in production | Host names the backend answers to. |
+| `DISCORD_ENABLED`, `DISCORD_MODE`, `DISCORD_BOT_TOKEN`, `DISCORD_LOGS_WEBHOOK_URL` | off, `mock` | Each module's log to Discord. See MAINTAINING.md, "Connecting Discord". |
 
-### Backend settings only some apps have
+### Settings only some modules have
 
-| App | Setting | Default | What it does |
+| Module | Setting | Default | What it does |
 |---|---|---|---|
-| CRM, Inventory, Pharmacy, Platform | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | not set | Makes the first administrator on start, **only** while the app has no accounts. For hosts where you can't run the users tool (Vercel). Remove the password after you've signed in. |
-| CRM, Inventory | `PLATFORM_API_URL` | not set | Bishnoi One Platform's API, where the app checks that a company is registered, active and given the app; its public key, for passes, is fetched from there too. Not set: on this computer the companies in `DEV_COMPANIES` are allowed; in production, none. |
-| CRM, Inventory | `FIRST_ADMIN_COMPANY` | not set | The one company whose database gets the `FIRST_ADMIN_*` account (each company has its own database). Not set: `DEFAULT_COMPANY` on this computer, none in production, where a company's administrators sign in with their Bishnoi One account. |
-| CRM, Inventory | `DEFAULT_COMPANY`, `DEV_COMPANIES` | `getmeds`, `["getmeds","northwind"]` | This computer only: the company a request is for when it doesn't say, and the companies allowed without the Platform. Ignored in production. |
+| CRM, Inventory, Pharmacy, Platform | `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_NAME`, `FIRST_ADMIN_PASSWORD` | not set | Makes the first administrator on start, **only** while the module has no accounts. Remove the password after you've signed in. |
+| CRM, Inventory | `FIRST_ADMIN_COMPANY` | not set | The company whose database gets the `FIRST_ADMIN_*` account. |
+| CRM, Inventory | `DEFAULT_COMPANY`, `DEV_COMPANIES` | `getmeds`, `["getmeds","northwind"]` | This computer only: the company a request is for when it doesn't say, and the companies allowed without the Platform. |
 | Inventory, Pharmacy | `EXPIRY_WARNING_DAYS` | `90` | A batch expiring within this many days is flagged "expiring soon". |
-| Inventory | `DEAD_STOCK_DAYS` | `180` | Stock with nothing issued or moved out for this long counts as dead stock. |
+| Inventory | `DEAD_STOCK_DAYS` | `180` | Stock with nothing moved out for this long counts as dead stock. |
 | Pharmacy | `PRESCRIPTION_VALID_DAYS` | `180` | A prescription older than this can't be verified. |
-| CRM | `INVENTORY_API_URL`, `INVENTORY_API_KEY` | not set | Links the CRM to Inventory: the product list and stock levels come from there. Not set: products are added and priced in the CRM by hand. |
-| CRM | `INVENTORY_APP_URL` | not set | Inventory's screens, for the "Add it in Inventory" link on Products. |
-| CRM | `FINANCE_API_URL`, `FINANCE_API_KEY` | not set | Links the CRM to Finance, which works out tax as the last step of the price rules. Not set: quotes are priced without tax. |
-| CRM | `PHARMACY_API_URL`, `PHARMACY_API_KEY` | not set | Links the CRM to Pharmacy, where a pharmacist checks quotes marked Rx before they're ordered. Not set: an Rx quote can't be sent for checking, so it can't be ordered. |
-| Inventory, Finance, Pharmacy | `INTEGRATION_KEYS` | `[]` | Which other apps may call this one, as `name:key` pairs. See [Linking apps](#linking-apps). |
-| Platform | `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL` | not set | A webhook in the announcements channel, where announcements are kept, a thread each (`ANN-20260926-0001`). |
+| Platform | `CRON_SECRET` | not set | The nightly events check (`GET /platform/cron/events-check`). |
+| Platform | `DISCORD_ANNOUNCEMENTS_WEBHOOK_URL` | not set | Where announcements are kept. |
+| CRM, Inventory, Admin, Platform | `BACKUP_FROM` (`CRM_BACKUP_FROM`…) | not set | The online database `scripts/backup-online-databases.cmd` copies. |
 
-### Linking apps
+### Linking modules
 
-> Online, nothing here is set by hand (2026-10-27): connected to the Platform, each app is given its
-> links and keys from **Admin Console > Applications** and **Connections**. What follows is for apps run
-> without the Platform.
-
-Some apps ask others for data: the CRM asks **Inventory** for products and
-stock, **Finance** for tax, and **Pharmacy** to check quotes marked Rx; **Finance** asks the
-**CRM** for customers to invoice (`CRM_API_URL`, `CRM_API_KEY` in Finance, and
-`INTEGRATION_KEYS=["finance:<the key>"]` in the CRM). The app being asked lists a key for each
-caller, and the caller sends that key with every request.
-
-1. Make a key (at least 24 characters):
-
-   ```
-   python -c "import secrets; print(secrets.token_urlsafe(32))"
-   ```
-
-2. In the app **being asked**, list it under the caller's name:
-
-   ```
-   INTEGRATION_KEYS=["crm:<the key>"]
-   ```
-
-3. In the **caller**, set the other app's API address and the same key:
-
-   ```
-   FINANCE_API_URL=http://127.0.0.1:8303
-   FINANCE_API_KEY=<the key>
-   ```
-
-Use a different key for each link: one for CRM → Inventory, another for
-CRM → Finance, another for CRM → Pharmacy. Restart both APIs. If the key is missing or doesn't match,
-the CRM tells its users the other app can't be reached; nothing breaks.
+The modules still call each other over HTTP, with a key for each link: the
+CRM asks **Inventory** for products and stock, **Finance** for tax and
+**Pharmacy** to check quotes marked Rx; **Finance** asks the **CRM** for
+customers and **Inventory** for costs. The **addresses** need nothing: each is
+`BACKEND_URL` + the module's path. The **keys** come from the Platform: each
+module is connected there (Operations > Services and connections), and the
+links between them are switched on there; nothing to copy. Without the
+Platform, `INTEGRATION_KEYS` (in the module being asked, as `["crm:<key>"]`)
+and `<MODULE>_API_KEY` (in the caller) still work, set with the module's
+prefix where two modules differ (e.g. `CRM_INTEGRATION_KEYS`). A missing link
+turns the feature off; nothing breaks.
 
 ### Screens settings (the one app)
 
-> Online, only `PLATFORM_API_URL` (2026-10-27): each module's API address comes from Admin Console >
-> Applications, and the site's own address from the address it's reached at.
-
-The screens are one app, so they have one settings file:
 `bishnoi-one-app/frontend/.env.local`. Only the one app's server talks to the
-APIs; browsers never do.
+backend; browsers never do.
 
 | Setting | Default | What it does |
 |---|---|---|
-| `ONE_APP_URL` | `http://localhost:4301` | The one app's own address, as the Platform knows it (online, `https://one.bishnoi.ai`; the Platform's `ONE_APP_URL` must be the same). |
-| `PLATFORM_API_URL` | `http://127.0.0.1:8305` | Bishnoi One Platform's API: the one sign-in, and the Platform module's API. |
-| `CRM_API_URL`, `INVENTORY_API_URL`, `FINANCE_API_URL`, `ADMIN_API_URL`, `PHARMACY_API_URL`, `INLICENSING_API_URL`, `REGULATORY_API_URL` | each module's API on your computer (`http://127.0.0.1:83xx`) | Where the screens find each module's API. |
+| `BACKEND_URL` | `http://127.0.0.1:8300` | The one backend: each module's API is `BACKEND_URL` + its path. Online, the backend's internal address. |
+| `ONE_APP_URL` | `http://localhost:4301` | The one app's own address, as the Platform knows it (online, `https://one.bishnoi.ai`; the backend's `ONE_APP_URL` must be the same). |
 
 The full list is in `bishnoi-one-app/frontend/.env.example`, and
 [bishnoi-one-app/README.md](bishnoi-one-app/README.md) explains it.
-
-### Complete files, app by app
-
-Ready to copy for your computer. Lines starting with `#` are optional:
-remove the `#` to use one.
-
-The screens' file, `bishnoi-one-app/frontend/.env.local`, is a copy of
-`bishnoi-one-app/frontend/.env.example`: every line in it is optional on your
-computer ([Screens settings](#screens-settings-the-one-app)).
-
-<details>
-<summary><b>Admin</b> (API :8300)</summary>
-
-`bishnoi-admin/backend/.env`
-
-```
-ENVIRONMENT=development
-# DATABASE_URL=sqlite:///.data/admin.db
-# SESSION_HOURS=10
-# LOGIN_ATTEMPTS=5
-# LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Bishnoi One
-# ORG_CURRENCY=PHP
-# ORG_MINOR_UNITS=2
-# ORG_LOCALE=en-PH
-# ORG_TIMEZONE=Asia/Manila
-# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
-# CORS_ORIGINS=[]
-```
-
-</details>
-
-<details>
-<summary><b>CRM</b> (API :8302)</summary>
-
-`bishnoi-crm/backend/.env`
-
-```
-ENVIRONMENT=development
-# DATABASE_URL=sqlite:///.data/crm.db
-# FIRST_ADMIN_EMAIL=you@example.com
-# FIRST_ADMIN_NAME=Your Name
-# FIRST_ADMIN_PASSWORD=
-# SESSION_HOURS=10
-# LOGIN_ATTEMPTS=5
-# LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Bishnoi One
-# ORG_CURRENCY=PHP
-# ORG_MINOR_UNITS=2
-# ORG_LOCALE=en-PH
-# ORG_TIMEZONE=Asia/Manila
-# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
-# CORS_ORIGINS=[]
-
-# Products and stock from Inventory (the key is "crm:<key>" in Inventory's INTEGRATION_KEYS)
-# INVENTORY_API_URL=http://127.0.0.1:8304
-# INVENTORY_API_KEY=
-# INVENTORY_APP_URL=http://localhost:4304
-
-# Tax from Finance (the key is "crm:<key>" in Finance's INTEGRATION_KEYS)
-# FINANCE_API_URL=http://127.0.0.1:8303
-# FINANCE_API_KEY=
-
-# The pharmacist's check on Rx quotes (the key is "crm:<key>" in Pharmacy's INTEGRATION_KEYS)
-# PHARMACY_API_URL=http://127.0.0.1:8307
-# PHARMACY_API_KEY=
-```
-
-</details>
-
-<details>
-<summary><b>Finance</b> (API :8303)</summary>
-
-`bishnoi-finance/backend/.env`
-
-```
-ENVIRONMENT=development
-# DATABASE_URL=sqlite:///.data/finance.db
-# SESSION_HOURS=10
-# LOGIN_ATTEMPTS=5
-# LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Bishnoi One
-# ORG_CURRENCY=PHP
-# ORG_MINOR_UNITS=2
-# ORG_LOCALE=en-PH
-# ORG_TIMEZONE=Asia/Manila
-# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
-# CORS_ORIGINS=[]
-
-# Apps allowed to ask Finance for tax
-# INTEGRATION_KEYS=["crm:<the CRM's FINANCE_API_KEY>"]
-```
-
-</details>
-
-<details>
-<summary><b>Inventory</b> (API :8304)</summary>
-
-`bishnoi-inventory/backend/.env`
-
-```
-ENVIRONMENT=development
-# DATABASE_URL=sqlite:///.data/inventory.db
-# FIRST_ADMIN_EMAIL=you@example.com
-# FIRST_ADMIN_NAME=Your Name
-# FIRST_ADMIN_PASSWORD=
-# SESSION_HOURS=10
-# LOGIN_ATTEMPTS=5
-# LOGIN_LOCKOUT_MINUTES=15
-# EXPIRY_WARNING_DAYS=90
-# DEAD_STOCK_DAYS=180
-# ORG_NAME=Bishnoi One
-# ORG_CURRENCY=PHP
-# ORG_MINOR_UNITS=2
-# ORG_LOCALE=en-PH
-# ORG_TIMEZONE=Asia/Manila
-# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
-# CORS_ORIGINS=[]
-
-# Apps allowed to read products and stock
-# INTEGRATION_KEYS=["crm:<the CRM's INVENTORY_API_KEY>"]
-```
-
-</details>
-
-<details>
-<summary><b>Platform</b> (API :8305)</summary>
-
-`bishnoi-platform/backend/.env`
-
-```
-ENVIRONMENT=development
-# DATABASE_URL=sqlite:///.data/platform.db
-# FIRST_ADMIN_EMAIL=you@example.com
-# FIRST_ADMIN_NAME=Your Name
-# FIRST_ADMIN_PASSWORD=
-# SESSION_HOURS=10
-# LOGIN_ATTEMPTS=5
-# LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Bishnoi One
-# ORG_CURRENCY=PHP
-# ORG_MINOR_UNITS=2
-# ORG_LOCALE=en-PH
-# ORG_TIMEZONE=Asia/Manila
-# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
-# CORS_ORIGINS=[]
-```
-
-The sign-in settings are only where Platform starts: after that, **Settings →
-Security** in the app changes them.
-
-</details>
-
-<details>
-<summary><b>Pharmacy</b> (API :8307)</summary>
-
-`bishnoi-pharmacy/backend/.env`
-
-```
-ENVIRONMENT=development
-# DATABASE_URL=sqlite:///.data/pharmacy.db
-# FIRST_ADMIN_EMAIL=you@example.com
-# FIRST_ADMIN_NAME=Your Name
-# FIRST_ADMIN_PASSWORD=
-# SESSION_HOURS=10
-# LOGIN_ATTEMPTS=5
-# LOGIN_LOCKOUT_MINUTES=15
-# EXPIRY_WARNING_DAYS=90
-# PRESCRIPTION_VALID_DAYS=180
-# ORG_NAME=Bishnoi One
-# ORG_CURRENCY=PHP
-# ORG_MINOR_UNITS=2
-# ORG_LOCALE=en-PH
-# ORG_TIMEZONE=Asia/Manila
-# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
-# CORS_ORIGINS=[]
-# INTEGRATION_KEYS=["crm:<the CRM's PHARMACY_API_KEY>"]
-```
-
-</details>
-
-<details>
-<summary><b>In-Licensing</b> (API :8306) and <b>Regulatory</b> (API :8308)</summary>
-
-Only the API exists so far. In the one app, `/in-licensing` and `/regulatory` show "Coming soon".
-
-`bishnoi-in-licensing/backend/.env` (for Regulatory, use
-`sqlite:///.data/regulatory.db`)
-
-```
-ENVIRONMENT=development
-# DATABASE_URL=sqlite:///.data/licensing.db
-# SESSION_HOURS=10
-# LOGIN_ATTEMPTS=5
-# LOGIN_LOCKOUT_MINUTES=15
-# ORG_NAME=Bishnoi One
-# ORG_CURRENCY=PHP
-# ORG_MINOR_UNITS=2
-# ORG_LOCALE=en-PH
-# ORG_TIMEZONE=Asia/Manila
-# ALLOWED_HOSTS=["localhost", "127.0.0.1"]
-# CORS_ORIGINS=[]
-```
-
-</details>
-
 ### Table prefixes
 
-Every table name starts with its app's prefix, so all the apps can share one
-database without clashing:
+Every table name starts with its module's prefix, so all the modules share one
+database without clashing (**Check apps** checks it):
 
-| App | Prefix | | App | Prefix |
+| Module | Prefix | | Module | Prefix |
 |---|---|---|---|---|
-| Admin | `nbad_` | | Inventory | `nbin_` |
-| CRM | `nbcm_` | | Platform | `nbpl_` |
-| Finance | `nbfi_` | | Pharmacy | `nbph_` |
+| CRM | `nbcm_` | | Inventory | `nbin_` |
+| Finance | `nbfi_` | | Platform | `nbpl_` |
+| Pharmacy | `nbph_` | | | |
 | In-Licensing | `nbil_` | | Regulatory | `nbrg_` |
 
 ---
@@ -839,7 +521,7 @@ decision before building it).
 | Visit record | A visit records the **products discussed**, in order, each with its key message and the doctor's reaction, and the **next visit's objective**, shown when the next visit is logged. **Field work** shows a month's products detailed and how doctors took them. |
 | Lead source | Customers and deals share one list (Settings → Deal stages); a new deal starts with its customer's. |
 | Duplicates | **Customers → Possible duplicates** finds lookalike customers and contacts (same phone however it's written, same email, same or similar name) and merges two into one with all their history. A merged id still leads to the one kept. Merging needs Delete. |
-| Email notifications | A quote waiting for approval is emailed to its approvers, and the decision to the rep, through an email delivery service's SMTP. Off until `EMAIL_ENABLED=true`; see `bishnoi-crm/backend/.env.example`. |
+| Email notifications | A quote waiting for approval is emailed to its approvers, and the decision to the rep, through an email delivery service's SMTP. Off until `EMAIL_ENABLED=true`; see `backend/modules/crm/.env.example`. |
 | Working without signal | **Offline visits and collections** on the phone, synced when there's signal. |
 
 ### Where the build is
@@ -864,10 +546,11 @@ decision before building it).
 
 ---
 
-## 8. Add a new app
+## 8. Add a new module
 
-A new app goes in through a **pull request**. You propose it, and GitHub
-checks it. The repo owner then reviews and merges it into `main`.
+A new module is a new folder in `backend/modules/`, and its screens are a new
+module in the one app. It goes in through a **pull request**: GitHub checks
+it, and the repo owner reviews and merges it into `main`.
 
 ### Step 1: Start a branch
 
@@ -876,54 +559,56 @@ From your clone of the repo ([section 3](#3-clone-download-the-code)):
 ```
 git switch main
 git pull
-git switch -c add-app/hr
+git switch -c add-module/hr
 ```
 
-Replace `hr` with your app's name.
+Replace `hr` with your module's name. **Don't** start a branch with `bishnoi-`.
 
-> Name your branch `add-app/<name>`. **Don't** start it with `bishnoi-`.
+### Step 2: Create the module
 
-### Step 2: Create the app's folder
+In `backend/modules/<name>/` (a Python package: small letters, digits and
+`_`), start from a small module (`in_licensing` or `regulatory`) and keep:
 
-Name the folder **`bishnoi-<name>`**, using small letters, digits and dashes
-only (e.g. `bishnoi-hr`, `bishnoi-field-sales`). Inside it, add:
-
-| What | How |
+| What | Why |
 |---|---|
-| `backend/` | the API: start from another app's `backend/` |
-| `.gitignore` | copy it from another app |
-| `README.md` | copy it from another app, and change the app's name, what it does, its port and how it's deployed |
+| `__init__.py`, `main.py` (`create_app()`), `config.py` | the module's API and its settings (its own `<NAME>_` prefix in `module_sources`) |
+| `alembic.ini`, `migrations/versions/` | its own migration history, with its own version table |
+| `tests/` | its tests, run with `uv run pytest modules/<name>/tests` |
+| `README.md` | what it does |
 
-Don't add a `frontend/`: **Check apps** refuses one in an app folder. The
-app's screens go in the one app, `bishnoi-one-app/frontend`, under a path of
-their own (see [bishnoi-one-app/README.md](bishnoi-one-app/README.md)).
+Then:
 
-Pick the next free API port after the last app (currently **8309**).
+1. Pick a table prefix (`nb` + two letters + `_`) that no module has, and
+   start every table name with it. Add it to `PREFIXES` in
+   `.github/workflows/check-apps.yml`.
+2. Add the module to `MODULES` in `backend/main.py`, with its path.
+3. Its screens go in the one app, under a path of their own (see
+   [bishnoi-one-app/README.md](bishnoi-one-app/README.md)).
 
 ### Step 3: Commit and push your branch
 
 ```
 git add .
-git commit -m "Add the HR app"
-git push -u origin add-app/hr
+git commit -m "Add the HR module"
+git push -u origin add-module/hr
 ```
 
 ### Step 4: Open a pull request
 
 1. On the repo's GitHub page, click **Compare & pull request** (or go to
    **Pull requests → New pull request**).
-2. Set it to merge **`add-app/hr` into `main`**.
-3. In the description, say what the app is for and which ports it uses.
+2. Set it to merge **`add-module/hr` into `main`**.
+3. In the description, say what the module is for and its table prefix.
 4. Click **Create pull request**.
 
 GitHub's **Check apps** check runs by itself. If it shows a red ✗, click
-**Details**: it lists what to fix (for example, a missing file or a wrong
-folder name). Fix it on your branch, then commit and push again. The check
-runs again by itself.
+**Details**: it lists what to fix (a missing folder, a table without the
+prefix, a module `backend/main.py` doesn't start). Fix it on your branch, then
+commit and push again. The check runs again by itself.
 
 ### Step 5: The owner merges it
 
-The repo owner reviews your app and merges it into `main`. From then on,
+The repo owner reviews the module and merges it into `main`. From then on,
 everyone has it on their next `git pull`.
 
 ---
@@ -969,15 +654,12 @@ Pushing doesn't deploy. Nothing goes online until someone deploys it by hand
 | See history | `git log --oneline` |
 | Which branch am I on? | `git branch --show-current` |
 | Who am I committing as? | `git config user.name` |
-| Run every API and the screens | `npm run one`, then open http://localhost:4301 (from the top of the repo) |
-| Run one API | `npm run bishnoi-crm` (from the top of the repo) |
-| Start a new app | `git switch -c add-app/<name>`, then [section 8](#8-add-a-new-app) |
+| Run the backend and the screens | `npm run one`, then open http://localhost:4301 (from the top of the repo) |
+| Run the backend only | `npm run backend` (or `uv run main.py` in `backend/`) |
+| Run one module's tests | `uv run pytest modules/crm/tests` (in `backend/`) |
+| Start a new module | `git switch -c add-module/<name>`, then [section 8](#8-add-a-new-module) |
 
 ---
 
-*Looking after the repo (adding people, reviewing new apps, deploying)? See
+*Looking after the repo (adding people, reviewing new modules, deploying)? See
 [MAINTAINING.md](MAINTAINING.md).*
-
-### Company assistant (Ollama)
-
-The chat icon opens the read-only company assistant. Configure `OLLAMA_BASE_URL` on the Platform backend using a private network origin, install `qwen3:1.7b`, and let Platform supply the Finance database company settings. If several companies have Finance, select its Database company in Operations > Services; no additional slug environment variables are needed. [Setup, permissions, accounting definitions and limitations](docs/company-assistant.md).

@@ -10,7 +10,7 @@ export const metadata = { title: "Documents" };
 type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 
-/** Approved presentations, PDFs and videos to show customers. Opened from a customer's page, each opening counts for them. */
+/** Approved presentations, PDFs and videos to show customers. */
 export default async function MediaPage({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
   const params = await searchParams;
@@ -30,7 +30,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Search
       <PageHeader title="Documents" crumbs={customer ? [{ href: `/crm/customers/${customer.id}`, label: customer.name }] : undefined}>
         {customer ? (
           <>
-            Approved materials to show <b>{customer.name}</b>. What you open is counted for them.{" "}
+            Approved materials to show <b>{customer.name}</b>.{" "}
             <Link href="/crm/media" className="text-ink underline">
               Not for a customer
             </Link>
@@ -42,7 +42,6 @@ export default async function MediaPage({ searchParams }: { searchParams: Search
       <Materials
         items={list.items}
         canManage={list.canManage}
-        companyId={customer?.id ?? null}
         products={products.items.map((p) => ({ value: p.code, label: p.name }))}
         teams={teams.filter((t) => t.isActive).map((t) => ({ value: t.id, label: t.name }))}
       />

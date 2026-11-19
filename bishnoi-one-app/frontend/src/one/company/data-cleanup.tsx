@@ -1,10 +1,7 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAccount } from "@/src/platform/lib/account";
-import { enterSoftly } from "@/src/platform/lib/enter";
 import type { ModuleKey } from "@/src/platform/lib/modules";
-import { moduleCookie } from "@/src/platform/lib/session-cookie";
 import { DataCleanupPage } from "@/src/platform/recycle/screen";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { logSources, PLATFORM } from "./activity";
@@ -62,8 +59,6 @@ export async function DataCleanupConsolePage({ search }: { search: Record<string
       </>
     );
   }
-  // The app's session first, softly: if it can't be opened, the page comes back with it marked unavailable.
-  if (!(await cookies()).get(moduleCookie(app.key))?.value) redirect(enterSoftly(app.key, `${HERE}?app=${app.key}`));
   return (
     <DataCleanupPage module={app.key as ModuleKey} path={HERE} tabs={tabs} />
   );

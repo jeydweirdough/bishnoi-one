@@ -7,6 +7,7 @@ import { CompanyForm } from "@/src/modules/crm/components/crm/company-form";
 import { CustomerStart } from "@/src/modules/crm/components/crm/new-customer";
 import { formLayout } from "@/src/modules/crm/components/extra/load";
 import { priceGroupsFor } from "@/src/modules/crm/components/catalogue/price-groups";
+import { termsOf } from "@/src/modules/crm/components/terms/terms";
 
 export const metadata = { title: "Add a customer" };
 
@@ -14,8 +15,11 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function NewCompanyPage({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
-  if (!can(me, "customers.create")) return <NoAccess what="adding customers" />;
   const params = await searchParams;
+  // A field agent may add a doctor to their own list (2026-11-18); anything else needs customers.create.
+  const visited = termsOf(me).visitedType;
+  const agentAdds = !can(me, "customers.create") && can(me, "visits.create") && Boolean(visited) && params.type === visited;
+  if (!can(me, "customers.create") && !agentAdds) return <NoAccess what="adding customers" />;
   const name = typeof params.name === "string" ? params.name.slice(0, 200) : "";
   const then = params.then === "quote" || params.then === "deal" ? params.then : null;
   const next = then && `Once they're saved, their new ${then} opens.`;

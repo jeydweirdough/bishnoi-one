@@ -1,0 +1,361 @@
+## Current integration - 2026-11-19, Finance0.4.60
+
+This header supersedes older layout/runtime/HTML-delivery statements below. Finance now lives in backend/modules/finance, Inventory/Platform alongside it. Keep Jade's unified backend, central sign-in/in-process checks, approval slips, security and report Save as. Strict2MG and explicit receipt-to-bill source are ported; no actual staff grant/sending activation is included.
+
+Confirmed report fixes: recognized liquidation totals require accepted receipts and a completed check, limited to covered categories; coded invoice lines require available valid Inventory costs and inventory/COGS defaults before a number is consumed; historical cash forecast uses dated AR/AP readers. Uncoded manual lines remain explicitly unknown-cost evidence; an explicit known zero cost is distinguished from a missing value. No supplier ownership/tax policy is inferred.
+
+Migration integration: preserve upstream0036/0037 Finance and0024-0031 Inventory. New Finance0038/0039/0040 and Inventory0032 add/preserve local features; schema recognition bridges the exact old feature revision meanings only inside a fresh verified SQLite API backup/restore boundary (or PostgreSQL transaction). Incomplete/mixed shapes refuse. Database originals have NOT been upgraded. Four private-copy rehearsals preserve all retained table values; upstream intentionally removes old exchange-rate/wave tables. Do not start against old databases until an explicitly approved migration/launch; no environment/provider/staff settings copied or changed by this source work.
+
+The user says staff decline the offline HTML reviewer. Keep its evidence private; in-system approved ownership/status/equivalence review is separate unfinished work. Marketing tax-evidence/sender, supplier advance handling, Pharmacy scope, filing credits/adjustments and actual staff/UI acceptance remain separate, not silently declared complete by this integration. See docs/handoff-audit-2026-11-19.md for the original bounded audit and docs/unified-integration-2026-11-19.md for final validation/status.
+
+The user authorized source publication through feature/finance-safe-improvements and PR3 on19November. Publication includes no deployment, actual database upgrade or access change. Preserve the local-only AGENTS guide and private source evidence outside version control.
+
+## Local supplier-data update - 2026-11-12
+User explicitly approved clearing all 1,658 local Finance suppliers and their old review links, including previously verified suppliers and one attachment link. This later operation supersedes supplier retention during the earlier transaction/chart reset below. Local suppliers and supplier-review metadata are now empty. Stored file bytes, staff/access, tax setup and other Finance records were preserved, with one maintenance audit added; all eight other local databases matched across paused maintenance.
+Fresh SQLite API backups/restores and a copy rehearsal matched the actual cleanup. After restart all 71 Finance table fingerprints matched the applied state, with no supplier reseed. The private offline supplier reviewer and canonical source data remain unchanged; returned answers still need a separately implemented and approved preview/apply feature. Accounts await the new full export. No private supplier data or backups are shipped in this branch; no schema, role, official or provider changes, commit or push are part of this operation.
+
+## Local UI update - 2026-11-12, Finance 0.4.59
+Finance's repeated environment/database banner is removed. Generic Print now lives in the page title's action group beside existing actions, with natural wrapping and centered alignment. Finance-owned wrappers reuse the shared header; other app/shared-kit source is unchanged. Print routes/eligibility, attachment preparation and accounting/provider safeguards are unchanged.
+Source-only TypeScript and52 existing screen tests pass. Native browser review confirmed Banking, Bills, Petty cash and Marketing headers; Print/New stayed adjacent at200% zoom. Print preview opened and was cancelled. Full keyboard/mobile/populated/PDF pagination acceptance is not claimed; empty Marketing preview had a blank trailing page needing separate assessment.
+Approved account-status/equivalence corrections are intended as enduring company setup for the real phase; the review/promotion implementation remains proposed, not delivered by this UI batch. No data, access, tax, provider or official changes, commit or push.
+
+## Local test-data update - 2026-11-12
+User-approved local Finance transaction/chart reset completed after fresh SQLite API backup and matching copy rehearsal. The local working chart and test financial records are empty; posting-account bindings are unset. Supplier identities/company evidence, staff/access/signatures, tax definitions, series counters and audit history were retained. Other app records were unchanged by the reset. After restart no chart or financial rows were recreated. No schema or application behavior change, official reset, role grant or deployment is part of this data operation.
+The new full-chart review/inactive-equivalence workflow remains a proposal; do not claim it is delivered by this reset. Finance customer-directory/billing identity work is also proposed separately; current invoice customer lookup uses CRM. Q1 opening/import/reconciliation still required before interpreting zero balances as real customer positions.
+
+## Local build update - 2026-11-11, Finance 0.4.58
+
+Inventory receipt -> Finance intake -> reviewed draft bill is installed locally, uncommitted. User authorized Inventory as part of this Finance flow and approved the prepared implementation on November 11. This supersedes the older generic producer-agreement hold below; no separate team agreement or message is claimed. Official deployment, actual staff grants and outbound provider activation remain separate.
+
+**Receiving:** after saved actual quantities, the receiver explicitly uses **Turn into a Bill in Finance** on the receipt. A separate `receiving.send_to_finance` permission is required. The visible panel explains holds and distinguishes waiting to reach Finance from confirmed acknowledgement. Counting alone sends nothing; stock is received once. Only ordinary 2MG purchases qualify. Quality-pending, consignment and ambiguous source/currency cases stay held.
+
+**Finance:** Bills > From Inventory shows paginated persisted receipt evidence, received/allocated/remaining quantities and both sides' status. A supplier editor who also has bill-view access explicitly confirms the Inventory vendor's verified active 2MG Finance supplier link. A bill preparer reviews the actual invoice, quantities, prices, units, accounts, currency/rate and per-line taxes, then uses the existing bill editor and independent approval/tax/payment pipeline. Partial deliveries and one invoice across multiple compatible receipts retain each source line. No account, tax code, invoice number, accrual or supplier ownership is inferred.
+
+**Safeguards:** one handoff per receipt, immutable evidence digest, signed source-bound events, transaction locks and version checks, quantity limits, retry idempotency plus supplier/invoice identity deduplication, approval-signature provenance, source/supplier rechecks, cleanup protection and audited cancellation of unsubmitted drafts. Cancellation releases quantities but retains the bill/evidence; posted void/correction does not silently reopen quantities. Manual review holds can resume after a note; changed source evidence cannot be cleared this way.
+
+**Schema and rollout:** Finance0038 adds four empty tracking tables; Inventory0024 adds one empty handoff table per tenant. Local installation used fresh SQLite API backups after copy rehearsal. All 67 original Finance tables and 50+50 Inventory tables had unchanged business rows; only schema-version rows advanced. No historical backfill, supplier/tax/role edit or business transaction was created. Shared Platform registers the two forward/reply event kinds; no Platform schema change. Register Platform kinds and deploy both consumers/schema before enabling the Inventory producer: older consumers can discard unknown events. `purchase_handoff_enabled` defaults false and remains false locally. No actual staff grant was applied. Do not enable a producer against an old destination or treat transport acceptance as Finance acknowledgement.
+
+**Validation:** full isolated Inventory run150 passed/1 skipped; Platform routing group7 passed. Finance full run617 passed/28 failed/139 skipped initially:27 stale migration-head expectations and one isolated test-layout path. All those failures were inspected and corrected without relaxing preservation checks; migration/history and affected-flow rerun74 passed/10 skipped. Final protocol/source checks23 Finance passed and10 Inventory passed/1 contract-file-dependent skip. Actual emitted Inventory fixture -> Finance prepared partial bill/reply -> Inventory matching digest/status contract passed in sequence. Source-only TypeScript and52 existing screen tests passed after installation. Source hashes match the isolated candidate. Optional PostgreSQL skips, static screen checks and fixture contracts do not establish live three-app/staff, visual, keyboard or narrow-screen acceptance. The local test stack remains stopped; no official process was started.
+
+Guide: [Buying from suppliers](docs/purchase-receipt-to-bill.md). Actual access deltas, quality/recognition/advance policy, Marketing, source/default account decisions, reconciliation PDF and official acceptance remain separate. No commit, push, PR update or deployment in this batch. Prior0.4.57 safeguards remain in the same uncommitted local files.
+
+## Local build update - 2026-11-10, Finance 0.4.57
+
+Approved supplier/account company eligibility is now required for new Finance work. The normal chart and supplier lists show verified 2MG records; retained records have an explicit read-only history view. Direct bill, petty-cash, journal and posting requests cannot bypass the selectors. Bills and payment allocations are checked again at consequential steps, including supplier-payment imports. Import suggestions, mapping saves/confirmation and signed incoming events enforce the relevant 2MG boundary. Unknown consignment suppliers do not silently become usable Finance vendors. Exact historical reversals and historical reports remain supported.
+
+**Deployment change from 0.4.56:** missing company-review metadata now holds new work, including on a fresh/unconfigured installation. The previous all-record compatibility behavior described in the older release header is superseded. This source does not ship private company classification data or backfill existing suppliers/accounts. Review the target's evidence and default-account setup before a separately approved rollout. No new migration is added in this batch. Saved default values needing review remain visible; no automatic replacement or reclassification is performed.
+
+This batch changes no staff permissions, existing financial rows, supplier tax settings or provider switches. Zoho outbound transmission remains held; this is not a declaration that future provider sending is ready. The receipt-to-bill handoff is planned separately: after counting, Glyza explicitly clicks **Turn into a Bill in Finance**; receiving alone does not send, approve, post or pay a bill. Inventory producer edits still require that team's agreement.
+
+Validation and source-copy verification are recorded in the local session report. Skipped PostgreSQL cases are not official acceptance. This build is local and uncommitted until separately authorized; the existing draft PR does not yet contain it.
+
+
+## Release review - 2026-11-10, Finance 0.4.54-0.4.56
+
+This release includes the dated build updates below and main's reduced-motion dropdown fix through be14767b. The old "not committed" and "not merged" statements below describe their build dates; this release header supersedes those preparation statuses. No official deployment or provider activation is included.
+
+**Full PR scope against main:** main currently has Finance 0.4.44. The branch also includes previously pushed 0.4.45-0.4.53: contained/paginated reports, CSV and Sales DAT source guards, shorter sidebar/area tabs, per-line withholding decisions and readiness, supplier origin/VAT-by-item, clearer labels, budget warnings and chart cleanup review. Migration 0036 is therefore also incoming: four columns added in place (two supplier fields and two petty-cash no-withholding fields), with supplier origin initialized by the approved name rule. It is not a verified ownership/tax determination. Review both 0036 and 0037, plus any older target-specific migration gap.
+
+Migration 0037 creates three company-review metadata tables only. Private source data, local reconciliation/cleanup, databases and access configuration are not shipped. An installation without company-review metadata retains all-record compatibility; deploying this source does not recreate the local verified directory. Review intervening migrations, back up and rehearse the target database before a separately authorized rollout.
+
+**Known gaps, not fixed in this release:** normal bill account choices are scoped but the save API still accepts active legacy account IDs; old supplier listing and petty-cash/manual-journal paths are not consistently scoped. Submission and automated consignment drafts need company revalidation. Strict remote-company checking for future Zoho bill/payment sending remains unfinished. Current local voucher-void grants conflict with the documented Malou-only policy; this release changes no roles. Treat this as a draft review, not complete 2MG enforcement or staff/filing acceptance. Provider sending remains disabled in local testing.
+
+Release validation: 621 full Finance backend tests passed; 138 skipped (not passed), using isolated fictional databases. All 285 backend source/test/migration files matched the tested copy. 52 Finance screen tests and the source-only TypeScript check passed; staged diff check clean. Audit-only vulnerability reproductions were excluded from the release regression count.. Browser visual/keyboard/zoom/narrow-screen acceptance of the supplier review remains unverified. No new role, actual accounting-data or official changes during release assembly.
+
+## Dated build update - 2026-11-09, Finance 0.4.56 (pre-release)
+
+Migration 0037 adds source-batch/source-row/company-review metadata tables only, with no migration-side backfill. User separately approved local supplier/account reconciliation: 396 source-row links and 61 new suppliers yield 456 distinct verified 2MG suppliers (one compatible alias pair); 38 source identity issues are retained in the supplier page. All original supplier tax/identity values and financial/history/access rows preserved. 267 approved 2MG account identities shown by default; 80 GPI-chart account matches deactivated, 11 import mappings reopened; 19 dependent starter accounts retained under Legacy without rewriting transactions/defaults. Existing bill editing can retain its historical supplier/account choices; new bill supplier choices require 2MG review once configured. No actual private source rows included in Git. Copy rehearsal and exact before/after table comparison passed; 35 affected backend/52 screen checks and source-only type check passed. Future strict Zoho outbound-company validation remains separate unfinished work; all local sending switches remain off, official untouched. New main be14767b was fetched but not merged; shared dropdown changes preserved for later authorised integration.
+
+## Working-branch update - 2026-11-09, Finance 0.4.55 (not committed)
+
+Suppliers has directly editable Local/Foreign and usual-tax-code controls, current-page selection and batch assignment, an always-visible pending-change review and one Save button on the same page. Complete paging, classification/no-code filters, old/new-value review, stale-tax-state rejection and transactional all-or-none updates preserve existing supplier edit permissions and bill lines. Edited tax defaults become unconfirmed until reviewed on a bill, matching existing confirmation safeguards. Finance-owned GET/POST /finance/suppliers/review adds no schema or shared CRM tax changes. No existing records are bulk-updated by installation. Browser host unavailable during this build; visual/keyboard acceptance must not be claimed from static/type/backend checks.
+
+## Working-branch update - 2026-11-09, Finance 0.4.54 (not committed)
+
+New consignment suppliers use the existing name-based Local/Foreign rule; matched suppliers keep their chosen origin. WC140 corporate brokerage above the annual ₱720,000 threshold is selectable at 15%, with no automatic supplier/line assignment. No schema, existing-data, role, shared CRM tax setup or official change. Isolated regression run: 34 passed across consignment/delivery, supplier/bill and withholding checks, including new failure-before/pass-after coverage. BIR source: Form 1601-EQ January 2019 page 2; applicability remains Finance/Sir Mel's choice. Reconciliation PDF and wider coverage review remain separate work.
+
+## Release gate clarified - 2026-11-04
+
+The same CRM connection-test failure (line65, expected1 fetch/observed2) was reproduced on a clean detached checkout of origin/main127d2aab with no Finance edits: `python -m pytest tests/test_platform_connect.py tests/test_platform_links.py -q --tb=short` gives1failed/6passed there too. User explicitly said an issue on Jade's side need not block our release so long as it does not come from us. This is a demonstrated pre-existing baseline failure, not a passing CRM suite or a repaired issue. No CRM app code or assertion was changed. Existing failed-check details below remain for Jade/Claude; no one was contacted. All previously recorded Finance/Platform/type/browser/CSV and record-preservation checks remain valid; application/test source hashes were rechecked unchanged. Proceeding with this documented exception is user-approved.
+~~**Release hold (2026-11-04): NOT COMMITTED OR PUSHED.**~~ **Superseded: user approved proceeding if the CRM failure is pre-existing.** The isolated combined check reproduces an order-dependent CRM connection-test failure: `tests/test_platform_links.py::test_the_platform_says_what_the_crm_is_linked_to`, line 65, expected one connection-details fetch but observed two. Alone it passes; `python -m pytest tests/test_platform_connect.py tests/test_platform_links.py -q --tb=short` gives 1 failed/6 passed. CRM source is identical to origin/main127d2aab. Do not bypass the failure, weaken the assertion or claim a root cause without investigating. Claude owns any required application/test fix. Finance587 passed/135 skipped, Platform211 passed,47 Finance screen tests and source type check passed,124 five-account browser checks and69 CSV exports passed. The running folder remains on its earlier HEAD with the matching local Finance edits; no merge/migration/restart or push there.
+## Handoff update - 2026-11-04, Finance 0.4.47
+
+This release includes main `127d2aab` (PR #2 plus Jade's organisation/access changes) and Finance versions 0.4.45-0.4.47: contained/paginated Journal and Bills, clearer BIR report/export layouts, readable VAT CSV labels, and guarded Sales DAT source parsing. CSV/print exports retain all matching rows regardless of the screen's current page. Production DAT guards reject mixed-month as-is inputs, malformed money, invalid supplied identifiers/settings and failed-load stale output while keeping genuine missing customer TIN warnings. Original converter engine logic is unchanged.
+
+There is no new Finance migration in this release. Main includes Platform `0028_unit_heads` and CRM `0082_user_managers`; back up the relevant databases and review those migrations before starting the combined code on an existing environment. No role alignment/seed tool is authorised by this handoff. No official/Neon deployment was performed.
+
+The release was assembled in an isolated checkout to avoid restarting the user's running test site or applying those incoming migrations. The original running folder intentionally retains its Finance changes until the user/Claude coordinates switching to the pushed branch. Those copies must not be discarded blindly or committed again: compare them with the release first. Current test data and private generated reports are not part of Git.
+
+Remaining, not delivered: native Finance Sales DAT adapter and purchases/QAP/SAWT/annual DAT generators; official BIR validator acceptance; separate raw-Oojeema packaging-fee import correction. Review PDFs remain review drafts, not evidence of online filing. Do not claim all CSV fields/tax decisions independently validated merely because totals agree.
+
+Continuity for the user's Claude session is in the local Bishnoi Finance Obsidian vault: Work Log, Review - CSV and DAT repair 2026-11-04, Guide - Sir Mel export files 2026-11-04, and Review - Sir Mel recording 11 and Finance impact 2026-11-04. The transcript review proposes withholding completeness checks, confirmed gross-up treatment and linked replenishment; it does not authorise changing company tax settings/accounts or implementing those proposals. Raw recordings, identities, bank details, databases and generated review files stay outside Git.
+
+---
+# Finance: handover for merging (as of 2026-10-24)
+
+For Jade, from the Finance work on branch `feature/finance-safe-improvements`. It says what the branch adds to Finance, how it is built, where it stands against main's one-app change (`61a34b3`), what to watch for when merging, and what's still planned.
+
+**⚠ Before the next deployment:** main now carries Finance migrations **0013–0020**. The next deploy of Finance's API runs them on the online Finance database (they add tables and columns in place; nothing is deleted except retired permission ticks; see §3). Please take a backup of that database first.
+
+**In one paragraph:** since 5 Oct, all Finance work had been on our branch only; it reaches main with this push. It adds journal approval, notifications, a per-person calendar, e-signatures, the BIR Sales DAT screen, downloads, chart import, payables (suppliers, bills with an approval flow, payment vouchers) and more. The API side is complete and merged with main's `61a34b3`, Platform roles included; tests pass. The screens are being moved from the old `bishnoi-finance/frontend` into `bishnoi-one-app/frontend/src/modules/finance` in batches. Batches 1–5 are done; **Payables (suppliers, bills, vouchers) is the one left** (batch 6). Finance migrations run **0013–0020** on our branch; main's newest is 0012.
+
+---
+
+## 1. Where the code is
+
+| | |
+|---|---|
+| Branch | `feature/finance-safe-improvements`; **pushed to `main` on 2026-10-24 at your request** (a fast-forward from `61a34b3`, nothing of yours changed) |
+| Commits since `61a34b3` | `87b8130` payment vouchers + bill approval flow (0.4.12–0.4.13) · `8edb03d` merge of main `61a34b3` · `8944202` batch 2 · `f4bb085` batch 3 · `c8b4c23` batch 4 · batch 5 (Calendar, Sales DAT) + this handover |
+| Backup branches | `backup/finance-before-one-app-2026-10-24` (= `87b8130`, last state with the old frontend), `backup/finance-before-main-merge-2026-10-23`, `-2026-10-22`, `backup/finance-before-bishnoi-merge` |
+| Our old screens, for anything not yet moved | `git show 87b8130:bishnoi-finance/frontend/<path>` |
+| Version | Finance's own numbering: 0.4.0 = everything of 22 Oct, then +0.0.1 per change; latest **0.4.13**. List: `src/modules/finance/version/changes.ts` (What's new page) |
+| User guide | `bishnoi-finance/FINANCE-GUIDE.md` (written for the finance team; addresses still the old app's: updated in batch 7) |
+
+Commits not on main (oldest last): `87b8130` vouchers + bill flow · `8fbaf82` payables, chart and supplier import, invoice reissue, tax messages · `d217fa2` no false build warning · `4dc3fe3` e-signatures, journal vouchers, liquidation reports · `127d09a` calendar · `658c2c4` quieter notifications, approve several, PH working days · `8499d01` journal approval + notifications · `5ac0450` Deputy's Overview · `e955e11` BIR Sales DAT · `818c327` Overview per role · `215d420` CRM company on every call · `3997fe8` version + What's new · `4552bab` release/review by different people · `8fd6894`, `8e79ec6`, `1ac4b51`, `582c944`, `7582970` (Oct 5: tests, guide, search + CSV downloads).
+
+---
+
+## Current local status — 26 October 2026
+
+This dated update supersedes the older pending-work statements below.
+
+- One-app screen batches 1–6 are complete on `feature/finance-safe-improvements`;
+  Payables moved in `3f30dcd`. Existing branch commits were pushed at `69d6965`.
+  Do not rebuild or move the Payables screens again.
+- Local, uncommitted 0.4.14: bill-line purchase types with migration 0023 (JSON
+  backfill inside existing bill lines), CASH descendants in disbursements/bank
+  reconciliation, and Payables form-filler compatibility attributes.
+- Local, uncommitted 0.4.15: permission-based Payables work queues on Overview,
+  current-day AP aging at `/finance/bills/aging`, supplier/bucket drilldowns and
+  CSV. Amounts owed, reserved in open vouchers and available to prepare remain
+  distinct. No A+B migration or changes to approval/release rules.
+- [Offline learning guide](../docs/finance-learning-guide.html) covers input
+  lifecycles and section interactions. Permission-specific lessons are later.
+- Last implementation checks: 45 affected backend tests, 24 Finance screen
+  tests, one-app type check and five-account server-render/download checks passed.
+  Browser visual/keyboard/zoom acceptance remains outstanding; HTTP checks are
+  not a substitute. Local version is not a deployment claim.
+- Batch 7 documentation is updated in this review. Central-role adoption,
+  real staff rollout and deployment remain separate decisions. No commit/push
+  of the new local work has been requested.
+- An earlier fetch failed on GitHub DNS; the retry during this review succeeded
+  (26 October). `origin/main` remained `0b2a686`, with no missing main commits.
+  Fetch again before a later merge or commit rather than relying on this snapshot.
+- Review follow-up: 26 targeted Calendar/signature/export/Sales DAT backend
+  checks and 55 five-account HTTP page/access/download checks passed. Current
+  local permissions, rather than older role descriptions, governed access checks.
+
+## 2. Against main's one-app change (`61a34b3`)
+
+**Merged as `8edb03d` with `git merge -X no-renames`.** Without it, Git's rename detection treats main's moved Finance files as renames and half-applies our old screens into the one app *unconverted*, and puts two of our files (`lib/tin.ts`, the account page) into the **Admin** module because they look alike. **Please merge our branch with `-X no-renames` too**, or the same happens.
+
+After the merge: the one app was left exactly as main had it; our old `bishnoi-finance/frontend` was removed (as `check-apps` requires); our screens are moved in batches:
+
+| Batch | What | State |
+|---|---|---|
+| 1 | The merge; the API keeps all ours + main's `platform_roles.py` | ✅ `8edb03d` |
+| 2 | Bell (notifications), version footer + What's new, the Overview's sections | ✅ `8944202` |
+| 3 | Journal approval, chart import + accounts under accounts, journal voucher print, ledger/statement/trial balance downloads, e-signatures (account page card, signature lines, Remove signature), Users' calendar switch | ✅ `f4bb085` |
+| 4 | Marketing requests (liquidation report, download), invoices (cancel and reissue, clearer problems, TIN dashes), tax (On record, History), Price approvals fix | ✅ `c8b4c23` |
+| 5 | Calendar, BIR Sales DAT (+ sidebar entries) | ✅ committed with this handover (checked by type check, tests and page loads; the finance team's own check still to come) |
+| 6 | **Payables: suppliers (+ CSV import), bills (approval flow), payment vouchers (+ print)**, sidebar group, supplier CSV test | Complete on branch: `3f30dcd`; pushed with existing commits |
+| 7 | Guide addresses, README note, What's new | Documentation updated 26 October; current local feature version 0.4.15 |
+
+### How the screens are moved (so you can follow or continue it)
+A converter applies the same rules main used for Finance; run on main's old Finance (`66087d2`) it reproduces main's one-app copy for **128 of 134 files**, the other 6 being your hand edits (`lib/api.ts`, `lib/apps.ts`, the frame, nav, the roles redirect, `profile-actions`).
+- `src/X` → `src/modules/finance/X`; `app/(app)/X` → `app/(app)/finance/X`.
+- Imports → absolute `@/src/modules/finance/...`.
+- Page links (href, push, redirect, form action, crumbs, `FINANCE_NEEDS`) get `/finance` in front; `"/"` → `/finance` only where it's a link. **API calls are left alone** (`api.get("/finance/...")`, `load`, `fetchFile`, Finance's `send("patch", "/admin/users")`).
+- Files changed on both sides: three-way merge (ours converted, main's old converted as base, main's one-app copy), so your hand edits stay. No conflicts so far.
+
+Things the converter can't see, done by hand:
+- **Links the API gives** (notifications, calendar items) are stored as the API names them (`/vouchers/…`, `/ledger?status=waiting`) and put under `/finance` **on screen**: `src/modules/finance/lib/links.ts` `screen()`. The API wasn't changed, so stored notifications keep working.
+- The calendar's "About" page list (`calendar/types.ts` `PAGES`) is **stored with each event** in the API's form (`/bir/sales-dat`) and shown through `screen()`.
+- `platform/lib/fail.ts` (removed from Finance by you) → the one app's shared `@/src/platform/lib/fail`.
+- Finance's frame (`modules/finance/platform/app/shell-layout.tsx`) got a `footer` prop (passed to its `Nav`); the bell goes in your existing `ModuleActions bell` slot. `app/(app)/finance/layout.tsx` passes `<Bell>` and `<VersionFooter>`.
+- **No one-app-wide setting was changed.** The upload limit you set (4.5 MB) covers our bill files; the Sales DAT engine import dropped its `.ts` ending (it needed `allowImportingTsExtensions`); the build stamp under the version (it needed `NEXT_PUBLIC_FINANCE_BUILD` in `next.config.ts`) is left out for now.
+- Finance's screen tests moved to `src/modules/finance/tests/` with their own loader (`tests/support/resolve-ts.mjs` maps `@/` to the one app's folder and adds `.ts`). Not included by `tsconfig.json` (`.mjs`), not built by Next.
+
+---
+
+## 3. Backend architecture (what we added)
+
+`bishnoi-finance/backend/app/`:
+
+| File | What |
+|---|---|
+| `notify.py` | Notifications: `tell(db, people, kind, text, link)`, `done(db, kind, link)` (marks everyone's unread item about a link done), `holders(db, permission)`. `ACTIONABLE` kinds count in the bell's red number; `GROUPS` collapse several of a kind into one line. Never sent to whoever acted. Table `nbfi_notifications` |
+| `signatures.py` | E-signatures: each person draws/uploads one on their account page (background cleaned in the browser); `sign(db, user, record_type, record_id, step, content)` records a signed step with a fingerprint of what was signed. Steps: prepared, approved, reviewed, settled, checked, released. Records: journal entries, fund requests, payment vouchers, bills (`SIGNED_RECORDS` in `routers/finance.py`). Tables `nbfi_signatures`, `nbfi_signed_steps` |
+| `calendar_events.py`, `routers/calendar.py` | Per-person calendar (`calendar.use` is **per person**, `PER_PERSON` in `permissions.py`, switched on under Users, not a role tick): events, repeats, reminders (working days), sharing, done. Tables `nbfi_calendar_events`, `_shares`, `_done` |
+| `workdays.py` | Philippine working days (uses the `holidays` package: added to `pyproject.toml`/`uv.lock`) |
+| `bir.py` + `routers/finance.py /bir/sales-dat` | The BIR Sales DAT screen's server side (the converter itself runs in the browser: `modules/finance/bir/sales-dat`, Rommel's converter followed line by line) |
+| `build.py` | The API's build (commit) for the version footer |
+| `routers/exports.py` | CSV downloads: journal, account statement, trial balance, funds (`/finance/exports/...`), each needing its screen's view permission |
+| `payables.py` | Bills' VAT and withholding worked out (`work_out`), the withholding codes (ATCs: WC158/WI158 1%, WC160/WI160 2%, WC120/WI120 2%, WC100/WI100 5%, WI010 5%, WI011 10%, WC010 10%, WC011 15%) |
+| `routers/payables.py` | Suppliers (`/finance/suppliers`: add, edit, switch off, files, CSV import of Zoho's vendor export) and bills (`/finance/bills`: draft → submit → approve → check (only with tax withheld) → posted, ready to pay; return with a reason; void; files) |
+| `routers/vouchers.py` | Payment vouchers (`/finance/vouchers`): several bills of one supplier, part of a bill allowed, never paid twice (open vouchers set aside what they hold), paid from an account under CASH; prepare → release (posts) → void; return/cancel; files; amount in words |
+| `routers/finance.py` | Overview sections per role (`/finance/dashboard`), notifications (`/finance/notifications`), signatures, the frame |
+| `ledger.py` | `post()` makes automatic entries (they count at once); sources: manual, fund, invoice, bill, voucher. Manual entries wait for approval (`status` waiting/approved/rejected; nobody approves their own; one "told first", others backup) |
+| `routers/ledger.py` | Journal approval, chart import (`/accounts/import/check`, `/accounts/import`), accounts under accounts (`parent_id`), posting defaults (incl. payables, input VAT, withholding) |
+| `routers/invoices.py` | Cancel and reissue (`replaces_id`), clearer problems, salesperson kept |
+| `routers/tax.py` | Registration "On record" + History (from the audit log: which parts changed, never values), plain-language missing-field messages |
+| `crm.py`, `config.py` | `CRM_COMPANY`: the company's short name sent on every call to the CRM |
+
+Rules kept everywhere: permissions are `area.action` ticks (`permissions.py` `AREAS`; `AREA_LABELS` gives an area its own wording); every change audited (field names, not values); nobody approves their own request; whoever releases money doesn't check its liquidation.
+
+### Permissions Finance declares (shown on the Platform's roles screen through `/platform/catalog`)
+`dashboard.view` · `funds.view/release/check/settle/cancel` · `categories.view/manage` · `invoices.view/create/issue/collect/void/setup` · `suppliers.view/add/edit/deactivate` · `bills.view/create/approve/first/check/void` · `vouchers.view/prepare/release/void` · `journal.view/post/reverse/approve/first` · `accounts.view/manage` · `tax.view/manage` · `prices.view/approve` · `bir.prepare` · `admin.users/roles/audit`; per person: `calendar.use`.
+
+### Database: migrations 0013–0020 (Finance only)
+| | What |
+|---|---|
+| 0013 | Journal entries: `status`, decided by/at, rejected reason; `nbfi_notifications` |
+| 0014 | Calendar tables; users' `calendar_on` |
+| 0015 | `nbfi_signatures`, `nbfi_signed_steps` |
+| 0016 | `nbfi_invoices.replaces_id` (once per invoice) |
+| 0017 | `nbfi_accounts.parent_id`; `nbfi_suppliers`, `nbfi_bills`, `nbfi_bill_files`; payables / input VAT / withholding defaults; starter accounts 1300, 2300 |
+| 0018 | Supplier details (Zoho's vendor fields, contacts JSON), `nbfi_supplier_files`; `suppliers.manage` split into add/edit/deactivate; `bills.record` also gets `bills.create` |
+| 0019 | `nbfi_payment_vouchers`, `_lines`, `_events`, `_files`; bills' `paid_centavos`, `payables_account_id` (backfilled) |
+| 0020 | Bills' approval stage and who approved/checked; `nbfi_bill_events`; `bills.record` and the voucher check/approve/first ticks retired; half-checked vouchers → to_release |
+
+How they're written (please keep if you touch them):
+- **Idempotent** ("only if not done": safe to re-run).
+- **Columns added in place, never by rebuilding a table on SQLite.** A batch rebuild drops the old table and fires ON DELETE CASCADE / SET NULL on everything pointing at it (it emptied default accounts and journal lines in tests; 0013 and 0016 were fixed for it; `tests/test_migrate.py` proves rows survive an upgrade from 0012).
+- Foreign keys added only on Postgres; record numbers `no` from 40000001 (a sequence on Postgres).
+- **Numbering:** main's newest Finance migration is 0012. If main adds Finance migrations, they'd need to come after 0020 (or ours be renumbered: it happened once, on 22 Oct, when both sides made a 0012).
+
+### Tests
+- API: `cd bishnoi-finance/backend && uv run python -m pytest` → **239 passed** after merging `61a34b3` (ours + your 6 Platform-roles tests).
+- Screens: `cd bishnoi-one-app/frontend && node --import ./src/modules/finance/tests/support/register.mjs --test "src/modules/finance/tests/*.test.mjs"` → **21 passed** (CSV readers, TIN, signature clean-up, version check, and the Sales DAT matched byte for byte against the original converter; that one needs the converter folder, `BIR_CONVERTER_DIR`, outside the repo, else it skips).
+- `npx tsc --noEmit -p .` in the one app: clean after each batch.
+
+---
+
+## 4. Features, as the finance team sees them
+
+- **Overview per role** (what waits on you, journal, calendar items, balances; Cristal's Deputy view).
+- **Notifications** (bell): what's waiting on you or was done to your work; grouped; never for your own actions.
+- **Journal**: manual entries wait for approval (the Finance Head told first, the Deputy backup); approve several; reverse; journal voucher print with e-signatures; automatic entries (marketing requests, invoices, bills, vouchers) count at once, their signatures being on their own documents.
+- **Chart of accounts**: accounts under accounts; import Oojeema's or Zoho's CSV (checked row by row first, all or none).
+- **Marketing requests**: release and review by different people; liquidation report with signatures; download.
+- **Invoices**: cancel and reissue (the new one says which it replaces), clearer messages, TIN dashes.
+- **Tax**: registration On record + History; messages that say what's missing.
+- **BIR Sales DAT** from Oojeema's exports (Rommel's converter, for "Prepare BIR files").
+- **Calendar**, per person, with reminders and sharing.
+- **E-signatures** on the account page.
+- **Payables**: suppliers like Zoho's vendors (+ CSV import of Zoho's export); bills with VAT and withholding worked out, the supplier's invoice attached ("Document missing" otherwise); **bill approval flow as Accounts Payable described it** (make + submit → Finance Head approves (Deputy backup) → BIR & Compliance checks only when tax is withheld → posted, ready to pay); **payment vouchers** (several bills, part-payments shown plainly, never paid twice, from an account under CASH, Oojeema and Zoho references kept, printable with amount in words and signatures, proof of payment, void by the Head).
+- Price approvals only for roles with `prices.view`; downloads need their screen's permission.
+
+---
+
+## 5. With main's central roles (`platform_roles.py`)
+
+- Finance still declares its ticks; the Platform shows them. At every sign-in Finance sets the person's role from the pass (`role_from` in `routers/auth.py`): an app admin → Administrator; a Platform role name matching a Finance role → that role; **anything else, or none → Finance Staff**.
+- **Found 2026-10-24:** in Access → People, switching someone's Finance access off and on brings it back **without a role name**, so their next sign-in makes them Finance Staff (it happened to a test account, which then saw Price approvals). Worth keeping the role, asking for one, or warning.
+- We haven't used "Bring in today's roles" yet; planned after the payables screens move (so the Platform becomes the master copy once, not mid-move).
+- On our PC only: the Platform set up from its example (company `2mg` with Finance; Bishnoi One accounts for the Administrator and four test people, given Finance under Finance's role names, so no central roles yet).
+
+---
+
+## 6. Where a merge with your changes may conflict
+
+- `bishnoi-finance/backend/app/main.py` (we include `exports.router`), `models.py`, `permissions.py`, `routers/finance.py` (includes the calendar, payables and vouchers routers, so `main.py` is otherwise untouched), `routers/auth.py`, `routers/admin.py`, `routers/profile.py`, `migrations/versions/` numbering.
+- In the one app, Finance's own files we changed: `src/modules/finance/platform/shell/nav.tsx` (footer slot, `/finance/prices`, `/finance/bir`, `/finance/calendar` rules and entries; batch 6 adds the Payables group and an `also` list so a group stays open on its other addresses), `platform/app/shell-layout.tsx` (`footer`), `app/(app)/finance/layout.tsx`, `lib/types.ts` (`calendarOn`, `hasSignature` on Me), `components/admin.tsx`, `app/(app)/finance/account/page.tsx` (signature card), the screens of invoices, ledger, funds, tax, prices, finance-home.
+- New folders only we add: `modules/finance/{notifications,version,dashboard,exports,signature,calendar,bir,lib/links.ts,lib/tin.ts,tests}`, `app/(app)/finance/{whats-new,calendar,bir,ledger/voucher,…/export,funds/[id]/report,funds/export}`.
+- Suggested order: merge with `-X no-renames`; take both sides in the files above; run the 239 API tests, the 21 screen tests and the one app's type check.
+
+---
+
+## 7. What's still planned
+
+1. **Bring in the Platform roles** as its own approved step; the screen move and batch 7 documentation are complete on this branch.
+2. **Payables home and aging:** built locally in 0.4.15; visual acceptance and commit/push still pending. Historical-date aging is deferred; current balances are explicitly labelled.
+3. **An ⓘ beside every screen's title** explaining the screen (Finance's page header only).
+4. Later proposals: reminder to the backup bill approver after a working day;
+   approve several bills; printable bill with signatures; offline bill drafts.
+   Supplier 2307s, withholding summaries and financial statement screens already
+   exist in Jade's BIR reports and need validation rather than a duplicate build.
+5. Waiting on others: Dispatch/Pharmacy invoicing in Finance and sending invoices to Zoho; opening balances from Zoho (a cut-off date); petty cash and SSS/PhilHealth/Pag-IBIG remittances; which number Zoho's invoices carry; how 2MG and GPI are companies on the Platform.
+6. **Working rule for Finance plans:** Zoho Books is the baseline; each plan says what's confusing in Zoho's way and how we improve on it.
+
+### Known findings, not fixed (older)
+Reversal date not validated, and fund/invoice entries can be reversed from the journal · money columns are 32-bit · the platform pass doesn't check the company · Inventory CSV negatives become text · invoices: back-dating unchecked against the ATP and previous numbers; Receivables says "latest first" but sorts most-overdue first; the `?on=` ageing uses today's payments; void/take-off reversals are dated today; Take off needs `invoices.void`; migration 0007 assumes account 4000 exists.
+
+---
+
+## 8. Data and safety
+- No real customer or personal data, converter files, or bank account numbers are in the repo. Local databases (`.data/*.db`) and `.env` files are git-ignored. Test names in tests are made up.
+- Nothing is deployed from this branch; no live data was changed.
+- Questions about this work: zie1203 (bermas.zictc@gmail.com).
+
+## Print-layout update —26 October2026 (local0.4.16)
+Finance-owned printing/{frame.tsx,print-action.tsx,print.css} supplies common branding/frame; existing page bodies remain authoritative.2MG asset copied to public/finance/brand/2mg-logo.jpg (original root2MGlogo.jpg preserved), existing Bishnoi mark copied beside it. Company branding uses cached Platform getAccount().company because Finance's local Org is generic bishnoi/Bishnoi One; no settings/roles/database changed. Other companies do not get2MG logo. Finance-local shell/sheet/actions/signature classes scope print CSS; no shared-kit/other-app stylesheet edits. Report/record print toolbar added; existing invoice/dedicated print actions reused, new/edit/settings forms do not get a new print action. Named A4 portrait/landscape pages, repeated table headers, totals once, signature-group breaks, applied-filter context and printed-time footer. No page-counter guarantee.24screen tests/type check,55HTTP role checks,17branded page renders/assets and component controller checks passed. Browser unavailable: actual PDF visual/pagination acceptance remains pending. Uncommitted/unpushed; no new migration.
+
+### Supplier importer0.4.18
+Approved phases1-4 retain existing inline UI and Finance kit. Frontend payables/csv.ts+import-review.ts+import.tsx; backend app/supplier_import.py and routers/payables.py. Existing/check endpoint accepts source rows plus temporary review decisions; final/import now accepts rows+confirmed and recomputes eligibility under a supplier writer lock. Old suppliers-only payload rejected,preventing bypass of explicit tax/TIN review. Existing DB fields only;no migration. Source identities separately deferred. Deploy paired frontend/API versions;no deployment performed here. Tax defaults are unconfirmed in preview;no VAT/ATC inference. Real file only read for aggregate mapping coverage;not imported.
+
+### 2026-10-28: permission-controlled local SO authoring restored (0.4.26)
+Restores sales_orders.create (Add and edit Finance draft orders), local POST/PUT and New/Edit screens. /finance/sales-orders remains Zoho source; /finance/sales-orders/local holds Finance-created orders, linked from the source page. Draft/returned editing only, stale-version and no-self-approval protections preserved, actor/time/history retained. Source records remain read-only; local approval does not send orders or supplier bills to Zoho. No schema migration. Seven order workflow tests,16 related permission/source tests,30 frontend tests and one-app type check passed; local HTTP page/access checks passed, actual browser visual review not performed. Existing Finance Head dormant authoring grant becomes effective again; no existing stored staff grants edited. Other role/account runtime details are in the local vault, not this handover. Feature changes remain uncommitted/unpushed.
+
+### 2026-10-28: source-list UI follows shared kit (0.4.27)
+Finance source SO/invoice screens reuse ListFrame,FigureStrip,UnderlineTabs,ListToolbar,ExpandableTable,Pager; headline counts cover selected saved period, not only page rows. Compact freshness with expandable update details, visible read-only/not-accounting notice, differentiated empty states, inline context and full-record links preserve company/period/search/page. Sales orders grouped under Sales. Source links respect view permissions. Refresh waits while typing/reading expanded records. Focused roles lacking dashboard.view land in their permitted source workspace. Shared primitives/API/schema/accounting logic unchanged. Role configuration and private onboarding/export notes remain in local vault. Browser visual check blocked by computer-use URL-policy detection; actual Chart key warning not reproduced or fixed. Type check,30frontend tests and HTTP renders/access checks passed. No feature commit/push/deployment.
+
+### 2026-10-28: reported UI defects repaired (0.4.28)
+Added stable per-column keys to source SO/invoice cell React elements before they cross the ExpandableTable boundary. Finance account page was 404 because shared ProfilePage asked for a GraphQL frame, which Finance does not serve. Shared profile now accepts an optional narrow identity/display context (default unchanged); Finance passes its cached REST frame, preserving shared UI and e-signature access. No API/schema/permission/accounting changes. Full type check,30Finance frontend tests,4profile backend tests and3role account/signature HTTP renders passed;fresh server logs had0keywarnings during source renders. Actual browser visual check not performed. Q1 raw-file audit/import readiness lives in local vault; four transaction CSV importers remain unbuilt. No feature commit/push/deploy.
+
+
+### 2026-10-28: PostgreSQL compatibility prepared, 0.4.29
+Finance-only pg8000 driver option (verified TLS/SCRAM-PLUS enforcement), optional encrypted database OAuth state, shared worker lease/daily GET reservations/pause audit, source-save fencing and clarified connection status.0027 defines two empty operational tables;0023–0026 stay unchanged. Migration advisory lock and Alembic now use the same transaction connection. Default SQLite encrypted-file flow and existing role permissions retained. No official Neon writes/active database switch/deployment/accounting import. Original target0022 confirmed via new read-only SQLAlchemy preflight; full local PostgreSQL migration rehearsal remains pending runtime availability. See ZOHO-CONNECTION.md for staged runtime and opt-in settings; don't use copy_database to upgrade existing Neon users/setup. Existing44dirtypaths preserved. Current activeSQLite0026servedfromignoredunchangedruntime;normalmainrestartwouldapplynewmigrationlocally,soactivationisexplicitlaterstep.
+
+### 2026-10-28: approved Neon activation and outbox preparation (0.4.30)
+Supersedes preparation-only runtime status. Full private backup/restore/PG migration/full-startup preservation rehearsal passed; fresh official backup then additive0022→0028upgrade preserved every original row.267additional chart accounts and1593imported suppliers transferred with ID/parent remapping. Existing19accounts/3users/10roles retained. Genuine Zoho source cache/checkpoints moved; no test transactions, local users/roles or tax/default-money settings copied. OfficialAPI8313/site127.0.0.1:4302usesNeon; testAPI8303/site localhost4301retainsSQLite with Zoho network off. Private operational config/keys/launchers remain ignored; see ZOHO-CONNECTION.md.
+Final bill clearance/voucher release enqueue durable work atomically, unique per local record/environment. No foreground provider writes. Delivery/link/history0028, independent statuses/admin queue, optional READ+CREATE consent, mapping/dependency guards, bounded worker, uncertainty/void holds and GET-only reconciliation prepared. Live sending remains off; withholding treatment and actual mappings/defaults need review. No live Zoho records sent. Actual PostgreSQL concurrent claims/worker ownership/quota/pause fencing checked using synthetic local-only schema. No deployment/commit/push; visual browser acceptance not checked.
+
+### 2026-10-28: Q1 review and isolated rehearsal (0.4.31)
+`/finance/import-review` loads the six Zoho transaction CSVs and dated Oojeema AR/AP controls through the existing UI kit. Existing integrations.manage plus relevant record/account view permissions apply. Files remain transient; no source snapshot, official transaction or provider record is changed. Source rows are grouped by identity, totals checked without summing repeated headers, links established only from exact source IDs/references with matching parties, unsupported components exposed and account/company choices grouped. Eight true-as-of controls are comparison evidence; provisional comparisons require explicit same-company/currency/reference confirmations. No filename-based dates, name-only joins, guessed exchange rates or balancing journals.
+The local-only rehearsal endpoint requires journal.post and explicit confirmation. It creates a separate private SQLite DB and uses Finance's actual invoice/bill/payment/ledger models for supported mapped records. It cannot post to official Neon or change the existing local tests, and does not call Zoho. Opening-only evidence, withholding/tax gaps, unsupported expenses and missing dependencies remain held. The real supplied pack initially has21active2MGaccount groups requiring confirmation; no real Q1 records were posted. Synthetic local test case successfully posts an invoice, bill, collection and supplier payment with balanced entries and correct remaining AR/AP.
+Checks:10newbackend tests/typecheck; real14-file authenticated screen/upload check passed,9703documents,2231linked payment allocations,8controls. Real rehearsal refused unmapped inputs rather than inventing entries. Browser visual acceptance not checked. Existing source records and accounting/BIR remain separate. Price approval investigation parked by user; localCRM was running but empty/noPlatformlink, no dummy prices or directCRMDB edits added. No commit/push/deployment.
+
+## 2026-10-28: interruption reconciliation (0.4.32)
+
+User approved audit repairs and reconciliation. Canonical main migration files0023_account_term,0024_cost_of_goods_sold,0025_invoice_division,0026_business_events remain unchanged. Their IDs had also been issued on the Finance feature branch for purchase types/directory/SO/cache; those feature implementations are retained under migrations/compat with their provenance. New0029 completes missing schemas from either applied history without stamping versions, replacing values, rebuilding tables or replaying postings. Keep compat helpers with the migration; fresh installs and either existing history require them. Downgrade requires verified backup restore.
+
+Proof before installing this graph:11 synthetic main/feature starting revisions plus an actual SQLite backup copy; fresh read-only Neon dump restored to a new local PostgreSQL DB, all45 existing tables/4532 rows preserved; full Finance startup on that restored copy queried46 ORM tables and preserved original rows. Official Neon and original SQLite remain0028; no production migration/restart performed by this reconciliation. All four Jade canonical file hashes preserved.
+
+Importer regressions: pack-wide allocation-ID uniqueness (separate customer/vendor namespaces); ambiguous TDS rows retained/held without guessing header-vs-line totals; company/party/reference collisions held; blocked controls suppress numeric reconstructed totals and expose status in the row. Tax readiness is always false until the statutory classifications are actually implemented. Original-file review and scratch posting are not a complete baseline or BIR sign-off. Voucher capture now occurs after final bank/check fields are saved, keeping job fingerprint equal to the released record. No live Zoho sending enabled.
+
+Source safety: original index/unstaged patches plus all88 changed/untracked paths saved privately; backup branch and original stash retained. All source files must be included in the final reviewed snapshot, including Q1 routes/UI/tests/compat helpers. No commit/push implied by this repair; integration may remain pending commit until authorised. Never push main. CLAUDE.md deletion is an incoming upstream change, not an accidental dropped Finance file; current repository docs/system-map.md and README are retained.
+
+## 2026-10-30: petty cash, Marketing requests page, reader budget (0.4.34, 0.4.35)
+
+- **Petty cash:** `app/routers/petty_cash.py`, models `PettyCashVoucher`, `PettyCashLine`, `PettyCashEvent` (migration `0033_petty_cash`, three new empty tables), permission area `petty_cash` (view, create, check, void). Draft or returned, submitted (every line needs its receipt file), checked and posted by someone who didn't make or submit it, or returned; void reverses the entry. Posting: Dr each line's account and Input VAT, Cr the fund and tax withheld; journal source `petty_cash`. Funds: accounts under CASH with "petty cash" in the name. Screens: `src/modules/finance/petty-cash/`, `screens/petty-cash.tsx`.
+- **BIR purchases:** `bir_reports.Purchase` no longer assumes a bill: `bills_between` returns supplier bills and each posted petty cash receipt. A store's payee id is `store:` plus its TIN, else its name, and `form_2307` accepts it. Voucher date is used for period lists, to agree with the books (Sir Mel to confirm).
+- **Marketing requests:** one page with stage tabs (`screens/funds.tsx`); old addresses redirect. Nothing feeds it today: the CRM's module was removed on 2026-10-06 (`83a99af1`); the CRM will bring it back with ERs. Finance's intake is `/integration/funds/...`.
+- **Reader budget:** see ZOHO-CONNECTION.md.
+- **Migration clash to resolve when merging main:** `0033_recycle_bin` (main) and `0033_petty_cash` (ours) share a number; resolve as 0029 and 0032 were, with an add-only `0034`.
+- **0.4.35:** the shared `Select` reads only `<option>`s written directly inside it; a helper component left it empty (`ledger/forms.tsx` now calls a function). `src/platform/ui/tip.tsx` measures its bubble and opens below when it wouldn't fit above.
+
+## 2026-10-31: Living Overview, phase 1 (0.4.36)
+
+- **New, and kept apart so a merge stays easy:** `app/overview.py` (`GET /finance/overview?period=month|quarter|year`, included at the end of `routers/finance.py`), `src/modules/finance/overview/` (types, `lib.ts`, charts, cards, the client part, one server action, the prices slot), `tests/test_overview.py`, `src/modules/finance/tests/overview.test.mjs`. No database change, no new package, no new permission. `screens/finance-home.tsx` keeps its redirect for people without `dashboard.view` and now renders only the new page.
+- **Left in place:** `GET /finance/dashboard`, `/finance/dashboard/payables` and `/finance/dashboard/waiting-prices` still work. `dashboard/sections.tsx`, `dashboard/cash.tsx` and `payables/home.tsx` are no longer drawn by the home page; they can go once nothing else needs them.
+- **Rules live in one place:** `CARD_NEEDS` (each card's view permissions), `DOING` (a hand-off's doing and view permission), `main_lead` (the hero). The server builds only what's allowed. The page has no permission logic of its own.
+- **Hero order:** the plan lists BIR first, which would have given Malou and Cristal the VAT hero (both hold `bir.view`), against the approved mock-up. `main_lead` puts the main approver (`bills.first` or `journal.first`) and whoever releases money first.
+- **Reads:** approved entries only (`money_moves`, `books_card`). `bir_reports.cash_disbursements` and `balances` don't filter on status, so with an entry waiting, the Cash Disbursements Journal can show more than Money in vs out; the Overview is the right one. Hand-offs reuse `filter_bills`, `filter_vouchers`, `may` and `check_hold`.
+- **Agings by period:** `periodCentavos` is the part on documents dated in the period; `wholeCentavos` is what the list shows. The lists have no date filter, so a bar opens its whole bucket.
+- **Clicks that open the closest list, not an exact one** (the list has no such filter): AR buckets (Receivables), Where money went (bills that are ready to pay, posted petty cash, no date filter), Zoho by age or GPI, and any Zoho period other than this month (Zoho invoices), petty cash entries in Books by source (journal for the period: the journal page offers no petty cash filter), Marketing by team (Settled and cancelled), a petty cash fund (Petty cash), a weekly EWT bar (that month's 0619-E), cash points (trial balance as of that day), "See all" on hand-offs that mix lists (the first list).
+- **Not available yet:** fund amounts (no field), who is away and who acts for them (no data), petty cash top-ups (not built), BIR deadlines (Sir Mel's list). Sales per division stays phase 2.
+- **Erica** has no `dashboard.view` in the local test database, so the home page still sends her to Zoho invoices. Her overview exists in the API; adding the permission to her role needs the user's go-ahead.
+- **Saving any `.py` under the backend while `npm run one` runs stops the whole stack** (the reloader ends the batch job).
+
+## 2026-10-31: Q1 imports from Oojeema, and imported expenses (0.4.38)
+
+- **Sales come from Oojeema, not Zoho** (user, 2026-10-31: those are the records used for BIR). `app/oojeema_sales_import.py` reads the Sales Journal and Receipt Journal together: one invoice per SI/BI No, the row's own amounts (the tax engine isn't used), `series_id` empty, Default accounts, no event to other apps, no cost of goods. Zoho's invoice and customer-payment exports feed no postings.
+- **Cancellations:** a negative row exactly undoing a positive one becomes a void (or a payment taken off) on the negative row's date. A negative row with no original is held.
+- **Receipts are all or nothing**, so half a receipt is never posted. Older invoices, overpayments and unexplained negatives hold the whole receipt. CWT posts with `cwt_atc` empty: the file has no ATC, so SAWT shows no code.
+- **Bank numbers:** `label_of` masks the deposit account name before it's stored, with a hash keeping accounts distinct. Raw names stay in memory only.
+- **Imported expenses** (`app/zoho_expense_import.py`, `routers/imported_expenses.py`): read-only, separate from petty cash, voided rather than edited, their own journal source `expense`. A company comes only from a confirmed match on the cost centre label.
+- **Migration 0035:** three new empty tables (`nbfi_imported_expenses`, `nbfi_imported_expense_lines`, `nbfi_import_links`). Nothing existing changes.
+- **Monthly lists differ from Oojeema's where a cancellation crosses months:** Finance leaves a voided invoice out of its own month, while Oojeema keeps it and shows a negative later. The books match Oojeema; which period carries it is a question for Sir Mel.
+- Imports stay on the testing site (`testing_only`). Official imports come with the cut-off plan.

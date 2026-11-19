@@ -5,56 +5,13 @@ import { FileText, Trash2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { deleteProductDocument, dropshipDelivered, saveProductDocument, sendSaleDocuments, setDropship, settleConsignment, uploadProductDocument } from "@/src/modules/inventory/actions/inventory";
+import { deleteProductDocument, saveProductDocument, sendSaleDocuments, settleConsignment, uploadProductDocument } from "@/src/modules/inventory/actions/inventory";
 import type { ProductDocument } from "@/src/modules/inventory/lib/types";
 import { Button } from "@/src/platform/ui/button";
 import { Input } from "@/src/platform/ui/field";
+import { Pill } from "@/src/platform/ui/figures";
 
-// Order-on-demand, dropshipping and documents with products (feature plan steps 15b, 15c, 15e).
-
-/** Before approval: whether the vendor ships this order straight to the customer. */
-export function DropshipSwitch({ orderId, on }: { orderId: string; on: boolean }) {
-  const router = useRouter();
-  const [busy, start] = useTransition();
-  return (
-    <Checkbox
-      checked={on}
-      disabled={busy}
-      onChange={(e) =>
-        start(async () => {
-          const r = await setDropship(orderId, e.target.checked);
-          if (!r.ok) return void toast.error(r.error);
-          toast.success(e.target.checked ? "The vendor ships it straight to the customer" : "It ships from our warehouse");
-          router.refresh();
-        })
-      }
-    >
-      Dropship: the vendor delivers straight to the customer
-    </Checkbox>
-  );
-}
-
-/** A placed dropship purchase order: the vendor says it was delivered to our customer. */
-export function DropshipDelivered({ poId }: { poId: string }) {
-  const router = useRouter();
-  const [busy, start] = useTransition();
-  return (
-    <Button
-      variant="primary"
-      loading={busy}
-      onClick={() =>
-        start(async () => {
-          const r = await dropshipDelivered(poId);
-          if (!r.ok) return void toast.error(r.error);
-          toast.success("Delivered to the customer", { description: "No stock came through us; Finance invoices the sale." });
-          router.refresh();
-        })
-      }
-    >
-      Vendor delivered it
-    </Button>
-  );
-}
+// Documents with products and consignment (feature plan steps 15d, 15e). Dropshipping (15c) was removed 2026-11-17.
 
 const size = (n: number) => (n > 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1000))} KB`);
 
@@ -75,7 +32,7 @@ export function ProductDocuments({ productId, documents, canEdit }: { productId:
     start(async () => {
       const r = await uploadProductDocument(productId, form);
       if (!r.ok) return void toast.error(r.error);
-      toast.success("Document added", { description: "It goes with every sale of this item." });
+      toast.success("Document added", { description: /cpr/i.test(`${name} ${f.name}`) ? "Kept as the CPR file; its name fills the CPR number and validity when they're missing." : "It goes with every sale of this item." });
       setName("");
       if (file.current) file.current.value = "";
       router.refresh();
@@ -94,16 +51,21 @@ export function ProductDocuments({ productId, documents, canEdit }: { productId:
   return (
     <div>
       {documents.length === 0 ? (
-        <p className="text-meta text-ink-3">None yet. Keep its certificate of analysis, leaflet or CPR certificate here; they go with every sale.</p>
+        <p className="text-meta text-ink-3">None yet. Keep its certificate of analysis, leaflet or CPR certificate here; they go with every sale. A file named with &ldquo;CPR&rdquo; (e.g. CPR DR-XY12345 2027-05-31.pdf) is the CPR file and fills its number and validity.</p>
       ) : (
         <ul className="divide-y divide-rule text-sm">
           {documents.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center gap-3 py-1.5">
               <FileText className="size-4 text-ink-3" aria-hidden />
               <a href={d.href} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-medium text-hema hover:underline">{d.name}</a>
+              {d.tag === "cpr" && <Pill tone="good">CPR file</Pill>}
               <span className="text-meta text-ink-3">{d.fileName} · {size(d.size)}</span>
               {canEdit ? (
                 <>
+                  {/* The item's FDA registration certificate (2026-11-18): shown at an FDA inspection. */}
+                  <Checkbox checked={d.tag === "cpr"} disabled={busy} onChange={(e) => run(() => saveProductDocument(productId, d.id, { tag: e.target.checked ? "cpr" : "" }), e.target.checked ? `${d.name} is the CPR file` : `${d.name} isn't the CPR file`)}>
+                    CPR file
+                  </Checkbox>
                   <Checkbox checked={d.sendWithSales} disabled={busy} onChange={(e) => run(() => saveProductDocument(productId, d.id, { sendWithSales: e.target.checked }), e.target.checked ? "Goes with every sale" : "Kept here only")}>
                     With every sale
                   </Checkbox>

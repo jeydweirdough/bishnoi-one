@@ -65,6 +65,7 @@ export function SupplierReview({ initial, initialQuery, org }: { initial: Suppli
   }
 
   async function load(page: number, applyFilters = false) {
+    if (applyFilters && companyUse !== applied.companyUse && changes.length) { setError("Save or discard changes before switching between 2MG suppliers and retained history."); return; }
     setBusy(true); setError("");
     try {
       const filters = applyFilters ? { search, origin, noCode, pageSize, companyUse } : applied;
@@ -74,7 +75,7 @@ export function SupplierReview({ initial, initialQuery, org }: { initial: Suppli
       params.set("company_use", filters.companyUse);
       const result = await loadSupplierReview(params.toString());
       if (!result.ok) setError(result.error);
-      else { setList(result.data); setApplied(filters); }
+      else { if (filters.companyUse !== applied.companyUse) setSelected({}); setList(result.data); setApplied(filters); }
     } catch { setError("The list could not be loaded. Your unsaved changes are still here."); }
     finally { setBusy(false); }
   }
@@ -105,14 +106,15 @@ export function SupplierReview({ initial, initialQuery, org }: { initial: Suppli
       {!!list.reconciliation.issues.length && <details><summary className="cursor-pointer text-sm font-semibold text-hema">View {list.reconciliation.issues.length} source identity issues</summary><p className="my-2 text-meta">These are 2MG source vendors whose existing-record link needs resolving. A missing tax code is a separate issue. No supplier has been deleted.</p><div className="max-h-80 overflow-auto" tabIndex={0}><table className="w-full text-sm"><thead><tr className="text-left"><th className="p-2">Source row</th><th className="p-2">Vendor</th><th className="p-2">Code / TIN</th><th className="p-2">Reason</th></tr></thead><tbody>{list.reconciliation.issues.map(r => <tr key={r.line} className="border-t border-rule"><td className="p-2">{r.line}</td><td className="p-2">{r.name}</td><td className="p-2">{r.code} · {r.tin || "No TIN"}</td><td className="p-2">{{ conflicting_tax_identity: "Conflicting tax identity", unresolved_existing_identity: "Existing identity not resolved", source_vendor_not_yet_linked: "Duplicate source tax identity" }[r.reason] ?? r.reason}</td></tr>)}</tbody></table></div></details>}
     </section>}
     <form className="flex flex-wrap items-end gap-3" onSubmit={e => { e.preventDefault(); void load(1, true); }}>
-      <label className="grid gap-1 text-meta">Company use<select className={control} value={companyUse} disabled={busy || uncertain} onChange={e => setCompanyUse(e.target.value)}><option value="2mg">Verified 2MG suppliers</option><option value="review">Other saved suppliers</option><option value="all">All saved suppliers</option></select></label>
+      <label className="grid gap-1 text-meta">Company use<select className={control} value={companyUse} disabled={busy || uncertain} onChange={e => setCompanyUse(e.target.value)}><option value="2mg">Verified 2MG suppliers</option><option value="history">Retained history (read only)</option></select></label>
       <label className="grid gap-1 text-meta">Find supplier<input className={control} value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, company or TIN" disabled={busy || uncertain} /></label>
       <label className="grid gap-1 text-meta">Local / Foreign<select className={control} value={origin} onChange={e => setOrigin(e.target.value)} disabled={busy || uncertain}><option value="">All suppliers</option><option value="local">Local</option><option value="foreign">Foreign</option><option value="unset">Not set</option></select></label>
       <label className="flex min-h-9 items-center gap-2 text-sm"><input type="checkbox" checked={noCode} onChange={e => setNoCode(e.target.checked)} disabled={busy || uncertain} />No usual tax code</label>
       <label className="grid gap-1 text-meta">Per page<select className={control} value={pageSize} disabled={busy || uncertain} onChange={e => setPageSize(Number(e.target.value))}>{[25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
       <Button disabled={busy || uncertain} type="submit">Search / filter</Button>
     </form>
-    <p className="text-meta text-ink-3">Edit directly in the table. Local/Foreign is a supplier classification; importation is a bill purchase type. No usual code means no default is selected.</p>
+    {applied.companyUse !== "2mg" && <p role="status" className="rounded border border-rule bg-bench/30 p-3 text-sm">Retained records are read only. They support existing history and are not verified for new 2MG work. Being outside the verified list does not prove a supplier is GPI-only.</p>}
+    <p className="text-meta text-ink-3">Edit verified 2MG suppliers directly in the table. Local/Foreign is a supplier classification; importation is a bill purchase type. No usual code means no default is selected.</p>
     {list.canEdit && <div className="flex flex-wrap items-end gap-3 rounded border border-rule bg-bench/30 p-3">
       <p className="self-center text-sm font-semibold">{picks.length} selected suppliers{hidden ? ` · ${hidden} outside this page` : ""}</p>
       <label className="grid gap-1 text-meta">Set classification<select className={control} value={bulkOrigin} onChange={e => setBulkOrigin(e.target.value)} disabled={busy || uncertain}><option value="">Keep current</option><option value="local">Local</option><option value="foreign">Foreign</option></select></label>

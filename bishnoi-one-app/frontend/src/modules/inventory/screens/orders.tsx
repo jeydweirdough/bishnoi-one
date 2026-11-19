@@ -6,7 +6,7 @@ import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Fi
 import { ExpandableTable } from "@/src/platform/ui/expandable-table";
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Icon } from "@/src/modules/inventory/platform/ui/icons";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
@@ -18,6 +18,8 @@ import { ReceivedProof, SignForDelivery } from "@/src/modules/inventory/componen
 import { ShippingCard } from "@/src/modules/inventory/components/shipping";
 import { PickCheck } from "@/src/modules/inventory/components/scan";
 import { PackingCard } from "@/src/modules/inventory/components/packing";
+import { RecordPhotos } from "@/src/modules/inventory/components/photos";
+import type { InventoryPhoto } from "@/src/modules/inventory/actions/inventory";
 import { SaleDocuments } from "@/src/modules/inventory/components/supply";
 import { PrintLink } from "@/src/modules/inventory/components/print-button";
 import { PickForm, type PickLine } from "@/src/modules/inventory/components/pick-form";
@@ -27,7 +29,7 @@ import { StepButton } from "@/src/modules/inventory/components/step-button";
 import { Chips, Filters, NoAccess, RowLink, Stamp, Table, Td, Trail } from "@/src/modules/inventory/components/ui";
 import { ORDER_KINDS, param, query } from "@/src/modules/inventory/lib/labels";
 import { FirstStep, NeedsFirst } from "@/src/modules/inventory/components/setup";
-import { KINDS, kindBySlug, kindOf, listHref, newHref } from "@/src/modules/inventory/lib/order-kinds";
+import { KINDS, kindBySlug, kindOf, listHref, newHref, newPermission } from "@/src/modules/inventory/lib/order-kinds";
 import { ToggleLinks } from "@/src/modules/inventory/platform/ui/toggle-links";
 import { OrdersBoard } from "@/src/modules/inventory/screens/boards";
 import { loadSetup } from "@/src/modules/inventory/lib/setup";
@@ -81,7 +83,7 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
     <>
       <PageHeader
         title={issued ? (info ? `${info.plural}: issued` : "Issuance history") : info ? info.plural : "All orders"}
-        actions={may("orders.create") && <LinkButton href={info ? newHref(info) : "/inventory/orders/new"} variant="primary" icon={<Plus className="size-4" aria-hidden />}>{info ? info.newLabel : "New order"}</LinkButton>}
+        actions={may(newPermission(info)) && <LinkButton href={info ? newHref(info) : "/inventory/orders/new"} variant="primary" icon={<Plus className="size-4" aria-hidden />}>{info ? info.newLabel : "New order"}</LinkButton>}
       >
         {info ? `${info.intro} Reserved, picked, then issued.` : "Outbound stock: customer orders and issues to departments and projects. Order → reserved → picked → issued."}
       </PageHeader>
@@ -107,7 +109,7 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
             <OrdersBoard orders={orders} fmt={fmt} day={day} may={may} kind={f.kind || undefined} />
           ) : (
             <Sheet>
-              <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()}` : "No orders"} body={info ? info.intro : "An order reserves stock for a customer or department until it is issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/inventory/orders/new"} action={info ? info.newLabel : "New order"} permission="orders.create" filtered={Boolean(f.q)} clear={info ? listHref(info) : "/inventory/orders"} may={may} />
+              <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()}` : "No orders"} body={info ? info.intro : "An order reserves stock for a customer or department until it is issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/inventory/orders/new"} action={info ? info.newLabel : "New order"} permission={newPermission(info)} filtered={Boolean(f.q)} clear={info ? listHref(info) : "/inventory/orders"} may={may} />
             </Sheet>
           )}
         </>
@@ -133,7 +135,7 @@ export async function OrdersPage({ searchParams }: { searchParams: Search }) {
             />
           </ListToolbar>
           {orders.length === 0 ? (
-            <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()}` : "No orders"} body={info ? info.intro : "An order reserves stock for a customer or department until it is issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/inventory/orders/new"} action={info ? info.newLabel : "New order"} permission="orders.create" filtered={Boolean(f.q || f.status)} clear={`/inventory/orders${query({ kind: f.kind, view: "list" })}`} may={may} />
+            <FirstStep icon={info?.icon ?? "issuance"} title={info ? `No ${info.plural.toLowerCase()}` : "No orders"} body={info ? info.intro : "An order reserves stock for a customer or department until it is issued."} needs={["warehouse", "stock"]} href={info ? newHref(info) : "/inventory/orders/new"} action={info ? info.newLabel : "New order"} permission={newPermission(info)} filtered={Boolean(f.q || f.status)} clear={`/inventory/orders${query({ kind: f.kind, view: "list" })}`} may={may} />
           ) : (
             <ExpandableTable
               minWidth="52rem"
@@ -245,6 +247,9 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
   const packing = ["confirmed", "picking", "issued"].includes(o.status) ? await load<Packing>(`/inventory/orders/${o.id}/packages`) : null;
   // Its items' documents that go with every sale (step 15e).
   const docs = await load<(ProductDocument & { product: { name: string } })[]>(`/inventory/orders/${o.id}/documents`);
+  // Its photos (optional, Step 4B): the goods, the proof of delivery.
+  const photos = await load<InventoryPhoto[]>(`/inventory/photos?targetType=delivery&targetId=${encodeURIComponent(o.id)}`);
+  const mayPhoto = (may("orders.edit") || may("orders.issue")) && o.status !== "cancelled";
 
   return (
     <>
@@ -286,6 +291,11 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
               may={{ edit: may("orders.edit"), issue: may("orders.issue") }} signedFor={Boolean(o.received)} />
           </div>
         )}
+        {(mayPhoto || photos.length > 0) && (
+          <div className="mt-4 border-t border-rule pt-3">
+            <RecordPhotos targetType="delivery" targetId={o.id} photos={photos} canAdd={mayPhoto} />
+          </div>
+        )}
         {docs.length > 0 && (
           <div className="mt-4 border-t border-rule pt-3">
             <SaleDocuments documents={docs} send={{ kind: "orders", id: o.id }} />
@@ -309,7 +319,6 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
       {packing && (
         <Sheet className="mt-5 px-5 py-4">
           <PackingCard orderId={o.id} packing={packing} canPack={may("orders.issue") && o.shipping?.status !== "delivered"} />
-          {o.waveId && <p className="mt-2 text-meta text-ink-3">Picked in <Link href={`/inventory/waves/${o.waveId}`} className="text-hema hover:underline">a wave</Link> with other deliveries.</p>}
         </Sheet>
       )}
       {/* Check picking by scanning (step 14c): while the stock is held, before it's issued. */}
@@ -323,7 +332,7 @@ export async function OrderPage({ params }: { params: Params<{ id: string }> }) 
           {o.lines.map((l) => (
             <tr key={l.id} className="relative hover:bg-bench/40">
               <Td><RowLink href={`/inventory/products/${l.product.id}`} sub={l.product.sku}>{l.product.name}</RowLink></Td>
-              <Td num>{fmt.count(l.quantity)} {l.product.unit}</Td>
+              <Td num>{fmt.count(l.quantity)} {l.product.unit}{l.soldAs && <span className="block text-meta text-ink-3">{l.soldAs}</span>}</Td>
               {o.status === "draft" && <Td num className={l.available !== null && l.available < l.quantity ? "font-semibold text-eosin" : "text-ink-2"}>{fmt.count(l.available ?? 0)}</Td>}
               {o.status === "issued" && (
                 <Td className="text-meta text-ink-2">
@@ -369,7 +378,7 @@ export async function NewOrderChooser() {
         Select the order type.
       </PageHeader>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {KINDS.map((k) => (
+        {KINDS.filter((k) => may(newPermission(k))).map((k) => (
           <Link key={k.kind} href={newHref(k)} className="group flex gap-4 rounded-xl border border-rule bg-sheet px-5 py-4 transition-colors hover:border-ink">
             <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-hema-tint text-sage-deep">
               <Icon name={k.icon} className="size-5" />
@@ -388,6 +397,7 @@ export async function NewOrderChooser() {
 export async function NewOrderPage({ params }: { params: Params<{ kind: string }> }) {
   const info = kindBySlug((await params).kind);
   if (!info) notFound();
+  if (info.elsewhere) redirect(info.elsewhere.href);  // a sale starts as a sales order in the CRM
   const { me, may } = await context();
   if (!may("orders.create")) return <NoAccess what="creating orders" />;
   const crumbs = [{ href: listHref(info), label: info.plural }];

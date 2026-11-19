@@ -20,7 +20,7 @@ export async function addOperator(input: { email: string; fullName: string; pass
 
 /** Find a person: any account, with the company it belongs to (or that it's an operator's). */
 export type FoundPerson = Operator & {
-  memberships: { id: string; companyId: string; company: string; companySlug: string; status: string; isCompanyAdmin: boolean; offDomain: boolean }[];
+  memberships: { id: string; companyId: string; company: string; companySlug: string; status: string; isCompanyAdmin: boolean }[];
 };
 
 export async function findPeople(q: string): Promise<Result<FoundPerson[]>> {

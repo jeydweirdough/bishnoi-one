@@ -42,7 +42,7 @@ export async function ShellLayout({ children, waiting, unset, notifications, all
   const rail = (await cookies()).get("bishnoi_nav")?.value === "rail";
   const actions = (
     <TopActions allHref={allHref} search={stranded ? undefined : search}>
-      <OneActions links={[{ href: "/crm/account", label: "Your profile" }, { href: "/crm/account/mailbox", label: "Your mailbox" }]} />
+      <OneActions links={[{ href: "/crm/account", label: "Your profile" }]} />
     </TopActions>
   );
   return (

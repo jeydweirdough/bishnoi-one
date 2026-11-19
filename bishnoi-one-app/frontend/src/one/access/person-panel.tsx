@@ -10,26 +10,35 @@ import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Pill } from "@/src/platform/ui/figures";
 import { Icon, moduleIcon } from "@/src/platform/ui/icons";
-import { Select } from "@/src/platform/ui/pickers";
+import { Combobox, Select } from "@/src/platform/ui/pickers";
 import { RowMenu } from "@/src/platform/ui/row-menu";
 import { Empty, Particulars, Sheet } from "@/src/platform/ui/sheet";
-import { setPersonAppRole, setPersonModule } from "./actions";
+import { addWatcher, removeWatcher, setPersonAppRole, setPersonModule } from "./actions";
 import { moduleLabel } from "./labels";
+import { HrRecordsView } from "./hr-records";
 import { usePersonActions } from "./person-dialogs";
-import type { AccessData, AccessPerson, PersonPage } from "./types";
+import type { AccessData, AccessPerson, HrRecords, PersonPage, Watcher } from "./types";
 
 // A person in a panel beside People (2026-10-31, after Zoho Directory's): who they are and every action on them
-// at the top, then Info, Applications (each app with their role in it), Security and Account activity.
+// at the top, then Info, Applications (each app with their role in it), Security and Activity (their own actions in
+// Bishnoi One and every app, 2026-11-18).
 
-export type PanelActivity = { id: string; at: string; text: string };
+export type PanelActivity = { id: string; at: string; app: string; text: string; fields: string[] };
+/** Read on the server only when the Activity tab is open (null: not open). */
+export type PanelLog = { entries: PanelActivity[]; older: string | null; unavailable: string[] } | null;
 
 const TABS = [
   ["info", "Info"],
   ["apps", "Applications"],
+  ["watchers", "Who can see them"],
   ["security", "Security"],
-  ["activity", "Account activity"],
+  ["activity", "Activity"],
+  // HR records (step 4I): only for HR and administrators (AccessData.hrRecords), read on the server when opened.
+  ["hr", "HR records"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
+/** Tabs read on the server only when opened, by their own address. */
+const READ_WHEN_OPENED: Partial<Record<Tab, true>> = { activity: true, hr: true };
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" }) : null);
 
@@ -42,13 +51,14 @@ function initials(name: string): string {
     .join("");
 }
 
-export function PersonPanel({ person, row, data, activity }: { person: PersonPage; row: AccessPerson; data: AccessData; activity: PanelActivity[] }) {
+export function PersonPanel({ person, row, data, activity, hr = null }: { person: PersonPage; row: AccessPerson; data: AccessData; activity: PanelLog; hr?: HrRecords | null }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("info");
+  const [tab, setTab] = useState<Tab>(activity ? "activity" : hr ? "hr" : "info");
+  const tabs = TABS.filter(([key]) => key !== "hr" || data.hrRecords);
   const isMe = row.id === data.meId;
   const colleagues = data.people.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.fullName }));
   const nameOf = (id?: string | null) => data.people.find((c) => c.id === id)?.fullName ?? null;
-  const a = usePersonActions(row, isMe, data.modules.map((m) => m.key), data.company.emailDomain, colleagues);
+  const a = usePersonActions(row, isMe, data.modules.map((m) => m.key), colleagues);
   const s = person.security;
 
   /** A menu action (with its own confirmation) from a button: said when done, the page read again. */
@@ -123,11 +133,16 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
       </div>
 
       <nav className="mt-5 flex gap-1 border-b border-rule px-6" aria-label={`About ${person.fullName}`}>
-        {TABS.map(([key, label]) => (
+        {tabs.map(([key, label]) => (
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
+            onClick={() => {
+              setTab(key);
+              // Activity and HR records are read on the server, only for the person open and only when asked for.
+              if (READ_WHEN_OPENED[key] && !(key === "activity" ? activity : hr))
+                router.push(`/platform/roles/people?person=${encodeURIComponent(row.id)}&tab=${key}`, { scroll: false });
+            }}
             aria-current={tab === key ? "page" : undefined}
             className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === key ? "border-ink font-semibold text-ink" : "border-transparent text-ink-3 hover:text-ink"}`}
           >
@@ -155,6 +170,7 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
           />
         )}
         {tab === "apps" && <Applications row={row} data={data} />}
+        {tab === "watchers" && <Watchers person={person} colleagues={colleagues} />}
         {tab === "security" && (
           <Particulars
             items={[
@@ -168,26 +184,47 @@ export function PersonPanel({ person, row, data, activity }: { person: PersonPag
             ]}
           />
         )}
+        {tab === "hr" && data.hrRecords && (hr ? <HrRecordsView personId={row.id} name={person.fullName} records={hr} /> : <p className="text-sm text-ink-3">Reading their HR records…</p>)}
         {tab === "activity" &&
-          (activity.length === 0 ? (
-            <Empty icon="auditLog" title="Nothing yet">
-              What they do in their account shows here: sign-ins, passwords, two-step sign-in.
-            </Empty>
+          (!activity ? (
+            <p className="text-sm text-ink-3">Reading their activity…</p>
           ) : (
             <>
-              <ul className="divide-y divide-rule">
-                {activity.map((e) => (
-                  <li key={e.id} className="flex items-baseline gap-3 py-2 text-sm">
-                    <time dateTime={e.at} title={when(e.at)} className="w-24 shrink-0 text-meta text-ink-3">
-                      {ago(e.at)}
-                    </time>
-                    <span className="min-w-0 flex-1 text-ink-2">{e.text}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link href={`/platform/company/activity?q=${encodeURIComponent(person.email)}`} className="mt-3 inline-block text-meta text-ink-2 hover:text-hema hover:underline">
-                Everything in the Activity log
-              </Link>
+              {activity.unavailable.length > 0 && (
+                <p role="status" className="mb-3 rounded-lg border border-promo bg-promo-tint px-4 py-2 text-sm text-promo-ink">
+                  {activity.unavailable.join(", ")} can&apos;t be read just now, so {activity.unavailable.length === 1 ? "its" : "their"} entries are left out.
+                </p>
+              )}
+              {activity.entries.length === 0 ? (
+                <Empty icon="auditLog" title="Nothing recorded yet">
+                  What they do in Bishnoi One and in every app shows here, newest first.
+                </Empty>
+              ) : (
+                <ul className="divide-y divide-rule">
+                  {activity.entries.map((e) => (
+                    <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2 text-sm">
+                      <time dateTime={e.at} title={when(e.at)} className="w-24 shrink-0 text-meta text-ink-3">
+                        {ago(e.at)}
+                      </time>
+                      <span className="w-20 shrink-0 truncate text-meta text-ink-3">{e.app}</span>
+                      <span className="min-w-0 flex-1 text-ink-2">
+                        {e.text}
+                        {e.fields.length > 0 && <span className="text-meta text-ink-3"> ({e.fields.join(", ")})</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 flex flex-wrap gap-4">
+                {activity.older && (
+                  <Link href={activity.older} scroll={false} className="text-sm font-medium text-sage-deep hover:underline">
+                    Older
+                  </Link>
+                )}
+                <Link href="/platform/company/activity" className="text-meta text-ink-2 hover:text-hema hover:underline">
+                  Company activity log
+                </Link>
+              </div>
             </>
           ))}
       </div>
@@ -277,6 +314,93 @@ function Applications({ row, data }: { row: AccessPerson; data: AccessData }) {
         </div>
       )}
       {opened.length === 0 && notYet.length === 0 && <p className="text-sm text-ink-3">Your company has no apps yet.</p>}
+    </div>
+  );
+}
+
+/** Who can see this employee's records for monitoring (2026-11-18): their managers from the org chart, kept when they move,
+ * and anyone an administrator added. Seeing never adds actions: what each may do stays with their own role. */
+function Watchers({ person, colleagues }: { person: PersonPage; colleagues: { id: string; name: string }[] }) {
+  const router = useRouter();
+  const [busy, start] = useTransition();
+  const watchers: Watcher[] = person.watchers ?? [];
+  const taken = new Set([person.id, ...watchers.map((w) => w.id)]);
+  const choices = colleagues.filter((c) => !taken.has(c.id)).map((c) => ({ value: c.id, label: c.name }));
+
+  function act(work: () => Promise<{ ok: boolean; error?: string }>, done: string) {
+    start(async () => {
+      const r = await work();
+      if (!r.ok) toast.error(r.error ?? "That didn't work.");
+      else {
+        toast.success(done);
+        router.refresh();
+      }
+    });
+  }
+
+  const source = (w: Watcher) =>
+    w.source === "added" ? `Added by ${w.addedBy ?? "an administrator"}` : w.onChart ? "From the org chart" : "From the org chart, before a move";
+  return (
+    <div className="space-y-4">
+      {watchers.length === 0 ? (
+        <Empty icon="people" title="Nobody sees them yet" compact>
+          Their managers on the org chart are added here. You can also add someone below.
+        </Empty>
+      ) : (
+        <ul className="divide-y divide-rule">
+          {watchers.map((w) => (
+            <li key={w.id} className="group flex items-center gap-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  <span className="truncate">{w.fullName}</span>
+                  {w.status !== "active" && <Pill tone="bad">Switched off</Pill>}
+                </p>
+                <p className="truncate text-meta text-ink-3">
+                  {source(w)}
+                  {w.since ? (
+                    <>
+                      {" · since "}
+                      <time dateTime={w.since} title={when(w.since)}>
+                        {day(w.since)}
+                      </time>
+                    </>
+                  ) : null}
+                </p>
+              </div>
+              {w.onChart ? (
+                <span className="text-meta text-ink-3" title="Change their place on the org chart, or who they report to, to remove this.">
+                  On the chart
+                </span>
+              ) : (
+                <ConfirmButton
+                  label={<X className="size-3.5" aria-hidden />}
+                  triggerVariant="quiet"
+                  triggerSize="sm"
+                  triggerTitle={`Remove ${w.fullName}`}
+                  title={`Remove ${w.fullName}`}
+                  body={`${w.fullName} will no longer see ${person.fullName}'s records. Their own role doesn't change.`}
+                  confirmLabel="Remove"
+                  disabled={busy}
+                  onConfirm={async () => act(() => removeWatcher(person.id, w.id), `${w.fullName} removed.`)}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="max-w-sm">
+        <p className="mb-1 text-sm font-semibold text-ink">Add someone</p>
+        <Combobox
+          aria-label={`Add someone who can see ${person.fullName}`}
+          placeholder="Choose an employee"
+          className="w-full"
+          options={choices}
+          value={undefined}
+          disabled={busy || choices.length === 0}
+          onChange={(v) => v && act(() => addWatcher(person.id, v as string), "Added.")}
+        />
+        <p className="mt-1 text-meta text-ink-3">They see this employee's records within their own role. What they may do doesn't change.</p>
+      </div>
     </div>
   );
 }

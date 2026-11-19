@@ -6,7 +6,7 @@ import { Board as KanbanBoard } from "@/src/platform/ui/board";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
 import { moveCustomerType } from "@/src/modules/crm/actions/boards";
 import { ListViews } from "@/src/modules/crm/components/crm/list-views";
-import { Copy, Download, ExternalLink, FileText, Handshake, Pencil, Sparkles, Trash2, Upload } from "lucide-react";
+import { Copy, Download, ExternalLink, FileText, Handshake, Pencil, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { NewCustomerButton } from "@/src/modules/crm/components/crm/new-customer";
 import { LinkButton } from "@/src/platform/ui/button";
@@ -89,11 +89,6 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Se
         actions={
           <>
             {/* One main action, one helper, the rest under More (decided 2026-10-26, Hick's law). */}
-            {can(me, "customers.create") && (
-              <LinkButton href="/crm/customers/find" icon={<Sparkles className="size-4" aria-hidden />}>
-                Find leads with AI
-              </LinkButton>
-            )}
             {can(me, "customers.create") && (
 <NewCustomerButton />
             )}

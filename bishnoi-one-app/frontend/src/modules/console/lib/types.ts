@@ -18,8 +18,6 @@ export type Company = {
   currency: string;
   timezone: string;
   contactEmail: string | null;
-  /** Its people's email domain (decided 2026-10-29). */
-  emailDomain?: string | null;
   notes: string | null;
   createdAt: string;
   suspendedAt: string | null;
@@ -54,6 +52,8 @@ export type Application = {
   version: string | null;
   /** Has a connect key (Connections), and when it last asked for its links. */
   connected: boolean;
+  /** A module of the one backend: the others reach it directly, connected without keys. */
+  inBackend?: boolean;
   connectedAt: string | null;
   isActive: boolean;
   status: Health;

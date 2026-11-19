@@ -26,7 +26,7 @@ export const FINANCE_TABS: LinkTab[] = [
  * The pages are the CRM's settings list (crm/lib/access.ts SETTINGS_PAGES), so each stays behind its permission.
  */
 export const CRM_GROUPS: { label: string; pages: string[]; also?: string[] }[] = [
-  { label: "General", pages: [`${CRM_SETTINGS}/company`, `${CRM_SETTINGS}/quote-templates`, `${CRM_SETTINGS}/emails`], also: [`${CRM_SETTINGS}/terms`] },
+  { label: "General", pages: [`${CRM_SETTINGS}/company`, `${CRM_SETTINGS}/quote-templates`], also: [`${CRM_SETTINGS}/terms`] },
   { label: "Customization", pages: [CRM_SETTINGS, `${CRM_SETTINGS}/customer-types`, `${CRM_SETTINGS}/deal-stages`, `${CRM_SETTINGS}/associations`], also: [`${CRM_SETTINGS}/lists`] },
   { label: "Sales and pricing", pages: [`${CRM_SETTINGS}/pricing`, `${CRM_SETTINGS}/price-rules`, `${CRM_SETTINGS}/retention-windows`, `${CRM_SETTINGS}/performance`, `${CRM_SETTINGS}/attention`], also: [`${CRM_SETTINGS}/kpis`] },
 ];

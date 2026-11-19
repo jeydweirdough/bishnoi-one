@@ -19,9 +19,6 @@ function sent<T>(run: () => Promise<T>): Promise<Result<T>> {
 export async function saveBankAccount(id: string | null, input: Json): Promise<Result<unknown>> {
   return sent(() => (id ? api.patch(`/finance/bank-accounts/${enc(id)}`, input) : api.post("/finance/bank-accounts", input)));
 }
-export async function saveRate(input: { currency: string; on: string; rate: number }): Promise<Result<unknown>> {
-  return sent(() => api.put("/finance/exchange-rates", input));
-}
 export async function recordEquity(input: Json): Promise<Result<{ entryId: string; number: string }>> {
   return sent(() => api.post<{ entryId: string; number: string }>("/finance/equity/entries", input));
 }

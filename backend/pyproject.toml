@@ -1,0 +1,44 @@
+[project]
+name = "bishnoi-one-backend"
+version = "0.1.0"
+description = "Bishnoi One's backend: every module's API (platform, crm, inventory, finance, pharmacy, in-licensing, regulatory) in one process"
+requires-python = ">=3.13"
+# The eight former APIs' dependencies together, each at the highest version any of them asked for.
+dependencies = [
+    "alembic>=1.20.0",
+    "boto3>=1.35",
+    "cryptography>=44",
+    "email-validator>=2.2",
+    "fastapi>=0.141.1",
+    "holidays>=0.107",
+    "httpx>=0.28.1",
+    "nh3>=0.2.17",
+    "openpyxl>=3.1.5",
+    "pg8000>=1.31.6,<2",
+    "phonenumbers>=8.13",
+    "pillow>=11.0",
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.15.0",
+    "pypdf>=5,<7",
+    "python-multipart>=0.0.32",
+    "reportlab>=4,<5",
+    "segno>=1.6.6",
+    "sqlalchemy>=2.0",
+    "strawberry-graphql>=0.270",
+    "tzdata>=2026.4",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+# One module at a time keeps the computer light: uv run python -m pytest modules/crm/tests -q
+# Each module's tests are the package modules.<name>.tests, so the eight conftest.py don't clash.
+testpaths = ["modules/*/tests"]

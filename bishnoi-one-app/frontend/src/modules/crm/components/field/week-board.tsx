@@ -125,6 +125,21 @@ export function WeekBoard({ plan, doctors, dayLabel, fullDay }: { plan: WeekPlan
         <div className="rounded-xl border border-rule bg-sheet px-4 py-3">
           <p className="mb-2 text-sm font-semibold text-ink">Review</p>
           <p className="mb-2 text-meta text-ink-3">Take off any visit that&apos;s there because the clinic is easy to reach, not because it&apos;s due. Then mark the week reviewed, with a word if you like.</p>
+          {(plan.added?.length ?? 0) > 0 && (
+            // Accounts the agent added to their own list this week (2026-11-18): theirs to add, the coach's to look over.
+            <div className="mb-2 text-sm">
+              <p className="text-meta font-medium text-ink-2">Added to their list this week</p>
+              <ul className="mt-1 flex flex-wrap gap-1.5">
+                {plan.added!.map((a) => (
+                  <li key={a.id}>
+                    <a href={`/crm/customers/${a.id}`} className="inline-flex items-center rounded-full border border-rule bg-white px-2.5 py-0.5 text-meta text-ink hover:border-ink">
+                      {a.name}{a.city ? ` · ${a.city}` : ""}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={1000} placeholder="Review note (optional)" aria-label="Review note" />
           <div className="mt-2 flex justify-end">
             <Button variant="primary" size="sm" icon={<Check className="size-4" aria-hidden />} loading={pending} onClick={() => run(() => reviewWeek(plan.person.id, plan.week, note), "Marked reviewed")}>

@@ -11,8 +11,6 @@ export type CompanyProfile = {
   /** How numbers and dates are written ("en-PH"), for every app (2026-10-31). */
   locale: string;
   contactEmail: string | null;
-  /** Its people's email domain (getmeds.ph): they're added, and sign in, only at it (decided 2026-10-29). */
-  emailDomain: string | null;
   createdAt: string;
   /** The letterhead every printed document carries (step 10). */
   legalName: string | null;
@@ -22,9 +20,6 @@ export type CompanyProfile = {
   documentFooter: string | null;
   logo: string | null;
 };
-
-/** Someone whose email isn't at the company's domain: they can't sign in until it's changed. */
-export type OffDomainPerson = { id: string; fullName: string; email: string };
 
 export type CompanyApp = { key: string; name: string; description: string | null; appUrl: string | null; people: number; administrators: number };
 
@@ -50,20 +45,6 @@ export type ActivityEntry = {
   category: string;
   target: string;
   fields: string[];
-};
-
-/** One app in the catalogue (step 6), with the feature switches inside it. */
-export type CatalogueEntry = {
-  key: string;
-  name: string;
-  job: string;
-  service: string;
-  /** Not built yet: shown, can't be turned on. */
-  later: boolean;
-  on: boolean;
-  /** The service it runs in is the company's, or can be added. */
-  available: boolean;
-  switches: { key: string; label: string; hint: string; later: boolean; on: boolean }[];
 };
 
 /** A person at the company, as the Administrators card lists them (2026-10-30). */

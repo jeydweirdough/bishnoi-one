@@ -10,6 +10,8 @@ import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modul
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import { OverBudgetNotice } from "@/src/modules/finance/budgets/over-budget";
+import { CancelPurchaseDraft } from "@/src/modules/finance/payables/purchase-queue";
+import { screen } from "@/src/modules/finance/lib/links";
 import { BillEditor } from "@/src/modules/finance/payables/bill-editor";
 import { attachFile, attachSupplierFile, removeFile, removeSupplierFile } from "@/src/modules/finance/payables/actions";
 import { BillSteps, DeleteBillDraft, VoidBill } from "@/src/modules/finance/payables/bill-steps";
@@ -127,6 +129,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
       </p>}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <nav aria-label="Show" className="flex flex-wrap gap-1.5">
+          <Link className="rounded border border-rule-strong px-3 py-1 text-meta font-semibold" href={screen("/purchase-intakes")}>From Inventory</Link>
           {TABS.map((t) => {
             const n = t.key ? list.counts[t.key as BillState | "missing"] : 0;
             return (
@@ -294,7 +297,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
             {b.canEdit && (
               <>
                 <LinkButton href={`/finance/bills/${b.id}?edit=1`}>Edit</LinkButton>
-                <DeleteBillDraft id={b.id} />
+                {b.purchaseEvidence?.length ? <CancelPurchaseDraft id={b.id}/> : <DeleteBillDraft id={b.id} />}
               </>
             )}
             {b.canPay && b.leftCentavos - b.setAsideCentavos > 0 && (
@@ -315,6 +318,8 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
         )}
       </PageHeader>
 
+      {b.companyHold && <p role="status" className="mb-4 rounded border border-rule-strong bg-bench/30 p-3 text-sm">{b.companyHold}</p>}
+      {!!b.purchaseEvidence?.length && <section className="mb-4 space-y-2 rounded border border-rule p-4"><h2 className="font-semibold">Received purchase evidence</h2><p>These quantities are reserved for this bill. Existing approval and payment steps still apply.</p>{b.purchaseEvidence.map(a=><p key={a.intakeId+a.sourceLineId+a.position}><Link className="underline" href={screen(`/purchase-intakes/${a.intakeId}`)}>Open source receipt evidence</Link> · {a.quantity} received units allocated to line {a.position+1}</p>)}</section>}
       {b.status === "recorded" && (
         <Sheet className="mb-5 px-5 py-4">
           <p className="text-sm">

@@ -17,16 +17,16 @@ ROOT = Path(__file__).resolve().parent.parent
 FRONT = ROOT / "bishnoi-one-app" / "frontend" / "src" / "modules"
 OUT = ROOT / "docs" / "system-map.md"
 
-# app folder, name shown, its module folder in the one app, address in the one app
+# module (backend/modules/<module>, API at /<address> in the one backend), name shown, its module folder in the
+# one app, address in the one app (the same as its path in the backend)
 APPS = [
-    ("bishnoi-platform", "Platform (Admin Console)", "../one/admin-console/frame.tsx", "/platform"),
-    ("bishnoi-crm", "CRM", "crm", "/crm"),
-    ("bishnoi-inventory", "Inventory", "inventory", "/inventory"),
-    ("bishnoi-finance", "Finance (Books)", "finance", "/finance"),
-    ("bishnoi-pharmacy", "Pharmacy", "pharmacy", "/pharmacy"),
-    ("bishnoi-admin", "Executive Admin (Office)", "admin", "/admin"),
-    ("bishnoi-in-licensing", "In-Licensing", "inlicensing", "/in-licensing"),
-    ("bishnoi-regulatory", "Regulatory", "regulatory", "/regulatory"),
+    ("platform", "Platform (Admin Console)", "../one/admin-console/frame.tsx", "/platform"),
+    ("crm", "CRM", "crm", "/crm"),
+    ("inventory", "Inventory", "inventory", "/inventory"),
+    ("finance", "Finance (Books)", "finance", "/finance"),
+    ("pharmacy", "Pharmacy", "pharmacy", "/pharmacy"),
+    ("in_licensing", "In-Licensing", "inlicensing", "/in-licensing"),
+    ("regulatory", "Regulatory", "regulatory", "/regulatory"),
 ]
 
 
@@ -70,7 +70,7 @@ def screens(module: str, base: str) -> list[tuple[str, list[tuple[str, str]]]]:
 
 def tables(backend: Path) -> list[tuple[str, str, str]]:
     """(table, class, what it is) from models.py."""
-    text = read(backend / "app" / "models.py")
+    text = read(backend / "models.py")
     out = []
     for m in re.finditer(r'^class (\w+)\([^)]*\):\n(?:\s+"""(.*?)"""\n)?(?:.*\n){0,6}?\s+__tablename__ = "([^"]+)"', text, re.M | re.S):
         cls, doc, table = m.groups()
@@ -87,7 +87,7 @@ def tables(backend: Path) -> list[tuple[str, str, str]]:
 def endpoints(backend: Path) -> list[tuple[str, list[str]]]:
     """Per router file: METHOD path."""
     out = []
-    for f in sorted((backend / "app" / "routers").glob("*.py")):
+    for f in sorted((backend / "routers").glob("*.py")):
         text = read(f)
         prefix = re.search(r'APIRouter\([^)]*prefix="([^"]*)"', text)
         prefix = prefix.group(1) if prefix else ""
@@ -99,7 +99,7 @@ def endpoints(backend: Path) -> list[tuple[str, list[str]]]:
 
 def permissions(backend: Path) -> list[tuple[str, str, str]]:
     """(area name, group, actions)."""
-    text = read(backend / "app" / "permissions.py")
+    text = read(backend / "permissions.py")
     consts = {name: re.findall(r'"([a-z_]+)"', body) for name, body in re.findall(r'^([A-Z_]+)\s*=\s*\(([^)]*)\)', text, re.M)}
     out = []
     for m in re.finditer(r'Area\(\s*"([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*(\([^)]*\)|[A-Z_]+)', text):
@@ -112,7 +112,7 @@ def permissions(backend: Path) -> list[tuple[str, str, str]]:
 def reports(backend: Path) -> list[tuple[str, str, bool]]:
     """(group, title, fixed) from the reports registry."""
     out = []
-    for f in list((backend / "app" / "routers").glob("*.py")) + list((backend / "app").glob("*.py")):
+    for f in list((backend / "routers").glob("*.py")) + list(backend.glob("*.py")):
         for m in re.finditer(r'Report\(\s*"[a-z0-9-]+",\s*"([^"]+)",\s*"([^"]+)"(.*?)\)\s*,?\s*$', read(f), re.M):
             title, group, rest = m.groups()
             out.append((group, title, "fixed=True" in rest))
@@ -121,7 +121,7 @@ def reports(backend: Path) -> list[tuple[str, str, bool]]:
 
 def settings(backend: Path) -> list[str]:
     """Setting names (as .env takes them); never values."""
-    text = read(backend / "app" / "config.py")
+    text = read(backend / "config.py")
     body = text.split("class Settings", 1)[-1]
     names = re.findall(r'^    ([a-z_][a-z0-9_]*)\s*:\s*[^=\n]+', body, re.M)
     return [n.upper() for n in names if not n.startswith("_") and n != "model_config"]
@@ -129,7 +129,7 @@ def settings(backend: Path) -> list[str]:
 
 def links(backend: Path) -> tuple[list[str], list[str]]:
     """(apps it calls, endpoints it offers other apps)."""
-    uses = re.search(r"USES[^=]*=\s*\{(.*?)\n\}", read(backend / "app" / "platform_links.py"), re.S)
+    uses = re.search(r"USES[^=]*=\s*\{(.*?)\n\}", read(backend / "platform_links.py"), re.S)
     calls = re.findall(r'^\s*"([a-z_]+)":', uses.group(1), re.M) if uses else []
     offers = []
     for name, found in endpoints(backend):
@@ -160,7 +160,7 @@ def main() -> None:
     ]
     sections = []
     for folder, name, module, base in APPS:
-        backend = ROOT / folder / "backend"
+        backend = ROOT / "backend" / "modules" / folder
         if not backend.exists():
             continue
         sc, tb, ep, pm, rp = screens(module, base), tables(backend), endpoints(backend), permissions(backend), reports(backend)
@@ -169,7 +169,7 @@ def main() -> None:
         n_eps = sum(len(e) for _, e in ep)
         lines.append(f"| [{name}](#{re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')}) | `{base}` | {n_pages} | {len(tb)} | {len(rp)} | {len(pm)} | {n_eps} | {migration(backend)} |")
 
-        s = [f"## {name}", "", f"Folder `{folder}/backend`, screens at `{base}` in the one app.", ""]
+        s = [f"## {name}", "", f"Code in `backend/modules/{folder}`, its API under `{base}` in the one backend, screens at `{base}` in the one app.", ""]
         s += ["### Screens (the sidebar)", ""]
         if sc:
             for group, pages in sc:

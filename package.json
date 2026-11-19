@@ -1,20 +1,12 @@
 {
   "name": "bishnoi",
   "private": true,
-  "description": "Runs Bishnoi One: npm run one (every API and the one app's screens at http://localhost:4301). One API alone: npm run bishnoi-crm. As a desktop app: npm run bishnoi-one-app:app.",
+  "description": "Runs Bishnoi One on this computer: npm run one (the one backend on port 8300 and the one app's screens at http://localhost:4301). The backend alone: npm run backend. As a desktop app: npm run bishnoi-one-app:app.",
   "scripts": {
     "one": "node scripts/run-one.mjs",
-    "bishnoi-one-app": "node scripts/run-app.mjs bishnoi-one-app",
-    "bishnoi-one-app:app": "node scripts/run-app.mjs bishnoi-one-app --app",
-    "bishnoi-admin": "node scripts/run-app.mjs bishnoi-admin",
-    "bishnoi-crm": "node scripts/run-app.mjs bishnoi-crm",
-    "bishnoi-finance": "node scripts/run-app.mjs bishnoi-finance",
-    "bishnoi-in-licensing": "node scripts/run-app.mjs bishnoi-in-licensing",
-    "bishnoi-inventory": "node scripts/run-app.mjs bishnoi-inventory",
-    "bishnoi-pharmacy": "node scripts/run-app.mjs bishnoi-pharmacy",
-    "bishnoi-platform": "node scripts/run-app.mjs bishnoi-platform",
-    "bishnoi-regulatory": "node scripts/run-app.mjs bishnoi-regulatory",
-    "setup": "node scripts/setup-all.mjs",
-    "deploy": "node scripts/deploy.mjs"
+    "backend": "node scripts/run-one.mjs --backend",
+    "bishnoi-one-app": "node scripts/run-one.mjs --web",
+    "bishnoi-one-app:app": "node scripts/run-one.mjs --web --app",
+    "setup": "node scripts/setup-all.mjs"
   }
 }

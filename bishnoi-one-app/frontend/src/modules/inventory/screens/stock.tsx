@@ -50,7 +50,7 @@ export async function StockPage({ searchParams }: { searchParams: Search }) {
               <tr key={`${r.product.id}-${r.warehouse.id}`} className="relative hover:bg-bench/40">
                 <Td><RowLink href={`/inventory/products/${r.product.id}`} sub={r.product.sku}>{r.product.name}</RowLink></Td>
                 <Td>{r.warehouse.name}</Td>
-                <Td num>{fmt.count(r.onHand)}</Td>
+                <Td num>{fmt.count(r.onHand)}{r.inPacks && <span className="block text-meta text-ink-3">{r.inPacks}</span>}</Td>
                 <Td num className="text-ink-3">{r.damaged ? fmt.count(r.damaged) : "—"}</Td>
                 <Td num className="text-ink-3">{r.reserved ? fmt.count(r.reserved) : "—"}</Td>
                 <Td num className="text-ink-3">{r.allocated ? fmt.count(r.allocated) : "—"}</Td>

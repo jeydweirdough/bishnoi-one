@@ -25,6 +25,8 @@ export type Visit = {
   distanceM: number | null;
   atClinic: boolean | null;
   can: { edit: boolean; delete: boolean };
+  /** Its photos (Step 4B): the clinic, a display, a receipt. */
+  photos: { id: string; href: string; takenBy: { id: string; name: string } | null; createdAt: string; canRemove: boolean }[];
 };
 
 export type Reaction = "will_prescribe" | "already_prescribes" | "interested" | "neutral" | "concerns" | "not_interested";
@@ -86,7 +88,8 @@ export type DoctorBalance = {
   can: { pin: boolean; unpin: boolean };
 };
 
-export type RoutePoint = { latitude: number; longitude: number; accuracyM: number; at: string };
+/** A trail point; weak: less sure than 200 m (Step 4H), drawn apart and left out of the distance. */
+export type RoutePoint = { latitude: number; longitude: number; accuracyM: number; at: string; weak?: boolean };
 
 export type RouteDaySummary = { day: string; distanceM: number; points: number; firstAt: string; lastAt: string };
 
@@ -98,6 +101,7 @@ export type Route = {
   points: RoutePoint[];
   visits: (Visit & { clinic: Pin | null })[];
   keptDays: number;
+  weakAccuracyM?: number;
   /** The day's plan, each planned doctor visited or not. */
   planned: { id: string; slot: "morning" | "midday" | "afternoon"; doctor: { id: string; name: string; zone: Zone | null; tier: 1 | 2 | 3 | null }; visited: boolean }[];
 };
@@ -130,6 +134,8 @@ export type WeekPlan = {
   days: { day: string; stops: PlanStop[] }[];
   status: { sentAt: string | null; changedAt: string | null; reviewedAt: string | null; reviewedBy: { id: string; name: string } | null; note: string | null };
   can: { plan: boolean; review: boolean };
+  /** Accounts they added to their own list that week (2026-11-18), for the coach's review. */
+  added?: { id: string; name: string; city: string | null; tier: number | null; zone: string | null }[];
 };
 
 /** A government assistance application (PAP, Rx playbook) for a doctor's patient. */

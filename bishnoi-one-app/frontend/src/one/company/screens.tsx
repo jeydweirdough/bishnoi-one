@@ -8,9 +8,8 @@ import { LinkButton } from "@/src/platform/ui/ant-button";
 import { ApiError } from "@/src/platform/lib/api";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/platform/ui/sheet";
 import { AdministratorsCard, LetterheadForm, ProfileForm, SignOutButton } from "./forms";
-import { CatalogueBoard } from "./catalogue";
 import { PLATFORM, logSources, readLog } from "./activity";
-import type { ActivityEntry, Administrators, CatalogueEntry, CompanyProfile, OffDomainPerson, SecurityData } from "./types";
+import type { ActivityEntry, Administrators, CompanyProfile, SecurityData } from "./types";
 
 // The company console (feature plan step 5, 2026-10-28): what a company's own administrators keep
 // about their company in the Admin Console. People, roles and the org chart have their own pages.
@@ -46,7 +45,7 @@ function Page({ title, intro, children }: { title: string; intro: ReactNode; chi
 
 export async function CompanyProfilePage() {
   const [data, admins] = await Promise.all([
-    read<{ company: CompanyProfile; offDomain: OffDomainPerson[] }>("/identity/company"),
+    read<{ company: CompanyProfile }>("/identity/company"),
     read<Administrators>("/identity/company/administrators"),
   ]);
   if (!data) return <Page title="Company profile" intro={null}><NotYours /></Page>;
@@ -67,23 +66,6 @@ export async function CompanyProfilePage() {
             <AdministratorsCard data={admins} />
           </Sheet>
         )}
-        {data.offDomain.length > 0 && (
-          <Sheet className="px-5 py-4 lg:col-span-2">
-            <SectionTitle icon="email">Emails to change</SectionTitle>
-            <p className="mt-1 mb-3 text-meta text-ink-3">
-              Not at @{c.emailDomain}: they can&apos;t sign in until you change their email on{" "}
-              <Link href="/platform/roles/people" className="text-hema hover:underline">People</Link> (⋯ → Change details). Their password stays.
-            </p>
-            <ul className="divide-y divide-rule">
-              {data.offDomain.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-center gap-x-3 py-2 text-sm">
-                  <span className="font-medium text-ink">{p.fullName}</span>
-                  <span className="text-ink-3">{p.email}</span>
-                </li>
-              ))}
-            </ul>
-          </Sheet>
-        )}
         <Sheet className="px-5 py-4 lg:col-span-2">
           <SectionTitle icon="documents">Letterhead</SectionTitle>
           <p className="mt-1 mb-3 text-meta text-ink-3">On every printed document: purchase orders, receipts, delivery notes, invoices.</p>
@@ -102,16 +84,6 @@ export async function CompanyProfilePage() {
           <p className="mt-3 text-meta text-ink-3">The short name is in every sign-in and can&apos;t change. Bishnoi One&apos;s operators can help with anything here.</p>
         </Sheet>
       </div>
-    </Page>
-  );
-}
-
-export async function CompanyAppsPage() {
-  const data = await read<{ apps: CatalogueEntry[] }>("/identity/company/catalogue");
-  if (!data) return <Page title="Apps" intro={null}><NotYours /></Page>;
-  return (
-    <Page title="Apps" intro="Turn on the apps your company uses and, inside each, the features it needs. What's off is hidden from menus, forms and reports for everyone. Who may open each app is on Employees.">
-      <CatalogueBoard apps={data.apps} />
     </Page>
   );
 }

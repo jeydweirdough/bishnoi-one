@@ -4,6 +4,9 @@ import { ReportChartView } from "./chart";
 import { applyDefinition, type SavedReport } from "./custom";
 import { RememberReport } from "./index-view";
 import { ReportCustomiseButton } from "./report-customise-button";
+import { getAccount } from "@/src/platform/lib/account";
+import { loadLetterhead } from "@/src/platform/print/letterhead";
+import type { ReportDoc } from "./save-as";
 import { ReportTable } from "./table";
 import type { Cell, ColumnKind, ReportData, ReportFilter } from "./types";
 
@@ -51,10 +54,13 @@ const numeric = (k: ColumnKind) => k === "money" || k === "number" || k === "per
 /**
  * One report, as every module shows it: the period (presets and dates) and its filters at
  * the top, the headline figures, the chart, then the rows (sortable, searchable, totalled,
- * each leading to its record), with export and print. Drawn on the server in the module's
+ * each leading to its record), saved as a PDF document or to Excel. Drawn on the server in the module's
  * formats; only the table's sorting and searching run in the browser.
  */
-export function ReportView({
+/** The part of Bishnoi One a report comes from, on its saved document. */
+const SOURCE: Record<string, string> = { crm: "Customers and selling", inventory: "Stock, buying and deliveries", finance: "Money and accounting", pharmacy: "Pharmacy", platform: "Employees" };
+
+export async function ReportView({
   data,
   base,
   search,
@@ -103,6 +109,21 @@ export function ReportView({
   const chartRows = chart ? effective.rows.slice(0, 40) : [];
   const today = new Date();
   const kept = Object.fromEntries(filters.map((f) => [f.key, search[f.key]]));
+
+  // What the saved document says around the rows (Save as, save-as.tsx).
+  const [head, me] = await Promise.all([loadLetterhead(), getAccount()]);
+  const companyName = head?.legalName || head?.name || me.company?.name || "";
+  const doc: ReportDoc = {
+    company: { legalName: companyName, address: head?.address ?? null, tin: head?.tin ?? null, phone: head?.phone ?? null, email: head?.email ?? null, logo: head?.logo ?? null, footer: head?.footer ?? null },
+    source: SOURCE[mod],
+    period: data.dated && data.from && data.to ? `${format.date(data.from)} to ${format.date(data.to)}` : null,
+    filters: filters
+      .filter((f) => search[f.key])
+      .map((f) => ({ label: f.label, value: f.options.find((o) => o.value === search[f.key])?.label ?? String(search[f.key]) })),
+    summary: (effective.summary ?? []).map((f) => ({ label: f.label, value: f.value === null ? "—" : show(f.kind, f.value) })),
+    notes: effective.notes ?? [],
+    preparedBy: { name: me.fullName, title: me.title },
+  };
 
   return (
     <div className="space-y-5">
@@ -223,7 +244,7 @@ export function ReportView({
       <section className="overflow-hidden rounded-xl border border-rule bg-white shadow-sm">
         {/* Zoho-style formal Report Header */}
         <div className="border-b border-rule bg-white px-6 py-4 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">GetMeds Philippines Inc.</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">{companyName}</p>
           <h2 className="mt-0.5 text-lg font-bold text-ink">{effective.title}</h2>
           {data.dated && data.from && data.to && (
             <p className="mt-0.5 text-xs text-ink-2">
@@ -238,7 +259,7 @@ export function ReportView({
             <p className="mt-1 text-sm text-ink-3">Nothing matches this {data.dated ? "period" : "report"}{filters.some((f) => search[f.key]) ? " and these filters" : ""}. Try a wider period or clear the filters.</p>
           </div>
         ) : (
-          <ReportTable title={effective.title} columns={effective.columns} rows={rows} totals={totals} canExport={canExport} />
+          <ReportTable title={effective.title} columns={effective.columns} rows={rows} totals={totals} canExport={canExport} doc={doc} />
         )}
       </section>
 

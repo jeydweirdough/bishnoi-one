@@ -4,7 +4,7 @@ import { Lock, LockOpen, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { closeYear, recordEquity, saveBankAccount, saveRate, setLock } from "@/src/modules/finance/banking/actions";
+import { closeYear, recordEquity, saveBankAccount, setLock } from "@/src/modules/finance/banking/actions";
 import { Button } from "@/src/platform/ui/button";
 import { ConfirmButton } from "@/src/platform/ui/confirm";
 import { Choice, Field, FormError, Input, Select } from "@/src/platform/ui/field";
@@ -79,31 +79,6 @@ export function BankActions({ bank }: { bank: Bank }) {
         {bank.isActive ? "Switch off" : "Switch on"}
       </Button>
     </span>
-  );
-}
-
-export function RateForm({ today }: { today: string }) {
-  const router = useRouter();
-  const [busy, start] = useTransition();
-  const [v, setV] = useState({ currency: "USD", on: today, rate: "" });
-  const [fields, setFields] = useState<Record<string, string>>({});
-  function save() {
-    start(async () => {
-      const r = await saveRate({ currency: v.currency, on: v.on, rate: Number(v.rate) });
-      if (!r.ok) return void (setFields(r.fields ?? {}), !r.fields && toast.error(r.error));
-      toast.success(`${v.currency} ${v.rate} recorded for ${v.on}`);
-      setV({ ...v, rate: "" });
-      setFields({});
-      router.refresh();
-    });
-  }
-  return (
-    <form noValidate onSubmit={(e) => (e.preventDefault(), save())} className="flex flex-wrap items-end gap-3">
-      <Field label="Currency" error={fields.currency}>{(p) => <Select {...p} value={v.currency} onChange={(e) => setV({ ...v, currency: e.target.value })}><option>USD</option><option>EUR</option><option>CNY</option><option>SGD</option></Select>}</Field>
-      <Field label="Day" error={fields.on}>{(p) => <Input {...p} type="date" max={today} value={v.on} onChange={(e) => setV({ ...v, on: e.target.value })} />}</Field>
-      <Field label="Pesos per unit" error={fields.rate}>{(p) => <Input {...p} inputMode="decimal" value={v.rate} onChange={(e) => setV({ ...v, rate: e.target.value })} placeholder="56.1250" className="w-32" />}</Field>
-      <Button type="submit" size="sm" loading={busy} disabled={!v.rate}>Record rate</Button>
-    </form>
   );
 }
 

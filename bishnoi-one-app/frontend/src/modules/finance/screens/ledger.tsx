@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { screen } from "@/src/modules/finance/lib/links";
 import { Pager } from "@/src/platform/ui/pager";
 import { pageOf } from "@/src/platform/ui/paging";
 import { buttonClass } from "@/src/modules/finance/platform/ui/button";
@@ -227,7 +228,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
 
 export async function ChartPage({ searchParams }: { searchParams: Search }) {
   const requested = one((await searchParams).company_use);
-  const companyUse = ["review", "legacy", "all"].includes(requested) ? requested : "2mg";
+  const companyUse = ["history", "review", "legacy", "all"].includes(requested) ? requested : "2mg";
   const chart = await load<Chart>(`/finance/ledger/accounts?company_use=${companyUse}`);
   return (
     <>
@@ -236,9 +237,9 @@ export async function ChartPage({ searchParams }: { searchParams: Search }) {
         one of the expense accounts. A chart can be brought in from a CSV (Oojeema&apos;s or Zoho&apos;s export) with Import from a file.
       </PageHeader>
       <nav aria-label="Account company use" className="mb-3 flex flex-wrap gap-3 text-sm">
-        {[['2mg', '2MG accounts'], ['legacy', 'Legacy setup / history'], ['review', 'Excluded / company review'], ['all', 'All saved accounts']].map(([value, label]) => <Link key={value} href={`/finance/ledger/accounts?company_use=${value}`} aria-current={companyUse === value ? "page" : undefined} className={companyUse === value ? "font-semibold text-hema underline" : "text-ink-2 hover:underline"}>{label}</Link>)}
+        {[['2mg', '2MG accounts'], ['history', 'Retained history (read only)']].map(([value, label]) => <Link key={value} href={screen(`/ledger/accounts?company_use=${value}`)} aria-current={companyUse === value ? "page" : undefined} className={companyUse === value ? "font-semibold text-hema underline" : "text-ink-2 hover:underline"}>{label}</Link>)}
       </nav>
-      {companyUse !== '2mg' && <p className="mb-3 text-meta">These records are retained for review and historical links; they are outside the verified 2MG chart. Existing transactions have not been moved or deleted.</p>}
+      {companyUse !== '2mg' && <p className="mb-3 text-meta">These accounts are read only and retained for historical links. They cannot be used for new 2MG entries. Existing transactions remain in the books; no accounts or transactions were deleted.</p>}
       <Sheet className="px-5 py-4">
         <ChartEditor accounts={chart.items} canEdit={chart.canEdit} importer={<ChartImport key="import" />} />
       </Sheet>

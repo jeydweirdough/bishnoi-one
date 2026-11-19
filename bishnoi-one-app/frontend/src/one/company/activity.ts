@@ -1,11 +1,7 @@
 import "server-only";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { accountSend, getAccount } from "@/src/platform/lib/account";
 import { ApiError, apiFor } from "@/src/platform/lib/api";
-import { enterSoftly } from "@/src/platform/lib/enter";
 import { moduleByAppKey, type ModuleDef, type ModuleKey } from "@/src/platform/lib/modules";
-import { moduleCookie } from "@/src/platform/lib/session-cookie";
 import type { ActivityEntry } from "./types";
 
 // The company's one activity log (2026-10-31): Bishnoi One's own (sign-ins, people, roles, the company) and each
@@ -36,7 +32,7 @@ export async function logSources(): Promise<(LogSource & { module: ModuleDef | n
  * `category` narrow Bishnoi One's entries. A source whose app can't be read now (not reachable, its session
  * not opened) is named in `unavailable` and left out, never the whole page.
  */
-export async function readLog({ sources, before, q, category, here, skip }: {
+export async function readLog({ sources, before, q, category, here, skip, person }: {
   sources: (LogSource & { module: ModuleDef | null })[];
   before: Record<string, string>;
   q: string;
@@ -45,23 +41,23 @@ export async function readLog({ sources, before, q, category, here, skip }: {
   here: string;
   /** Apps the enter route already said can't be opened. */
   skip: Set<string>;
+  /** One employee's own entries only (2026-11-18, step 4F): each source reads just theirs, by its actor index. */
+  person?: { id: string; email: string };
 }): Promise<{ entries: LogEntry[]; more: boolean; next: Record<string, string>; unavailable: string[] }> {
-  const jar = await cookies();
   const unavailable: string[] = [];
   const read = sources.map(async (s): Promise<{ key: string; items: LogEntry[]; more: boolean }> => {
     if (s.module === null) {
       const p = new URLSearchParams({ ...(q && { q }), ...(category && { category }), ...(before[s.key] && { before: before[s.key] }) });
-      const data = await accountSend<{ entries: ActivityEntry[]; more: boolean }>("GET", `/identity/company/activity?${p}`);
+      const path = person ? `/identity/access/people/${encodeURIComponent(person.id)}/activity` : "/identity/company/activity";
+      const data = await accountSend<{ entries: ActivityEntry[]; more: boolean }>("GET", `${path}?${p}`);
       return { key: s.key, items: data.entries.map((e) => ({ ...e, source: s.key, cursor: e.at })), more: data.more };
     }
     if (skip.has(s.key)) {
       unavailable.push(s.label);
       return { key: s.key, items: [], more: false };
     }
-    // Its session first, softly: if it can't be opened, the page comes back with it in `unavailable`.
-    if (!jar.get(moduleCookie(s.module.key))?.value) redirect(enterSoftly(s.module.key, here));
     try {
-      const data = await apiFor(s.module.key as ModuleKey).get<{ items: AppItem[]; more: boolean }>(`/admin/audit?limit=${PAGE}${before[s.key] ? `&before=${before[s.key]}` : ""}`);
+      const data = await apiFor(s.module.key as ModuleKey).get<{ items: AppItem[]; more: boolean }>(`/admin/audit?limit=${PAGE}${before[s.key] ? `&before=${before[s.key]}` : ""}${person ? `&person=${encodeURIComponent(person.email)}` : ""}`);
       const items = data.items.map((e) => ({
         id: `${s.key}-${e.id}`, at: e.at, actor: e.actor, action: e.action, category: "app", target: e.target ?? "", fields: e.fields ?? [], source: s.key, cursor: String(e.id),
       }));

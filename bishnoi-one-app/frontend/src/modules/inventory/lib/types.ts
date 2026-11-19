@@ -46,7 +46,7 @@ export type Reference = {
   units: { code: string; name: string; isActive: boolean }[];
   suppliers: (Ref & { isActive: boolean })[];
   warehouses: (Ref & { isActive: boolean; locations: { id: string; code: string; name: string; isDefault: boolean; isActive: boolean }[] })[];
-  products: (ProductRef & { status: ProductStatus; costPrice: number; sellingPrice: number; supplierId: string | null; packagings?: { name: string; quantity: number }[] })[];
+  products: (ProductRef & { status: ProductStatus; costPrice: number; sellingPrice: number; supplierId: string | null; packagings?: PackagingRow[]; baseSellable?: boolean })[];
 };
 
 export type ProductType = "stock" | "consumable" | "asset" | "service";
@@ -95,6 +95,9 @@ export type Product = ProductRow & {
   consigned?: number;
   /** Its packs (step 14e); stock stays in its base unit. */
   packagings?: PackagingRow[];
+  /** Whether the base unit may be sold on its own, and stock in packs (step 4A). */
+  baseSellable?: boolean;
+  inPacks?: { onHand: string | null; available: string | null };
   description: string | null;
   unitName: string;
   taxRateBp: number;
@@ -105,7 +108,7 @@ export type Product = ProductRow & {
   parent: { id: string; sku: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
-  warehouses: (Level & { warehouse: Ref })[];
+  warehouses: (Level & { warehouse: Ref; inPacks?: string | null })[];
   balances: { warehouse: Ref; location: { id: string; code: string; name: string }; batch: BatchRef | null; onHand: number; damaged: number }[];
   batches: (BatchRef & { onHand: number })[];
   variants: ProductRow[];
@@ -127,7 +130,8 @@ export type CategoryRow = {
 export type BrandRow = { id: string; name: string; isActive: boolean; productCount: number };
 export type UnitRow = { code: string; name: string; isActive: boolean; productCount: number };
 
-export type StockRow = Level & { product: ProductRef; warehouse: Ref; reorderPoint: number; state: StockState; value: number };
+/** `inPacks`: on hand written in the item's packs, "2 Boxes + 4 Strips" (step 4A). */
+export type StockRow = Level & { product: ProductRef; warehouse: Ref; reorderPoint: number; state: StockState; value: number; inPacks?: string | null };
 /** One page of the stock list: `total` sums every matching row, `count` is how many there are. */
 export type StockOverview = { items: StockRow[]; total: Level & { value: number }; count: number };
 
@@ -193,7 +197,7 @@ export type SerialRow = {
 export type WarehouseRow = Ref & { address: string | null; isActive: boolean; locationCount: number; units: number; value: number; products: number; qualityCheck?: boolean };
 
 /** A file kept with an item, and whether it goes with every sale (step 15e). */
-export type ProductDocument = { id: string; productId: string; name: string; fileName: string; contentType: string; size: number; sendWithSales: boolean; createdAt: string; href: string };
+export type ProductDocument = { id: string; productId: string; name: string; fileName: string; contentType: string; size: number; sendWithSales: boolean; createdAt: string; href: string; tag?: "cpr" | null };
 
 /** Replenishment (step 15a). */
 export type ReplenishmentSettings = { safetyDays: number; defaultLeadDays: number; historyDays: number; automatic: boolean; lastRunAt: string | null };
@@ -203,24 +207,17 @@ export type ReplenishmentRow = {
 };
 
 /** A pack of an item and how many of its base unit it holds (step 14e). */
-export type PackagingRow = { id: string; name: string; quantity: number; barcode: string | null };
+/** A pack of an item (step 14e); `sellable` and `price` (centavos per pack, null = base price x quantity): step 4A. */
+export type PackagingRow = { id: string; name: string; quantity: number; barcode: string | null; sellable?: boolean; price?: number | null };
 
 /** A delivery's packages (step 14d). */
 export type Packing = {
   packages: { id: string; number: string; index: number; of: number; weightGrams: number | null; notes: string | null; packedBy: Person | null; createdAt: string;
-              lines: { lineId: string; product: ProductRef; quantity: number }[] }[];
+              lines: { lineId: string; product: ProductRef; quantity: number }[];
+              /** Photos of the box (Step 4B). */
+              photos: { id: string; href: string; takenBy: { id: string; name: string } | null; createdAt: string; canRemove: boolean }[] }[];
   lines: { lineId: string; product: ProductRef; quantity: number; packed: number }[];
   allPacked: boolean;
-};
-
-/** Several held deliveries picked together (step 14d). */
-export type WaveBrief = {
-  id: string; number: string; status: "open" | "done"; warehouse: Ref; notes: string | null; createdBy: Person | null; createdAt: string; doneAt: string | null;
-  orders: { id: string; number: string; recipient: string; status: string; units: number }[]; units: number;
-};
-export type Wave = WaveBrief & {
-  pickList: { product: ProductRef; total: number; short: number; from: { location: { id: string; code: string }; batch: { id: string; batchNo: string; expiresOn: string | null } | null; quantity: number }[];
-              orders: { orderId: string; number: string; recipient: string; quantity: number }[] }[];
 };
 
 /** A cycle count that comes round every so many days (step 14b). */
@@ -324,6 +321,7 @@ export type Backorder = {
 };
 
 export type ReceiptBrief = {
+  financeState?:string;
   id: string;
   /** One document header (step 8). */
   header: DocumentHeader;
@@ -339,11 +337,14 @@ export type ReceiptBrief = {
   total: number;
 };
 export type POExtras = {
-  /** Raised for a sales order (order-on-demand 15b, dropship 15c), or made by replenishment (15a). */
-  salesOrder?: { id: string; number: string } | null; dropship?: boolean; shipTo?: { name: string | null; address: string | null } | null; replenishment?: boolean;
+  /** Raised for a sales order (order-on-demand 15b), or made by replenishment (15a). */
+  salesOrder?: { id: string; number: string; customer?: string } | null; replenishment?: boolean;
+  /** Why the system made it (order-on-demand, replenishment): read-only, apart from `notes`. */
+  reason?: string | null;
 };
 
 export type Receipt = ReceiptBrief & {
+  financeHandoff:import("@/src/modules/inventory/components/receipt-finance").ReceiptFinance;
   notes: string | null;
   /** Its quality check, when its warehouse checks what it receives (step 14a). */
   qualityCheck?: { id: string; number: string; status: "waiting" | "done" } | null;
@@ -355,7 +356,8 @@ export type OrderStatus = "draft" | "confirmed" | "picking" | "issued" | "cancel
 export type Pick = { locationId: string; locationCode: string; batchId: string | null; batchNo: string | null; expiresOn: string | null; quantity: number };
 
 /** A delivery company (step 12). */
-export type Courier = { id: string; code: string; name: string; trackingUrl: string | null; sortOrder: number; isActive: boolean };
+/** `defaultFee`: its usual fee in centavos, filled into a delivery when it is picked (2026-11-18). */
+export type Courier = { id: string; code: string; name: string; trackingUrl: string | null; sortOrder: number; isActive: boolean; defaultFee: number };
 export type DeliveryMethod = "courier" | "own" | "pickup";
 /** How a customer's delivery goes and where it is (step 12). */
 export type Shipping = {
@@ -395,8 +397,6 @@ export type OrderBrief = {
   items: { sku: string; product: string; quantity: number; unitPrice: number }[];
   /** A customer's delivery's shipping (step 12); null for an issue to a department or project. */
   shipping?: Shipping | null;
-  /** The wave it is picked in (step 14d). */
-  waveId?: string | null;
 };
 export type Order = OrderBrief & {
   /** Proof of delivery: who signed for it, and their signature (step 10). */
@@ -405,7 +405,7 @@ export type Order = OrderBrief & {
   createdBy: Person;
   confirmedBy: Person;
   issuedBy: Person;
-  lines: { id: string; product: ProductRef; quantity: number; unitPrice: number; total: number; available: number | null; picks: Pick[]; serials: string[] }[];
+  lines: { id: string; product: ProductRef; quantity: number; unitPrice: number; total: number; available: number | null; picks: Pick[]; serials: string[]; soldAs?: string | null }[];
 };
 export type Reservation = {
   order: { id: string; number: string; status: OrderStatus; recipient: string; neededOn: string | null };

@@ -237,8 +237,14 @@ and Philippine pharmaceutical/accounting statutory compliance:
 
 ## 2026-11-03: company assistant (user requested)
 
-Adopt a self-hosted Ollama `qwen3:1.7b` assistant with thinking disabled. The model selects an allowlisted read-only tool; trusted backend templates render facts and references. No AI-generated SQL, writes, unrestricted proxy or public model endpoint. Directory reads require company directory authority; monthly Finance reads require existing accounting-report authority and a signed company-bound read pass. Reuse invoiced-revenue and approved profit-and-loss definitions, distinguish missing data from zero, and audit outcomes without logging prompt/data values. See `docs/company-assistant.md`.
+Adopt a self-hosted Ollama `qwen3:1.7b` assistant with thinking disabled. The model selects an allowlisted read-only tool; trusted backend templates render facts and references. No AI-generated SQL, writes, unrestricted proxy or public model endpoint. Directory reads require company directory authority; monthly Finance reads require existing accounting-report authority and a signed company-bound read pass. Reuse invoiced-revenue and approved profit-and-loss definitions, distinguish missing data from zero, and audit outcomes without logging prompt/data values. **Removed 2026-11-17 (owner decision): the assistant, its Platform route, the Finance monthly read and the one app's chat were deleted.**
 
 ## 2026-11-03: company configuration is Platform data (user requested)
 
-Keep OLLAMA_BASE_URL as infrastructure configuration. Derive Finance company ID, slug, currency and timezone from Platform records via its authenticated service configuration. Store a pinned database company ID on the single-company Finance service, auto-resolving only an initially unambiguous active subscription; otherwise select an existing company in Operations. Do not learn ownership from user requests or sign-in order. Assistant reads require fresh central ownership, match ID and slug, and fail closed without stale/environment fallbacks.
+Derive Finance company ID, slug, currency and timezone from Platform records via its authenticated service configuration. Store a pinned database company ID on the single-company Finance service, auto-resolving only an initially unambiguous active subscription; otherwise select an existing company in Operations. Do not learn ownership from user requests or sign-in order. (The assistant-only fresh-read rule went with the assistant on 2026-11-17; the pinned database company stays for Finance's company profile and header.)
+
+## 2026-11-17: removed company email domain, app catalogue switches and the assistant (owner decision)
+
+- One email domain per company is gone: whoever manages a company's employees adds them with any email (Gmail too), with the authority given to them. One email = one account stays ("This email isn't available.").
+- The Admin Console's "Apps and features" catalogue (turning apps and features on or off per company) is gone: every company runs everything it is subscribed to as one operation. Abilities and job roles stay; operators still manage service subscriptions and connections in Operations.
+- The "Ask Bishnoi" read-only assistant is gone (Platform chat route, Finance monthly read, the one app's floating chat).

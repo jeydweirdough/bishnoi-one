@@ -414,6 +414,7 @@ export function PostingEditor({ posting, accounts }: { posting: Posting; account
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const heldDefaults = posting.items.filter(i => i.account && !accounts.some(a => a.id === i.account?.id && a.isActive));
   return (
     <form
       noValidate
@@ -434,12 +435,14 @@ export function PostingEditor({ posting, accounts }: { posting: Posting; account
       className="space-y-4"
     >
       <p className="text-sm text-ink-2">These are the company's own accounts, not a customer's accounts. The money defaults are used for receipts and payments when no specific money account is selected.</p>
+      {!!heldDefaults.length && <p role="status" className="rounded border border-rule-strong p-3 text-sm">Some saved defaults need 2MG review: {heldDefaults.map(i => i.label).join(", ")}. Existing values have been retained. New entries using these accounts will be held until Finance confirms their replacements.</p>}
       <FormGrid>
         {posting.items.map((i) => (
-          <Field key={i.key} label={i.label} size="md" error={fields[i.key]} hint={i.key.startsWith("fx_") ? "The same combined Forex Gain/Loss account can be selected for both." : undefined}>
+          <Field key={i.key} label={i.label} size="md" error={fields[i.key]}>
             {(p) => (
               <Select {...p} value={values[i.key]} disabled={!posting.canEdit} onChange={(e) => setValues({ ...values, [i.key]: e.target.value })}>
                 <option value="">Not set</option>
+                {i.account && !accounts.some(a => a.id === i.account?.id && a.isActive) && <option value={i.account.id} disabled>{i.account.code} - {i.account.name} - needs 2MG review</option>}
                 {accountOptions(accounts, i.types ?? i.type)}
               </Select>
             )}

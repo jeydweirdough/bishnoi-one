@@ -19,18 +19,18 @@ is kept, unchanged, as the reference the tests compare against.
 | `screen.tsx`, `prepare-tab.tsx`, `as-is-tab.tsx`, `dat-csv-tab.tsx`, `drop.tsx`, `parts.tsx`, `download.ts` | The screen | Freely |
 
 Each company's details for the file's first line (RDO code, year-end month) come from
-the API, `GET /finance/bir/sales-dat` (backend `app/bir.py`), found by the seller TIN
+the API, `GET /finance/bir/sales-dat` (`backend/modules/finance/bir.py`), found by the seller TIN
 in the exports. A company with no details (GPI, so far) is asked for them before a DAT
 can be downloaded. Only a role with **Prepare BIR files** (`bir.prepare`) opens the page.
 
 ## Tests
 
 ```
-cd bishnoi-finance/frontend
-node --import ./tests/support/register.mjs --test "tests/*.test.mjs"
+cd bishnoi-one-app/frontend
+node --import ./src/modules/finance/tests/support/register.mjs --test src/modules/finance/tests/bir-sales-dat.test.mjs
 ```
 
-Node 24 or later; nothing to install. `tests/bir-sales-dat.test.mjs` runs the original
+Node 24 or later; nothing to install. `src/modules/finance/tests/bir-sales-dat.test.mjs` runs the original
 `converter.html` and this code on the same real Oojeema exports (March–September 2026)
 and requires the same DAT byte for byte, the same corrections, open items, checks,
 totals, gap explanations and Excel report, month by month.

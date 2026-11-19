@@ -149,6 +149,8 @@ export type BillLine = Omit<BillLineInput, "noWithholdingReason"> & {
 export type BillFile = { id: string; name: string; contentType: string; size: number; uploadedBy: string; uploadedAt: string };
 
 export type Bill = Omit<BillSummary, "supplier"> & {
+  companyHold?: string | null;
+  purchaseEvidence?:{intakeId:string;sourceLineId:string;quantity:number;position:number;digest:string;active?:boolean}[];
   zohoSync?: {label:string;message:string|null}|null;
   taxReviewed: boolean;
   supplier: Supplier;

@@ -261,7 +261,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Search
             <SectionTitle icon="approvals" action={<ViewAll href={PEOPLE} />}>
               Waiting on you
             </SectionTitle>
-            <Later data={data} fallback={<div className="mt-3"><ListRows rows={6} columns={2} /></div>}>
+            <Later data={data} fallback={<div className="mt-3"><ListRows rows={5} columns={2} /></div>}>
               {(o) => {
                 const items = [
                   { label: "No role yet", count: o.people.noRole, href: PEOPLE },
@@ -269,7 +269,6 @@ export default async function AdminHome({ searchParams }: { searchParams: Search
                   { label: "Invitations waiting", count: o.signIns.invitesPending, href: PEOPLE },
                   { label: "Passwords to change", count: o.signIns.passwordsToChange, href: PEOPLE },
                   { label: "Locked out now", count: o.security.lockedNow, href: "/platform/company/security" },
-                  { label: "Emails to change", count: o.security.offDomain, href: "/platform/company" },
                 ];
                 return (
                   <ul className="mt-2 divide-y divide-rule">

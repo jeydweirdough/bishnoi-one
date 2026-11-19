@@ -108,6 +108,7 @@ export async function saveSupplier(id: string | null, input: SupplierInput): Pro
 }
 
 export type BillInput = {
+  currency?:string;rate?:number|null;
   taxReviewed: boolean;
   saveSupplierDefaults?: boolean;
   supplierVatRegistered?: boolean | null;

@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
     ["Waiting on you", "Invitations waiting", o.signIns.invitesPending, ""],
     ["Waiting on you", "Passwords to change", o.signIns.passwordsToChange, ""],
     ["Waiting on you", "Locked out now", o.security.lockedNow, ""],
-    ["Waiting on you", "Emails to change", o.security.offDomain, ""],
     ...o.apps.map((a) => ["Access by app", a.name, a.people, ""]),
     ...o.roles.map((r) => ["Employees by role", r.name, r.people, ""]),
     [],

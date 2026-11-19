@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { accountSend } from "@/src/platform/lib/account";
 import { attempt, type Result } from "@/src/platform/lib/result";
 import { eachOf } from "@/src/platform/bulk/each";
-import type { AccessRole, AppDetails, ImportReport, RoleInput } from "./types";
+import type { AccessRole, AppDetails, HrDocument, HrRecords, ImportReport, RoleInput } from "./types";
 
 // A company administrator's changes to access, on Bishnoi One Platform
 // (/identity/access). The Platform sends each module the change.
@@ -85,6 +85,23 @@ export async function addPerson(input: PersonInput): Promise<Result<{ person: { 
 export async function setReporting(id: string, links: { reportsToId?: string | null; assistantOfId?: string | null }): Promise<Result> {
   return attempt(async () => {
     await accountSend("PUT", `/identity/access/people/${enc(id)}/reporting`, links);
+    refresh();
+    return null;
+  });
+}
+
+/** Who can see an employee (2026-11-18): one more watcher, or one removed; the Platform tells the apps. */
+export async function addWatcher(personId: string, watcherId: string): Promise<Result> {
+  return attempt(async () => {
+    await accountSend("POST", `/identity/access/people/${enc(personId)}/watchers`, { watcherId });
+    refresh();
+    return null;
+  });
+}
+
+export async function removeWatcher(personId: string, watcherId: string): Promise<Result> {
+  return attempt(async () => {
+    await accountSend("DELETE", `/identity/access/people/${enc(personId)}/watchers/${enc(watcherId)}`);
     refresh();
     return null;
   });
@@ -211,4 +228,22 @@ export async function bulkSetManager(ids: string[], managerId: string | null) {
 /** What Mentor, Coach or Coachee hold by default in each app, to start a role from (nothing is saved). */
 export async function standardDefaults(level: "mentor" | "coach" | "coachee"): Promise<Result<{ permissions: Record<string, string[]>; scopes: Record<string, string> }>> {
   return attempt(async () => accountSend<{ permissions: Record<string, string[]>; scopes: Record<string, string> }>("GET", `/identity/access/standard/${level}`));
+}
+
+// ---- HR records (step 4I): HR and administrators only; the Platform refuses anyone else ----------
+
+export async function saveHrDetails(personId: string, details: { label: string; value: string }[]): Promise<Result<HrRecords>> {
+  return attempt(() => accountSend<HrRecords>("PUT", `/identity/access/people/${enc(personId)}/hr`, { details }));
+}
+
+/** The form carries file, label and expiresOn. */
+export async function addHrDocument(personId: string, form: FormData): Promise<Result<HrDocument>> {
+  return attempt(() => accountSend<HrDocument>("POST", `/identity/access/people/${enc(personId)}/hr/documents`, form));
+}
+
+export async function removeHrDocument(personId: string, docId: string): Promise<Result> {
+  return attempt(async () => {
+    await accountSend("DELETE", `/identity/access/people/${enc(personId)}/hr/documents/${enc(docId)}`);
+    return null;
+  });
 }

@@ -1,7 +1,7 @@
 import { ArrowRightLeft, Building, CircleCheck, ClipboardList, FilePenLine, Hourglass, Lock, PackageCheck, PackageOpen, ScanBarcode, Send, Truck, User, Warehouse } from "lucide-react";
 import { Board, type BoardCard, type BoardColumn, type BoardMove } from "@/src/modules/inventory/platform/ui/board";
 import { orderStep, purchaseOrderStep, transferStep } from "@/src/modules/inventory/actions/inventory";
-import { kindOf } from "@/src/modules/inventory/lib/order-kinds";
+import { kindOf, newHref, newPermission } from "@/src/modules/inventory/lib/order-kinds";
 import type { OrderBrief, POBrief, TransferBrief } from "@/src/modules/inventory/lib/types";
 
 // Each document's board: its columns, how a card reads (as the CRM's deal cards
@@ -81,7 +81,7 @@ export function OrdersBoard({ orders, fmt, day, may, kind }: { orders: OrderBrie
       cards={cards}
       moves={moves}
       run={orderStep as Run}
-      newHref={may("orders.create") ? (kindOf(kind) ? `/inventory/orders/new/${kindOf(kind)!.slug}` : "/inventory/orders/new") : undefined}
+      newHref={may(newPermission(kindOf(kind))) ? (kindOf(kind) ? newHref(kindOf(kind)!) : "/inventory/orders/new") : undefined}
       more={{ issued: { href: `/inventory/orders?view=list&status=issued${k}`, label: hidden ? `All issued (${fmt.count(hidden + KEEP_DONE)})` : "Issued (list view)" } }}
     />
   );

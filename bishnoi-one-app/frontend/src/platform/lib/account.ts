@@ -9,7 +9,9 @@ import { siteOrigin } from "./site";
 // one sign-in for every module. Only the Next server talks to it, with the
 // account's token from its httpOnly cookie.
 
-export const PLATFORM_API = (process.env.PLATFORM_API_URL ?? "http://127.0.0.1:8305").replace(/\/$/, "");
+import { PLATFORM_API } from "./backend";
+
+export { PLATFORM_API };
 
 // Where this site is: a module's pass names it as the return. ONE_APP_URL when
 // set; else the address it was reached at (decided 2026-10-27: nothing to set),
@@ -62,8 +64,9 @@ export async function accountSend<T>(method: "GET" | "POST" | "PUT" | "PATCH" | 
   try {
     response = await fetch(`${PLATFORM_API}${path}`, {
       method,
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      // FormData (a file upload) sets its own multipart Content-Type; everything else is JSON.
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body === undefined || body instanceof FormData ? {} : { "Content-Type": "application/json" }) },
+      body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
       cache: "no-store",
     });
   } catch {
@@ -87,14 +90,15 @@ export type Account = {
   fullName: string;
   title: string | null;
   isCompanyAdmin: boolean;
+  /** May read and change the company's HR records (step 4I): its administrators and holders of "Manage HR records". */
+  hrRecords?: boolean;
   /** Also Bishnoi One staff (same email): "admin" (Platform Admin) or "member" (Support); null otherwise. */
   staff?: "admin" | "member" | null;
   company: { id: string; name: string; slug: string } | null;
   companies: { id: string; name: string; slug: string; current: boolean }[];
   /** The applications given to them, that their company has: a module each (by its Platform key). */
-  apps: { key: string; name: string; appUrl: string | null; role: string | null; isAppAdmin: boolean; grantedAt?: string | null }[];
-  /** The company's app catalogue (step 6): "app:purchasing", "inventory.batches"… on or off. */
-  features?: Record<string, boolean>;
+  /** `permissions`: what their role allows there, for the one menu (src/one/menu); null = every page of it. */
+  apps: { key: string; name: string; appUrl: string | null; role: string | null; isAppAdmin: boolean; grantedAt?: string | null; permissions?: string[] | null }[];
   /** Sign-in security (2026-10-30): a handed-over password still to change; two-step sign-in, and whether it's owed. */
   mustChangePassword?: boolean;
   /** `needed`: required and missing (only when the Platform requires it); `suggested`: anyone without it, offered the set-up after signing in and told on their profile. */

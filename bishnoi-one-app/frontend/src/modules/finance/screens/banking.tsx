@@ -1,10 +1,10 @@
 import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import { Empty, PageHeader, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
-import { AddBankAccount, BankActions, BankBadge, CloseYear, EquityForm, LockForm, RateForm, type Bank, type Provider } from "@/src/modules/finance/banking/forms";
+import { AddBankAccount, BankActions, BankBadge, CloseYear, EquityForm, LockForm, type Bank, type Provider } from "@/src/modules/finance/banking/forms";
 
-// Banks, payments and equity (feature plan step 16): the company's bank accounts and e-wallets, exchange rates,
-// owner's equity, closing the year and the period lock.
+// Banks, payments and equity (feature plan step 16): the company's bank accounts and e-wallets, owner's equity,
+// closing the year and the period lock. (Exchange rates for foreign-currency bills were removed on 2026-11-17.)
 
 const may = (me: { permissions?: string[] }, p: string) => me.permissions?.includes(p) ?? false;
 
@@ -12,11 +12,9 @@ type AccountRow = { id: string; code: string; name: string; type: string; isActi
 
 export async function BankAccountsPage() {
   const me = await getCompanyMe();
-  const fmt = makeFormat(me.org);
-  const [{ items, providers }, { items: accounts }, usd] = await Promise.all([
+  const [{ items, providers }, { items: accounts }] = await Promise.all([
     load<{ items: Bank[]; providers: Provider[] }>("/finance/bank-accounts"),
     load<{ items: AccountRow[] }>("/finance/ledger/accounts"),
-    load<{ items: { on: string; rate: number; createdBy: string }[] }>("/finance/exchange-rates?currency=USD"),
   ]);
   const manage = may(me, "accounts.manage");
   const assets = accounts.filter((a) => a.type === "asset" && a.isActive);
@@ -48,21 +46,6 @@ export async function BankAccountsPage() {
                   </span>
                 </span>
                 {manage && <BankActions bank={b} />}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Sheet>
-      <Sheet className="px-5 py-4">
-        <SectionTitle icon="money">Exchange rates</SectionTitle>
-        <p className="mb-3 text-meta text-ink-3">Pesos per unit, by day: foreign-currency supplier bills are booked at the rate on their day and paid at the rate on the day paid; the difference is an exchange gain or loss.</p>
-        {manage && <RateForm today={fmt.todayKey()} />}
-        {usd.items.length > 0 && (
-          <ul className="mt-3 grid gap-1 text-sm sm:grid-cols-3">
-            {usd.items.slice(0, 12).map((r) => (
-              <li key={r.on} className="flex justify-between rounded border border-rule px-3 py-1.5">
-                <span className="text-ink-3">{fmt.dateLabel(r.on)}</span>
-                <span className="tabular-nums">USD {r.rate.toFixed(4)}</span>
               </li>
             ))}
           </ul>

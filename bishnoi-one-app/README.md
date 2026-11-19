@@ -1,21 +1,25 @@
 # Bishnoi One: the one app
 
 Every module's screens on one site, **one.bishnoi.ai** (decided 2026-10-23,
-`benchmarks/decisions.md`). Each module keeps its own API and database in its
-own folder (`bishnoi-crm/backend`, `bishnoi-finance/backend`…); this folder
-has only the screens, and since 2026-10-24 it is the only place screens are
-(the per-app frontends were removed).
+`benchmarks/decisions.md`). Every module's API is in the one backend
+(`backend/`, since 2026-11-17), each under its path; this folder has only the
+screens, and since 2026-10-24 it is the only place screens are.
 
-| Module | Path | API (on this computer) | Status |
-|---|---|---|---|
-| CRM | `/crm` | 8302 | **here** (since 2026-10-23) |
-| Inventory | `/inventory` | 8304 | **here** (since 2026-10-23, its own kit) |
-| Finance | `/finance` | 8303 | **here** (since 2026-10-23, its own kit) |
-| Pharmacy | `/pharmacy` | 8307 | **here** (since 2026-10-23, its own kit) |
-| Executive Admin | `/admin` | 8300 | **here** (since 2026-10-23, its own kit) |
-| Admin Console (Platform) | `/platform` | 8305 | **here** (since 2026-10-24): APIs, companies and accounts for Bishnoi One's staff; roles and role assignments for a company's administrators. One sign-in |
-| In-Licensing | `/in-licensing` | 8306 | coming soon |
-| Regulatory | `/regulatory` | 8308 | coming soon |
+The screens' server talks to the backend at `BACKEND_URL` (default
+`http://127.0.0.1:8300`): a module's API is `BACKEND_URL` + its path
+(`src/platform/lib/backend.ts`). Browsers never call the backend.
+
+| Module | Path (screens and API) | Status |
+|---|---|---|
+| CRM | `/crm` | **here** (since 2026-10-23) |
+| Inventory | `/inventory` | **here** (since 2026-10-23) |
+| Finance | `/finance` | **here** (since 2026-10-23) |
+| Pharmacy | `/pharmacy` | **here** (since 2026-10-23) |
+| Executive Admin | `/admin` | **here** (since 2026-10-23) |
+| Admin Console (Platform) | `/platform` (API `/platform`) | **here** (since 2026-10-24): a company's administration. One sign-in |
+| Operations | `/operations` (API `/platform`) | **here** (since 2026-10-30): Bishnoi One's operators |
+| In-Licensing | `/in-licensing` | coming soon |
+| Regulatory | `/regulatory` | coming soon |
 
 The list, and each module's status, is `frontend/src/platform/lib/modules.ts`.
 Module code is in `frontend/src/modules/<module>/`, its pages under
@@ -27,13 +31,16 @@ with its own bar; print pages and public links under `app/(bare)/`).
 From the repo root:
 
 ```
-npm run one                    # everything: the Platform's and each module's API, and these screens
-npm run bishnoi-one-app        # the screens only, at http://localhost:4301
+npm run one                    # everything: the one backend (every module's API) and these screens
+npm run bishnoi-one-app        # the screens only, at http://localhost:4301 (the backend must be running)
+npm run bishnoi-one-app:app    # the backend and the screens, in a desktop window
 ```
 
-`npm run one` prepares what's missing, starts the Platform's API (the sign-in),
-each live module's API and these screens, and labels their output; Ctrl+C stops
-it all. Open http://localhost:4301 and sign in with your Bishnoi One account. You
+By hand, in `frontend/`: `npm run dev` (the backend running: `uv run main.py`
+in `backend/`), `npm run build`, `npx tsc --noEmit -p .`.
+
+`npm run one` prepares what's missing, starts the backend, then these screens
+once it answers, and labels their output; Ctrl+C stops it all. Open http://localhost:4301 and sign in with your Bishnoi One account. You
 see the modules your company has and you're granted, both set in the Platform
 (Companies > the company's apps; People > the person's apps).
 
@@ -56,9 +63,9 @@ Settings: `frontend/.env.example`.
 A company's administrators (Platform: People > company administrator) make
 the company's roles once, for every module, and give each person one
 (decided 2026-10-23, step R1). The Platform keeps them
-(`bishnoi-platform/backend/app/access_roles.py`) and sends each module the
+(`backend/modules/platform/access_roles.py`) and sends each module the
 roles and who holds them, signed, to `POST <api>/platform/roles`; each module
-keeps them in its own role tables (`app/platform_roles.py`, the same file in
+keeps them in its own role tables (`platform_roles.py`, the same file in
 every module) and enforces them as before. Each sign-in pass carries the
 person's role too, so a module that missed a change catches up.
 
@@ -74,7 +81,7 @@ person's role too, so a module that missed a change catches up.
 The Platform's screens in the one app, with the one Bishnoi One sign-in
 (decided 2026-10-24; it replaced the separate staff console and its staff
 login). Someone whose email is also a Platform staff account is that staff
-member here (Platform `app/deps.py`, `staff_by_account`): Platform Admins
+member here (`backend/modules/platform/deps.py`, `staff_by_account`): Platform Admins
 change, Support looks. They see **APIs** (each module's API, its status and
 deployments), **Companies** and **Accounts**. A company's administrators see
 **Roles** and **Role assignments**. Incidents, support, monitoring,
@@ -96,22 +103,23 @@ brought onto the shared one. Fixed by hand after the move:
   under `app/(app)/platform/(staff)/`, links to its removed pages made plain
   text, and no address-following (that was for the old separate sites).
 
-On this computer, Finance's and Pharmacy's APIs ask the Platform for its pass
-key (their `PLATFORM_PUBLIC_KEY` is commented out): a fixed key must be the
-running Platform's.
+On this computer, every module asks the Platform (`BACKEND_URL/platform`) for
+its pass key (`PLATFORM_PUBLIC_KEY` unset): a fixed key must be the running
+Platform's.
 
 ## At cutover (one.bishnoi.ai)
 
 - One deployment for the screens: this folder's `frontend/` (the old screens
   projects, one per app, go).
-- Platform API: `ONE_APP_URL=https://one.bishnoi.ai`.
+- Backend: `ONE_APP_URL=https://one.bishnoi.ai`.
 - Platform console > Applications: each app's screens address becomes its path
   here (`https://one.bishnoi.ai/crm`, `/inventory`, `/finance`, `/admin`,
   `/pharmacy`, `/platform/console`; `/in-licensing`, `/regulatory`). The
   modules read these (the CRM links to Inventory's products with it). Done on
   this computer with `http://localhost:4301/...` on 2026-10-24.
-- This app: `ONE_APP_URL=https://one.bishnoi.ai`, `PLATFORM_API_URL` and each
-  module's `<MODULE>_API_URL` (see `frontend/.env.example`).
-- CRM API: `CRM_APP_URL=https://one.bishnoi.ai/crm` (links in its emails, and
+- This app: `ONE_APP_URL=https://one.bishnoi.ai` and `BACKEND_URL` (the
+  backend's internal address; see `frontend/.env.example`). The old per-module
+  `*_API_URL` settings are no longer read.
+- Backend: `CRM_APP_URL=https://one.bishnoi.ai/crm` (links in its emails, and
   the mailbox sign-in's return address: update that address in the Google and
   Microsoft apps used for mailboxes too).

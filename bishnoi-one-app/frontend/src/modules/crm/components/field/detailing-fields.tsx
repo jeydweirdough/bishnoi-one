@@ -41,7 +41,27 @@ export function DetailingFields({
   useEffect(() => {
     let current = true;
     if (!companyId) return;
-    visitBrief(companyId).then((r) => current && setBrief(r.ok ? r.data : null));
+    // The last brief is kept on the phone, so a visit logged offline can still name what was detailed (Step 4H).
+    const key = `bishnoi-brief:${companyId}`;
+    const kept = (): VisitBrief | null => {
+      try {
+        return JSON.parse(localStorage.getItem(key) ?? "null");
+      } catch {
+        return null;
+      }
+    };
+    visitBrief(companyId)
+      .then((r) => {
+        if (r.ok) {
+          try {
+            localStorage.setItem(key, JSON.stringify(r.data));
+          } catch {
+            // Storage full: only the offline copy is missed.
+          }
+        }
+        if (current) setBrief(r.ok ? r.data : kept());
+      })
+      .catch(() => current && setBrief(kept()));
     return () => {
       current = false;
     };

@@ -1,0 +1,157 @@
+"""Telling the applications the org chart (feature plan step 4, agreed 2026-10-28).
+
+- placement(db, person): where someone sits, for their sign-in pass ("org"): their main
+  unit, the units above it (top first), their other units, their branch and their manager
+  (the main unit's head; for the head themselves, the head of the unit above).
+- push(...): the company's units and where each person sits, as the business event
+  "organisation.changed" (step 7, app/events.py): kept, delivered to each app that takes it (the
+  CRM's teams), in order, and retried; each sign-in pass also carries the person's own placing.
+"""
+
+import logging
+import secrets
+import threading
+import time
+
+import httpx
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from modules.platform.access_roles import modules_of
+from modules.platform.config import Settings
+from modules.platform import unit_heads, watchers
+from modules.platform.models import Branch, Company, Identity, MembershipUnit, Unit
+
+log = logging.getLogger(__name__)
+
+LIFETIME = 600  # seconds a note may be taken
+
+
+def _units(db: Session, company_id: str) -> dict[str, Unit]:
+    return {u.id: u for u in db.scalars(select(Unit).where(Unit.company_id == company_id))}
+
+
+def path_of(units: dict[str, Unit], unit_id: str | None) -> list[Unit]:
+    """The unit and the units above it, top first."""
+    path, seen = [], set()
+    while unit_id and unit_id in units and unit_id not in seen:
+        seen.add(unit_id)
+        path.append(units[unit_id])
+        unit_id = units[unit_id].parent_id
+    return path[::-1]
+
+
+def email_of(db: Session, identity_id: str | None) -> str | None:
+    other = db.get(Identity, identity_id) if identity_id else None
+    return other.email.lower() if other else None
+
+
+def manager_of(db: Session, units: dict[str, Unit], person: Identity) -> str | None:
+    """Who they report to: the link (2026-11-03), else the closest head above them on the chart (the first, where several)."""
+    linked = email_of(db, person.reports_to_id)
+    if linked:
+        return linked
+    heads = unit_heads.heads_by_unit(db, person.company_id)
+    for unit in reversed(path_of(units, person.main_unit_id)):
+        for head_id in heads.get(unit.id, []):
+            if head_id != person.id:
+                return email_of(db, head_id)
+    return None
+
+
+def managers_for(db: Session, units: dict[str, Unit], person: Identity, others: list[str]) -> list[str]:
+    """Everyone who sees them: the heads of their unit and every unit above it, who they report to by link, and then
+    whoever else watches them (watchers.py: managers they had before a move, and watchers added by hand)."""
+    heads = unit_heads.heads_by_unit(db, person.company_id)
+    ids = {i for hs in heads.values() for i in hs} | {person.reports_to_id}
+    emails = {i.id: i.email.lower() for i in db.scalars(select(Identity).where(Identity.id.in_([x for x in ids if x])))}
+    return watchers.union(unit_heads.managers_of(units, heads, emails, person, others),
+                          watchers.watcher_emails(db, person.company_id).get(person.id, []), person.email)
+
+
+def placement(db: Session, person: Identity) -> dict | None:
+    """Where they sit, for their pass; None when they aren't placed anywhere and nobody watches them."""
+    units = _units(db, person.company_id)
+    others = list(db.scalars(select(MembershipUnit.unit_id).where(MembershipUnit.membership_id == person.id)))
+    branch = db.get(Branch, person.branch_id) if person.branch_id else None
+    managers = managers_for(db, units, person, others)
+    if not person.main_unit_id and not others and branch is None and not managers and not person.reports_to_id and not person.assistant_of_id:
+        return None
+    main = units.get(person.main_unit_id) if person.main_unit_id else None
+    return {
+        "unit": {"id": main.id, "name": main.name, "kind": main.kind} if main else None,
+        "units": [u.id for u in path_of(units, person.main_unit_id)],
+        "otherUnits": others,
+        "branch": {"id": branch.id, "name": branch.name} if branch else None,
+        "manager": manager_of(db, units, person),
+        "managers": managers,
+        "reportsTo": email_of(db, person.reports_to_id),
+        "assistantOf": email_of(db, person.assistant_of_id),
+    }
+
+
+def chart(db: Session, company: Company) -> dict:
+    """The company's units, and where each of its people sits: the "organisation.changed" event's data."""
+    units = _units(db, company.id)
+    heads = unit_heads.heads_by_unit(db, company.id)
+    emails = {i.id: i.email for i in db.scalars(select(Identity).where(Identity.company_id == company.id))}
+    others: dict[str, list[str]] = {}
+    for m in db.scalars(select(MembershipUnit).join(Identity, Identity.id == MembershipUnit.membership_id).where(Identity.company_id == company.id)):
+        others.setdefault(m.membership_id, []).append(m.unit_id)
+    people = db.scalars(select(Identity).where(Identity.company_id == company.id, Identity.via_operator.is_(False))).all()
+    lower = {k: v.lower() for k, v in emails.items()}
+    watching = watchers.watcher_emails(db, company.id)
+    return {
+        "units": [{"id": u.id, "kind": u.kind, "name": u.name, "parentId": u.parent_id, "manager": emails.get(u.manager_id),
+                   "managers": [emails[h] for h in heads.get(u.id, []) if h in emails],
+                   "areas": u.areas or [], "active": u.is_active} for u in units.values()],
+        "people": [{"email": p.email.lower(), "unit": p.main_unit_id, "otherUnits": others.get(p.id, []),
+                    "managers": watchers.union(unit_heads.managers_of(units, heads, lower, p, others.get(p.id, [])), watching.get(p.id, []), p.email),
+                    "reportsTo": emails.get(p.reports_to_id, "").lower() or None, "assistantOf": emails.get(p.assistant_of_id, "").lower() or None} for p in people],
+    }
+
+
+def _send(sessions, settings: Settings, company_id: str) -> None:
+    """The chart as a business event (step 7): kept, delivered to each app that takes it, retried."""
+    from modules.platform import events
+
+    watchers.remember(sessions, company_id)
+    with sessions() as db:
+        company = db.get(Company, company_id)
+        if company is None:
+            return
+        events.publish(db, company, "organisation.changed", chart(db, company))
+        db.commit()
+        events.deliver_due(db, settings)
+
+
+def push(sessions, settings: Settings, company_id: str) -> None:
+    """Sends every application the company has its org chart, in the background. Who the chart now gives each person as a
+    manager is kept as their watcher first, at once (watchers.py), so a later move doesn't lose them."""
+    watchers.remember(sessions, company_id)
+
+    def run() -> None:
+        try:
+            _send(sessions, settings, company_id)
+        except Exception:  # noqa: BLE001 (each sign-in carries the person's placing too)
+            log.exception("Org chart push: couldn't tell the applications about %s.", company_id)
+
+    threading.Thread(target=run, name="org-push", daemon=True).start()
+
+
+def push_all(sessions, settings: Settings, company_id: str) -> None:
+    """The roles, then the chart, one after the other in the background (2026-11-04): an app makes the people it is told
+    about before it places them, so the chart has to follow the roles."""
+    from modules.platform import access_roles
+
+    watchers.remember(sessions, company_id)
+
+    def run() -> None:
+        for what, send in (("Roles", access_roles._send), ("Org chart", _send)):
+            try:
+                send(sessions, settings, company_id)
+            except Exception:  # noqa: BLE001 (each sign-in carries the person's role and place too)
+                log.exception("%s push: couldn't tell the applications about %s.", what, company_id)
+
+    threading.Thread(target=run, name="roles-and-chart-push", daemon=True).start()
+

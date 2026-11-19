@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { accountSend } from "@/src/platform/lib/account";
+import { accountSend, getAccount } from "@/src/platform/lib/account";
+import { loadLetterhead } from "@/src/platform/print/letterhead";
 import { ApiError } from "@/src/platform/lib/api";
 import { ReportTable } from "@/src/platform/reports/table";
 import type { Cell, ColumnKind } from "@/src/platform/reports/types";
@@ -32,7 +33,7 @@ function span(period: Period): { from: string; to: string } {
   return { from: iso(y, m, 1), to: today };
 }
 
-/** One people report (2026-10-30): the Platform's rows in the shared report table (sort, search, export, print). */
+/** One people report (2026-10-30): the Platform's rows in the shared report table (sort, search, saved as a PDF document or to Excel). */
 export default async function PeopleReport({ params, searchParams }: { params: Promise<{ key: string }>; searchParams: Search }) {
   const { key } = await params;
   const s = await searchParams;
@@ -46,6 +47,13 @@ export default async function PeopleReport({ params, searchParams }: { params: P
     throw error;
   }
   const base = `/platform/reports/people/${encodeURIComponent(key)}`;
+  const [head, me] = await Promise.all([loadLetterhead(), getAccount()]);
+  const doc = {
+    company: { legalName: head?.legalName || head?.name || me.company?.name || "", address: head?.address ?? null, tin: head?.tin ?? null, phone: head?.phone ?? null, email: head?.email ?? null, logo: head?.logo ?? null, footer: head?.footer ?? null },
+    source: "Employees",
+    period: report.dated ? `${report.from} to ${report.to}` : null,
+    preparedBy: { name: me.fullName, title: me.title },
+  };
   return (
     <>
       <PageHeader
@@ -57,7 +65,7 @@ export default async function PeopleReport({ params, searchParams }: { params: P
         {report.dated ? ` ${report.from} to ${report.to}.` : ""}
       </PageHeader>
       <Sheet className="px-5 py-4">
-        <ReportTable title={report.name} columns={report.columns} rows={report.rows} totals={null} canExport />
+        <ReportTable title={report.name} columns={report.columns} rows={report.rows} totals={null} canExport doc={doc} />
       </Sheet>
     </>
   );

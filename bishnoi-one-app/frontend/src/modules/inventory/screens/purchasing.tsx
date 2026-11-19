@@ -1,4 +1,3 @@
-import { DropshipDelivered } from "@/src/modules/inventory/components/supply";
 import { DocumentHeaderStrip } from "@/src/platform/ui/document-header";
 import { HeaderFilters, type OperationTypeRow } from "@/src/modules/inventory/components/document-header";
 import { Ban, ExternalLink, FileText, PackageCheck, Pencil, Plus, Printer, Trash2, Truck } from "lucide-react";
@@ -14,6 +13,7 @@ import { Trash2 as BulkTrash } from "lucide-react";
 import { bulkDeletePurchaseOrders, deletePurchaseOrder, purchaseOrderStep } from "@/src/modules/inventory/actions/inventory";
 import { PurchaseOrderForm } from "@/src/modules/inventory/components/document-forms";
 import { PrintLink } from "@/src/modules/inventory/components/print-button";
+import { ReceiptFinancePanel } from "@/src/modules/inventory/components/receipt-finance";
 import { ReceiveForm } from "@/src/modules/inventory/components/receive-form";
 import { RecordTools } from "@/src/modules/inventory/components/record-tools";
 import { POStamp } from "@/src/modules/inventory/components/stamps";
@@ -256,7 +256,6 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
         actions={
           <>
             <PrintLink href={`/inventory/print/purchase-orders/${po.id}`} />
-            {po.dropship && (po.status === "ordered" || po.status === "partial") && may("receiving.receive") && <DropshipDelivered poId={po.id} />}
             {po.status === "draft" && may("purchasing.approve") && (
               <StepButton run={purchaseOrderStep.bind(null, po.id, "place")} label="Approve and place order" done={`${po.number} placed`} variant="primary" confirm={{ title: `Place ${po.number} with ${po.supplier.name}?`, body: "Once placed, it cannot be edited, only received or cancelled.", danger: false }} />
             )}
@@ -272,16 +271,17 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
           </>
         }
       >
-        <POStamp status={po.status} late={po.late} /> <span className="ml-1">{po.supplier.name} → {po.dropship && po.shipTo ? `${po.shipTo.name} (dropship)` : po.warehouse.name}</span>
+        <POStamp status={po.status} late={po.late} /> <span className="ml-1">{po.supplier.name} → {po.warehouse.name}</span>
       </PageHeader>
-      {(po.salesOrder || po.replenishment) && (
+      {(po.reason || po.salesOrder || po.replenishment) && (
+        // Why the system made it (2026-11-18): read-only; the buyer's own notes are below.
         <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
-          {po.replenishment && "Made by replenishment from use and lead time. "}
+          {po.reason ?? (po.replenishment ? "Made by replenishment from use and lead time." : null)}
           {po.salesOrder && (
             <>
-              {po.dropship ? "Dropship for " : "Order-on-demand for "}
-              <Link href={`/crm/sales/orders/${po.salesOrder.id}`} className="font-semibold text-hema hover:underline">{po.salesOrder.number}</Link>
-              {po.dropship && po.shipTo && <>: the vendor delivers to {po.shipTo.name}{po.shipTo.address && `, ${po.shipTo.address}`}. No stock comes through our warehouse.</>}
+              {" "}
+              <Link href={`/crm/sales/orders/${po.salesOrder.id}`} className="font-semibold text-hema hover:underline">Open {po.salesOrder.number}</Link>
+              {po.salesOrder.customer && !po.reason && <span className="text-ink-2"> · {po.salesOrder.customer}</span>}
             </>
           )}
         </p>
@@ -341,7 +341,7 @@ function ReceiptsTable({ receipts, at, count, peso }: { receipts: ReceiptBrief[]
     <Table head={["Receipt", "Received date", "Vendor", "Warehouse", "Order", " Units", " Value", <span key="a" className="sr-only">Actions</span>]} min="52rem">
       {receipts.map((r) => (
         <tr key={r.id} className="relative hover:bg-bench/40">
-          <Td><RowLink href={`/inventory/receipts/${r.id}`} sub={r.deliveryRef ?? undefined}>{r.number}</RowLink></Td>
+          <Td><RowLink href={`/inventory/receipts/${r.id}`} sub={r.deliveryRef ?? undefined}>{r.number}</RowLink>{r.financeState&&r.financeState!=="not_sent"&&<span className="block text-meta">Finance: {r.financeState==='sending'?'waiting for acknowledgement':r.financeState.replaceAll('_',' ')}</span>}</Td>
           <Td className="whitespace-nowrap">{at(r.receivedAt)}<span className="block text-meta text-ink-3">{r.receivedBy?.name}</span></Td>
           <Td>{r.supplier?.name ?? "—"}</Td>
           <Td>{r.warehouse.code} · {r.location.code}</Td>
@@ -445,6 +445,7 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
         {r.deliveryRef && <> · delivery {r.deliveryRef}</>}
       </PageHeader>
       <DocumentHeaderStrip header={r.header} source={r.order && <Link href={`/inventory/purchase-orders/${r.order.id}`} className="hover:underline">{r.order.number}</Link>} />
+      <ReceiptFinancePanel id={r.id} status={r.financeHandoff}/>
       {/* Receive → check → store (step 14a): waiting on hold until its quality check. */}
       {r.qualityCheck && (
         <p className={`mb-4 rounded-[3px] px-4 py-2 text-sm text-ink ${r.qualityCheck.status === "waiting" ? "bg-promo-tint" : "bg-hema-tint"}`}>

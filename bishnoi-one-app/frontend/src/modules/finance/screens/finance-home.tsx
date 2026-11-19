@@ -18,7 +18,7 @@ export default async function FinanceHome() {
   // or financial actions merely to make the module's starting page usable.
   if (!me.permissions?.includes("dashboard.view")) {
     if (me.permissions?.includes("sales_orders.view") && me.permissions?.includes("sales_orders.create")) redirect("/finance/sales-orders");
-    if (me.permissions?.includes("invoices.view")) redirect("/finance/invoices/zoho");
+    if (me.permissions?.includes("invoices.view")) redirect("/finance/invoices");
     if (me.permissions?.includes("sales_orders.view")) redirect("/finance/sales-orders");
   }
   const overview = await load<OverviewData>("/finance/overview?period=month");
