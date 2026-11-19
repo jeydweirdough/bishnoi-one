@@ -96,10 +96,10 @@ export function RowLink({ href, children, sub }: { href: string; children: React
 /** Search and filters, sent as the page's address (a plain GET form). */
 export function Filters({ children, q, placeholder = "Search", keep = {} }: { children?: ReactNode; q?: string; placeholder?: string; keep?: Record<string, string> }) {
   return (
-    <form role="search" className="mb-3 flex flex-wrap items-end gap-3">
+    <form role="search" className="mb-4 flex flex-wrap items-center gap-2">
       {Object.entries(keep).map(([k, v]) => v && <input suppressHydrationWarning key={k} type="hidden" name={k} value={v} />)}
       {q !== undefined && (
-        <label className="relative min-w-[14rem] flex-1">
+        <label className="relative w-full sm:w-64">
           <span className="sr-only">{placeholder}</span>
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <input suppressHydrationWarning
@@ -107,12 +107,12 @@ export function Filters({ children, q, placeholder = "Search", keep = {} }: { ch
             name="q"
             defaultValue={q}
             placeholder={placeholder}
-            className="block h-8 w-full rounded-lg border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            className="block h-7 w-full rounded-[min(var(--radius-md),10px)] border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           />
         </label>
       )}
       {children}
-      <Button type="submit" icon={<Search className="size-4" aria-hidden />}>
+      <Button type="submit" size="sm" icon={<Search className="size-4" aria-hidden />}>
         Show
       </Button>
     </form>
@@ -122,9 +122,9 @@ export function Filters({ children, q, placeholder = "Search", keep = {} }: { ch
 /** A plain select for a filter bar. */
 export function FilterSelect({ name, value, label, options }: { name: string; value: string; label: string; options: { value: string; label: string }[] }) {
   return (
-    <label className="block min-w-[10rem]">
-      <span className="mb-1.5 block text-sm font-medium">{label}</span>
-      <Select name={name} defaultValue={value}>
+    <label className="block">
+      <span className="sr-only">{label}</span>
+      <Select name={name} defaultValue={value} prefix={label} className="h-7 w-auto min-w-36">
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

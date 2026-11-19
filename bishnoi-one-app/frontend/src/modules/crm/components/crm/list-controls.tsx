@@ -39,9 +39,9 @@ export function Filters({ search, selects }: { search?: string; selects: { name:
   }, [q]);
 
   return (
-    <div className="mb-4 flex flex-wrap items-end gap-3">
+    <div className="mb-4 flex flex-wrap items-center gap-2">
       {search && (
-      <label className="relative min-w-[14rem] flex-1">
+      <label className="relative w-full sm:w-64">
         <span className="sr-only">Search</span>
         <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <input suppressHydrationWarning
@@ -49,14 +49,14 @@ export function Filters({ search, selects }: { search?: string; selects: { name:
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={search}
-          className="block h-8 w-full rounded-lg border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="block h-7 w-full rounded-[min(var(--radius-md),10px)] border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
         />
       </label>
       )}
       {selects.map((s) => (
-        <label key={s.name} className="min-w-[10rem]">
-          <span className="mb-1 block text-meta font-medium text-ink-2">{s.label}</span>
-          <Select value={params.get(s.name) ?? ""} onChange={(e) => go({ [s.name]: e.target.value })}>
+        <label key={s.name} className="block">
+          <span className="sr-only">{s.label}</span>
+          <Select value={params.get(s.name) ?? ""} onChange={(e) => go({ [s.name]: e.target.value })} prefix={s.label} className="h-7 w-auto min-w-36">
             {s.options.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}

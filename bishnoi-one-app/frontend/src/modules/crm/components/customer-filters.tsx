@@ -10,17 +10,9 @@ import type { ListItem } from "@/src/platform/lib/types";
 
 function FilterSelect({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) {
   return (
-    <span className="relative">
-      <Select
-        aria-label={label}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-9 min-w-0 appearance-none rounded-lg border border-rule-strong bg-sheet pr-8 pl-2.5 text-sm text-ink hover:border-control focus:border-ring focus:outline-none"
-      >
-        {children}
-      </Select>
-      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-2 size-4 -translate-y-1/2 text-ink-3" />
-    </span>
+    <Select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} prefix={label} className="h-7 w-auto min-w-36">
+      {children}
+    </Select>
   );
 }
 
@@ -76,7 +68,7 @@ export function CustomerFilters({
           value={q}
           onChange={(e) => onSearch(e.target.value)}
           placeholder="Name, city, specialty or phone"
-          className="block h-8 w-full rounded-lg border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="block h-7 w-full rounded-[min(var(--radius-md),10px)] border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
         />
       </label>
       {divisions.length > 1 && (

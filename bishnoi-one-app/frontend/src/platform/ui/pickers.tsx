@@ -123,13 +123,15 @@ type TriggerProps = {
   className?: string;
   placeholder: string;
   shown: ReactNode;
+  /** A filter's name inside the box ("Status:"), as Studio Admin's filters. */
+  prefix?: string;
   clear?: () => void;
   aria: Record<string, unknown>;
   autoFocus?: boolean;
   onFocus?: ComponentProps<"button">["onFocus"];
 };
 
-function Trigger({ id, open, disabled, className, placeholder, shown, clear, aria, autoFocus, onFocus }: TriggerProps) {
+function Trigger({ id, open, disabled, className, placeholder, shown, prefix, clear, aria, autoFocus, onFocus }: TriggerProps) {
   const empty = shown === null || shown === undefined || shown === "";
   return (
     <PopoverTrigger asChild>
@@ -145,6 +147,7 @@ function Trigger({ id, open, disabled, className, placeholder, shown, clear, ari
         className={cn("h-8 w-full min-w-0 justify-between px-2.5 font-normal aria-[invalid=true]:border-destructive", className)}
         {...aria}
       >
+        {prefix && <span className="shrink-0 text-muted-foreground">{prefix}:</span>}
         <span className={cn("min-w-0 flex-1 truncate text-left", empty && "text-muted-foreground")}>{empty ? placeholder : shown}</span>
         {clear && !empty ? (
           <span
@@ -193,10 +196,12 @@ type SelectProps = Omit<ComponentProps<"select">, "onChange" | "size"> & {
   placeholder?: string;
   /** What the list says when nothing matches what was typed (or there is nothing at all): a way forward, not a dead end. */
   notFound?: (typed: string) => ReactNode;
+  /** A filter's name shown inside the box before its value ("Status: Active"). */
+  prefix?: string;
 };
 
 /** A dropdown, typed into to find an option. Written like a plain <select>, with <option>s. */
-export function Select({ children, value, defaultValue, onChange, name, id, disabled, className = "", placeholder, notFound, required: _required, ...rest }: SelectProps) {
+export function Select({ children, value, defaultValue, onChange, name, id, disabled, className = "", placeholder, notFound, prefix, required: _required, ...rest }: SelectProps) {
   const { current, emit, formValue } = useFieldValue(value, defaultValue, name, onChange);
   const [open, setOpen] = useState(false);
   const options = optionsOf(children);
@@ -212,6 +217,7 @@ export function Select({ children, value, defaultValue, onChange, name, id, disa
           className={className}
           placeholder={placeholder ?? "Select"}
           shown={chosen ? chosen.label : current}
+          prefix={prefix}
           aria={{ "aria-invalid": rest["aria-invalid"], "aria-describedby": rest["aria-describedby"], "aria-label": rest["aria-label"] }}
         />
         <PopoverContent className="w-(--radix-popover-trigger-width) min-w-48 p-0" align="start">
