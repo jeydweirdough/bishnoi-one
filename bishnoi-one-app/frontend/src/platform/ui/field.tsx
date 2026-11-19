@@ -1,21 +1,29 @@
 "use client";
 
-import { Info } from "lucide-react";
+import { cn } from "cn";
+import { CircleAlert, Eye, EyeOff, Info, Loader2, Search, X } from "lucide-react";
 import { plainText } from "@/src/platform/ui/about-tip";
 import { Tip } from "@/src/platform/ui/tip";
-import { Alert, Input as AntInput, Radio, type InputRef } from "antd";
-import { useId, type ComponentProps, type ReactNode, type Ref } from "react";
+import { useId, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
+import { Alert, AlertTitle } from "@/src/components/ui/alert";
+import { Input as ShadInput } from "@/src/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/src/components/ui/input-group";
+import { Textarea as ShadTextarea } from "@/src/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/src/components/ui/toggle-group";
 import { DateInput, type FieldChange } from "./pickers";
 
-// Fields are Ant Design's: boxed, Ant's border, blue on focus, red when
-// invalid. The label always sits above, never inside.
+// Fields are shadcn/ui's, as Studio Admin uses them (2026-11-19): boxed, the theme's border, a ring on focus,
+// red when invalid. The label always sits above, never inside.
 const control =
-  "block w-full min-w-0 rounded-lg border border-control bg-sheet px-4 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:outline-none focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] aria-[invalid=true]:border-danger disabled:bg-bench disabled:text-ink-3";
+  "block w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-[invalid=true]:border-destructive disabled:opacity-50";
 
-/** Hands the caller the real <input> (or <textarea>), as before, not Ant's wrapper. */
-function toElement<E extends HTMLElement>(ref: Ref<E> | undefined, el: E | null) {
-  if (typeof ref === "function") ref(el);
-  else if (ref) (ref as { current: E | null }).current = el;
+/** Enter in a field (Ant's onPressEnter), kept for the screens that pass it. */
+function withEnter(onPressEnter: (() => void) | undefined, onKeyDown: ComponentProps<"input">["onKeyDown"]) {
+  if (!onPressEnter) return onKeyDown;
+  return (e: KeyboardEvent<HTMLInputElement>) => {
+    onKeyDown?.(e);
+    if (e.key === "Enter" && !e.defaultPrevented) onPressEnter();
+  };
 }
 
 type FieldProps = {
@@ -78,35 +86,94 @@ export function Field({ label, hint, error, optional, size, className = "", chil
 }
 
 /** A text field; `prefix` and `suffix` sit inside it (an icon, a unit). */
-export function Input({ ref, size: _size, ...rest }: Omit<ComponentProps<"input">, "prefix"> & { prefix?: ReactNode; suffix?: ReactNode; onPressEnter?: () => void; status?: "error" | "warning" | "" }) {
-  // Dates and times: the CRM's one picker (the date first, then the time), not the browser's.
+export function Input({
+  ref,
+  size: _size,
+  prefix,
+  suffix,
+  onPressEnter,
+  status: _status,
+  onKeyDown,
+  className,
+  ...rest
+}: Omit<ComponentProps<"input">, "prefix"> & { prefix?: ReactNode; suffix?: ReactNode; onPressEnter?: () => void; status?: "error" | "warning" | "" }) {
+  // Dates and times: the one picker (the date first, then the time), not the browser's.
   if (rest.type === "date" || rest.type === "datetime-local" || rest.type === "time") {
-    const { type, onChange, prefix: _prefix, suffix: _suffix, ...field } = rest;
+    const { type, onChange, ...field } = rest;
     return <DateInput {...field} type={type as "date" | "datetime-local" | "time"} onChange={onChange as unknown as (e: FieldChange) => void} />;
   }
+  const keyDown = withEnter(onPressEnter, onKeyDown);
+  if (prefix == null && suffix == null) return <ShadInput suppressHydrationWarning ref={ref} onKeyDown={keyDown} className={className} {...rest} />;
   return (
-    <AntInput suppressHydrationWarning
-      ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
-      status={rest["aria-invalid"] ? "error" : undefined}
-      {...(rest as ComponentProps<typeof AntInput>)}
-    />
+    <InputGroup className={className}>
+      {prefix != null && <InputGroupAddon>{prefix}</InputGroupAddon>}
+      <InputGroupInput suppressHydrationWarning ref={ref} onKeyDown={keyDown} {...rest} />
+      {suffix != null && <InputGroupAddon align="inline-end">{suffix}</InputGroupAddon>}
+    </InputGroup>
   );
 }
 
 /** A password: hidden as typed, with the eye to show it. */
-export function PasswordInput({ ref, size: _size, ...rest }: ComponentProps<"input"> & { status?: "error" | "warning" | "" | string }) {
+export function PasswordInput({ ref, size: _size, status: _status, className, ...rest }: ComponentProps<"input"> & { status?: "error" | "warning" | "" | string }) {
+  const [shown, setShown] = useState(false);
   return (
-    <AntInput.Password suppressHydrationWarning
-      ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
-      status={rest["aria-invalid"] ? "error" : undefined}
-      {...(rest as ComponentProps<typeof AntInput.Password>)}
-    />
+    <InputGroup className={className}>
+      <InputGroupInput suppressHydrationWarning ref={ref} {...rest} type={shown ? "text" : "password"} />
+      <InputGroupAddon align="inline-end">
+        <InputGroupButton size="icon-xs" aria-label={shown ? "Hide password" : "Show password"} title={shown ? "Hide password" : "Show password"} onClick={() => setShown((v) => !v)}>
+          {shown ? <EyeOff /> : <Eye />}
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }
 
-/** A search box: the magnifier, and `onSearch` on Enter or its button. */
-export function SearchInput(props: ComponentProps<typeof AntInput.Search>) {
-  return <AntInput.Search suppressHydrationWarning allowClear {...props} />;
+type SearchProps = Omit<ComponentProps<"input">, "size"> & {
+  allowClear?: boolean;
+  loading?: boolean;
+  /** Called with the text on Enter, and with "" when cleared. */
+  onSearch?: (value: string) => void;
+};
+
+/** A search box: the magnifier, a clear button once something is typed, and `onSearch` on Enter. */
+export function SearchInput({ allowClear, loading, onSearch, value, defaultValue, onChange, onKeyDown, className, ...rest }: SearchProps) {
+  const [own, setOwn] = useState(String(defaultValue ?? ""));
+  const text = value !== undefined ? String(value) : own;
+  return (
+    <InputGroup className={className}>
+      <InputGroupAddon>{loading ? <Loader2 className="animate-spin" /> : <Search />}</InputGroupAddon>
+      <InputGroupInput
+        suppressHydrationWarning
+        type="search"
+        value={text}
+        onChange={(e) => {
+          if (value === undefined) setOwn(e.target.value);
+          onChange?.(e);
+        }}
+        onKeyDown={(e) => {
+          onKeyDown?.(e);
+          if (e.key === "Enter" && !e.defaultPrevented) onSearch?.(text);
+        }}
+        {...rest}
+      />
+      {allowClear && text && (
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-xs"
+            aria-label="Clear"
+            title="Clear"
+            onClick={() => {
+              if (value === undefined) setOwn("");
+              onChange?.({ target: { value: "" }, currentTarget: { value: "" } } as unknown as React.ChangeEvent<HTMLInputElement>);
+              onSearch?.("");
+            }}
+          >
+            <X />
+          </InputGroupButton>
+        </InputGroupAddon>
+      )}
+    </InputGroup>
+  );
 }
 
 /** A file picker drawn like the other fields: the native button, quietened, on the same underline. */
@@ -126,24 +193,11 @@ export function FileInput({ className = "", ...rest }: Omit<ComponentProps<"inpu
  * be typed. Always give it an aria-label naming its row and column.
  */
 export function CellInput({ ref, size: _size, className = "", ...rest }: ComponentProps<"input">) {
-  return (
-    <AntInput suppressHydrationWarning
-      ref={(r: InputRef | null) => toElement(ref, r?.input ?? null)}
-      status={rest["aria-invalid"] ? "error" : undefined}
-      className={`text-right tabular-nums ${className}`}
-      {...(rest as ComponentProps<typeof AntInput>)}
-    />
-  );
+  return <ShadInput suppressHydrationWarning ref={ref} className={cn("text-right tabular-nums", className)} {...rest} />;
 }
 
 export function Textarea({ ref, ...rest }: ComponentProps<"textarea">) {
-  return (
-    <AntInput.TextArea suppressHydrationWarning
-      ref={(r: { resizableTextArea?: { textArea: HTMLTextAreaElement } } | null) => toElement(ref, r?.resizableTextArea?.textArea ?? null)}
-      status={rest["aria-invalid"] ? "error" : undefined}
-      {...(rest as ComponentProps<typeof AntInput.TextArea>)}
-    />
-  );
+  return <ShadTextarea suppressHydrationWarning ref={ref} {...rest} />;
 }
 
 /** Every dropdown is the CRM's combobox (src/platform/ui/pickers.tsx): typed into to find an option. */
@@ -166,21 +220,24 @@ export function Choice<T extends string>({
   return (
     <fieldset className="min-w-0">
       <legend className="mb-1.5 text-sm text-ink">{legend}</legend>
-      <Radio.Group name={name} value={value} onChange={(e) => onChange(e.target.value as T)} optionType="button" buttonStyle="solid">
+      <ToggleGroup type="single" variant="outline" spacing={0} value={value} onValueChange={(v) => v && onChange(v as T)} aria-label={legend}>
         {options.map((o) => (
-          <Radio.Button key={o.value} value={o.value}>
-            <span className="inline-flex items-center gap-1.5">
-              {o.icon}
-              {o.label}
-            </span>
-          </Radio.Button>
+          <ToggleGroupItem key={o.value} value={o.value} name={name} className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+            {o.icon}
+            {o.label}
+          </ToggleGroupItem>
         ))}
-      </Radio.Group>
+      </ToggleGroup>
     </fieldset>
   );
 }
 
 export function FormError({ message }: { message?: string | null }) {
   if (!message) return null;
-  return <Alert role="alert" type="error" showIcon title={message} />;
+  return (
+    <Alert variant="destructive">
+      <CircleAlert />
+      <AlertTitle>{message}</AlertTitle>
+    </Alert>
+  );
 }
