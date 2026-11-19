@@ -82,7 +82,7 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
                 key={t.key}
                 href={t.key ? `/finance/vouchers?show=${t.key}` : "/finance/vouchers"}
                 aria-current={show === t.key ? "page" : undefined}
-                className={`rounded-[3px] border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
+                className={`rounded-lg border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
               >
                 {t.label}
                 {n ? <span className={t.key === "returned" ? "font-semibold text-due-today" : "text-ink-3"}> {n}</span> : null}
@@ -93,7 +93,7 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
         <form className="flex gap-2">
           {query.has("queue") && <input suppressHydrationWarning type="hidden" name="queue" value={query.get("queue")!} />}
           {show && <input suppressHydrationWarning type="hidden" name="show" value={show} />}
-          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Number, supplier, Oojeema PV, check" aria-label="Find a voucher" className="h-8 w-72 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Number, supplier, Oojeema PV, check" aria-label="Find a voucher" className="h-8 w-72 rounded-lg border border-rule-strong bg-sheet px-2 text-sm" />
         </form>
       </div>
       <Sheet>
@@ -222,7 +222,7 @@ export async function VoucherPage({ params, searchParams }: { params: Promise<{ 
       </PageHeader>
 
       {v.status === "returned" && lastReturn && (
-        <p className="mb-4 rounded-[3px] bg-due-today/10 px-4 py-2 text-sm">
+        <p className="mb-4 rounded-lg bg-due-today/10 px-4 py-2 text-sm">
           <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
         </p>
       )}
@@ -374,7 +374,7 @@ export async function PrintVoucherPage({ params }: { params: Promise<{ id: strin
       </div>
       <Sheet className="relative px-8 py-7 print:border-0 print:shadow-none">
         {v.status !== "released" && (
-          <p className="mb-4 rounded-[3px] bg-danger-tint px-3 py-2 text-sm font-semibold text-danger">
+          <p className="mb-4 rounded-lg bg-danger-tint px-3 py-2 text-sm font-semibold text-danger">
             {v.status === "void" || v.status === "cancelled" ? `${VOUCHER_STATUS_LABELS[v.status]}: not a payment.` : `${VOUCHER_STATUS_LABELS[v.status]}: not paid yet.`}
           </p>
         )}

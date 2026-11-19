@@ -106,7 +106,7 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
                       aria-label={`Line ${n + 1}: VAT category`}
                       value={r.category}
                       onChange={(e) => setRow(n, { category: e.target.value })}
-                      className="h-8 rounded-[3px] border border-rule-strong bg-sheet px-1.5 text-meta"
+                      className="h-8 rounded-lg border border-rule-strong bg-sheet px-1.5 text-meta"
                     >
                       {setup.pack.categories.map((c) => (
                         <option key={c.key} value={c.key}>
@@ -170,13 +170,13 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
 function InvoiceSummary({ result, fmt }: { result: ComputedSale | null; fmt: ReturnType<typeof makeFormat> }) {
   if (!result) {
     return (
-      <div className="grid min-h-48 place-content-center rounded-[3px] border-2 border-dashed border-rule p-6 text-center text-meta text-ink-3">
+      <div className="grid min-h-48 place-content-center rounded-lg border-2 border-dashed border-rule p-6 text-center text-meta text-ink-3">
         The sales invoice summary appears here.
       </div>
     );
   }
   return (
-    <section aria-label="Sales Invoice summary" className="h-fit rounded-[3px] border border-ink bg-sheet p-5 text-sm">
+    <section aria-label="Sales Invoice summary" className="h-fit rounded-lg border border-ink bg-sheet p-5 text-sm">
       <header className="border-b-[3px] border-double border-ink pb-3 text-center">
         <p className="font-semibold">{result.seller.registeredName ?? "(registered name)"}</p>
         {result.seller.tradeName && <p className="text-meta">{result.seller.tradeName}</p>}

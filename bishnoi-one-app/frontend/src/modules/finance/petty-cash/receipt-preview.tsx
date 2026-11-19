@@ -13,14 +13,14 @@ export function ReceiptPreview({ voucherId, lineId, file }: { voucherId: string;
   return (
     <div className="space-y-1.5 print:hidden">
       {showsInline(file.contentType) ? (
-        <a href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-[3px] border border-rule bg-bench" title="Open the receipt full size">
+        <a href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-rule bg-bench" title="Open the receipt full size">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={url} alt={`Receipt: ${file.name}`} className="mx-auto max-h-80 w-auto object-contain" />
         </a>
       ) : file.contentType === "application/pdf" ? (
-        <iframe src={url} title={`Receipt: ${file.name}`} className="h-80 w-full rounded-[3px] border border-rule bg-bench" />
+        <iframe src={url} title={`Receipt: ${file.name}`} className="h-80 w-full rounded-lg border border-rule bg-bench" />
       ) : (
-        <p className="rounded-[3px] border border-rule bg-bench px-3 py-4 text-sm text-ink-2">This kind of photo can&apos;t be shown here. Open it to see the receipt.</p>
+        <p className="rounded-lg border border-rule bg-bench px-3 py-4 text-sm text-ink-2">This kind of photo can&apos;t be shown here. Open it to see the receipt.</p>
       )}
       <p className="flex items-center gap-1.5 text-meta text-ink-3">
         <FileText className="size-3.5 shrink-0" aria-hidden />

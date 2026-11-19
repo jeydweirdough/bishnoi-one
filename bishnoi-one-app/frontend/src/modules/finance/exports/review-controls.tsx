@@ -4,7 +4,7 @@ export function ReviewExports({ filters, options, dates = true }: {
   filters: string; options: readonly (readonly [string, string])[]; dates?: boolean;
 }) {
   const query = new URLSearchParams(filters);
-  const control = "h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm";
+  const control = "h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm";
   return <details className="mb-4 print:hidden">
     <summary className="cursor-pointer text-sm font-semibold text-hema">Export for review</summary>
     <form action="/finance/exports/review" className="mt-3 flex flex-wrap items-end gap-3">

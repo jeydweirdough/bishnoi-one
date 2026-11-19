@@ -79,7 +79,7 @@ export function Bell({ unread }: { unread: number }) {
         aria-expanded={open}
         aria-label={count ? `Notifications: ${count} unread` : "Notifications"}
         title="Notifications"
-        className={`relative flex size-10 items-center justify-center rounded-[3px] text-ink-2 transition-colors hover:bg-sheet hover:text-ink ${open ? "bg-hema-tint" : ""}`}
+        className={`relative flex size-10 items-center justify-center rounded-lg text-ink-2 transition-colors hover:bg-sheet hover:text-ink ${open ? "bg-hema-tint" : ""}`}
       >
         <BellIcon className="size-5" aria-hidden />
         {count > 0 && (
@@ -89,7 +89,7 @@ export function Bell({ unread }: { unread: number }) {
         )}
       </button>
       {open && (
-        <div role="dialog" aria-label="Notifications" className="absolute top-full right-0 z-40 mt-1 w-[min(24rem,calc(100vw-2rem))] rounded-[3px] border border-rule bg-sheet shadow-overlay">
+        <div role="dialog" aria-label="Notifications" className="absolute top-full right-0 z-40 mt-1 w-[min(24rem,calc(100vw-2rem))] rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 shadow-overlay">
           <div className="flex items-center justify-between border-b border-rule px-4 py-2.5">
             <p className="text-sm font-semibold text-ink">Notifications</p>
             {count > 0 && (

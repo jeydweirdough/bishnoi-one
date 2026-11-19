@@ -185,7 +185,7 @@ function CheckRow({ request, expense: e, categories, org }: { request: FundReque
           value={e.category?.id ?? ""}
           disabled={pending}
           onChange={(ev) => run(() => checkReceipt(request.id, e.id, { categoryId: ev.target.value }), "Expense reclassified")}
-          className="h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-meta"
+          className="h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-meta"
         >
           {!e.category && <option value="">Unclassified</option>}
           <CategoryOptions categories={categories} />

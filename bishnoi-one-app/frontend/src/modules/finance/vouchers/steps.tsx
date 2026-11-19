@@ -59,7 +59,7 @@ export function VoucherSteps({ voucher: v, today }: { voucher: Voucher; today: s
     return (
       <form
         noValidate
-        className="w-full space-y-3 rounded-[3px] border border-rule bg-sheet p-4"
+        className="w-full space-y-3 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-4"
         onSubmit={(e) => {
           e.preventDefault();
           run(
@@ -115,7 +115,7 @@ export function VoucherSteps({ voucher: v, today }: { voucher: Voucher; today: s
   if (asking) {
     const a = ASK[asking];
     return (
-      <div className="w-full space-y-3 rounded-[3px] border border-danger/40 bg-danger-tint/40 p-4">
+      <div className="w-full space-y-3 rounded-lg border border-danger/40 bg-danger-tint/40 p-4">
         <p className="text-sm">{a.title(v)}</p>
         <Field label={a.field} error={fields.reason ?? (error ?? undefined)}>
           {(p) => <Input {...p} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder={a.placeholder} autoFocus />}

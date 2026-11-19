@@ -116,7 +116,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                 key={t.key}
                 href={t.key ? `/finance/bills?show=${t.key}` : "/finance/bills"}
                 aria-current={show === t.key ? "page" : undefined}
-                className={`rounded-[3px] border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
+                className={`rounded-lg border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
               >
                 {t.label}
                 {n ? <span className={t.key === "missing" || t.key === "returned" ? "font-semibold text-due-today" : "text-ink-3"}> {n}</span> : null}
@@ -127,7 +127,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
         <form className="flex gap-2">
           {["queue", "supplierId", "bucket"].map((key) => query.has(key) ? <input suppressHydrationWarning key={key} type="hidden" name={key} value={query.get(key)!} /> : null)}
           {show && <input suppressHydrationWarning type="hidden" name="show" value={show} />}
-          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Supplier, invoice, PO or reference" aria-label="Find a bill" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Supplier, invoice, PO or reference" aria-label="Find a bill" className="h-8 w-64 rounded-lg border border-rule-strong bg-sheet px-2 text-sm" />
         </form>
       </div>
       <Sheet>
@@ -307,7 +307,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
       )}
 
       {b.state === "returned" && lastReturn && (
-        <p className="mb-4 rounded-[3px] bg-due-today/10 px-4 py-2 text-sm">
+        <p className="mb-4 rounded-lg bg-due-today/10 px-4 py-2 text-sm">
           <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
         </p>
       )}
@@ -475,7 +475,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">{list.canAdd && <SupplierImport />}</div>
         <form>
-          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Name, company or TIN" aria-label="Find a supplier" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Name, company or TIN" aria-label="Find a supplier" className="h-8 w-64 rounded-lg border border-rule-strong bg-sheet px-2 text-sm" />
         </form>
       </div>
       <Sheet>

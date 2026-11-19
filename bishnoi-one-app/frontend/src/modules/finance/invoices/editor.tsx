@@ -151,9 +151,11 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
     });
   }
 
+  // Studio Admin's Invoice (2026-11-19): the form on the left, the paper as it will read on the right.
   return (
-    <form onSubmit={submit} noValidate className="space-y-5">
-      <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+    <div className="grid items-start gap-5 2xl:grid-cols-2">
+    <form onSubmit={submit} noValidate className="min-w-0 space-y-5">
+      <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <p className="text-sm font-semibold">Bill to</p>
         {crmLinked && (
           <div>
@@ -186,7 +188,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
               )
             )}
             {found && (
-              <ul className="mt-2 divide-y divide-rule rounded-[3px] border border-rule">
+              <ul className="mt-2 divide-y divide-rule rounded-lg border border-rule">
                 {found.length === 0 && <li className="px-3 py-2 text-meta text-ink-3">No customer matches. Type their details below.</li>}
                 {found.map((c) => (
                   <li key={c.id}>
@@ -246,7 +248,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
         </FormGrid>
       </section>
 
-      <section className="space-y-3 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-3 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <p className="text-sm font-semibold">
           Items <span className="font-normal text-ink-3">· prices {choices.pricesIncludeTax ? "include" : "exclude"} VAT (Tax, Registration)</span>
         </p>
@@ -266,7 +268,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
               {lines.map((l, i) => (
                 <tr key={l.key} className="align-top">
                   <td className="py-1.5 pr-2">
-                    <CellInput aria-label={`Line ${i + 1}: description`} value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} maxLength={200} placeholder="Amoxicillin 500 mg, box of 100" />
+                    <CellInput aria-label={`Line ${i + 1}: description`} className="text-left" value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} maxLength={200} placeholder="Amoxicillin 500 mg, box of 100" />
                     {needsId && (
                       <label className="mt-1 flex items-center gap-1.5 text-meta text-ink-2">
                         <input suppressHydrationWarning type="checkbox" checked={l.relief} onChange={(e) => set(l.key, { relief: e.target.checked })} />
@@ -299,22 +301,17 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
                     <CellInput aria-label={`Line ${i + 1}: discount`} inputMode="decimal" className="text-right" value={l.discount} onChange={(e) => set(l.key, { discount: e.target.value })} placeholder="0.00" />
                   </td>
                   <td className="px-2 py-1.5">
-                    <select suppressHydrationWarning
-                      aria-label={`Line ${i + 1}: VAT category`}
-                      value={l.category}
-                      onChange={(e) => set(l.key, { category: e.target.value })}
-                      className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
-                    >
+                    <Select aria-label={`Line ${i + 1}: VAT category`} value={l.category} onChange={(e) => set(l.key, { category: e.target.value })}>
                       {choices.categories.map((c) => (
                         <option key={c.key} value={c.key}>
                           {c.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td className="py-1.5 pl-1">
                     {lines.length > 1 && (
-                      <button suppressHydrationWarning type="button" aria-label={`Remove line ${i + 1}`} onClick={() => setLines(lines.filter((x) => x.key !== l.key))} className="inline-flex size-8 items-center justify-center rounded-[3px] text-ink-3 hover:bg-danger/10 hover:text-danger">
+                      <button suppressHydrationWarning type="button" aria-label={`Remove line ${i + 1}`} onClick={() => setLines(lines.filter((x) => x.key !== l.key))} className="inline-flex size-8 items-center justify-center rounded-lg text-ink-3 hover:bg-danger/10 hover:text-danger">
                         <Trash2 className="size-4" aria-hidden />
                       </button>
                     )}
@@ -329,7 +326,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
         </Button>
       </section>
 
-      <section className="grid gap-4 rounded-[3px] border border-rule bg-sheet p-5 sm:grid-cols-3">
+      <section className="grid gap-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5 sm:grid-cols-3">
         <Field label="Invoice date" error={fields.invoiceDate}>
           {(p) => <Input {...p} type="date" max={today} value={date} onChange={(e) => setDate(e.target.value)} />}
         </Field>
@@ -354,5 +351,76 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
         </Button>
       </div>
     </form>
+    <InvoicePaper org={org} customer={customer} lines={lines} date={date} terms={terms} reference={reference} notes={notes} fmt={fmt} />
+    </div>
+  );
+}
+
+/** The invoice as it will read, kept in step with the form (amounts before VAT is worked out on saving). */
+function InvoicePaper({ org, customer, lines, date, terms, reference, notes, fmt }: {
+  org: Org;
+  customer: { name: string; tin: string; address: string };
+  lines: Line[];
+  date: string;
+  terms: string;
+  reference: string;
+  notes: string;
+  fmt: ReturnType<typeof makeFormat>;
+}) {
+  const rows = lines.map((l) => {
+    const qty = Number(l.quantity) || 0;
+    const price = fmt.toCentavos(l.price) ?? 0;
+    const discount = fmt.toCentavos(l.discount) ?? 0;
+    return { key: l.key, description: l.description, qty, price, amount: Math.max(0, Math.round(qty * price) - discount) };
+  });
+  const total = rows.reduce((n, r) => n + r.amount, 0);
+  return (
+    <aside className="sticky top-16 hidden rounded-xl bg-card p-8 text-sm ring-1 ring-foreground/10 2xl:block print:hidden" aria-label="Preview">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xl font-medium tracking-tight">Sales invoice</p>
+          <p className="text-muted-foreground">{org.brandName || org.name}</p>
+        </div>
+        <div className="text-right text-muted-foreground">
+          <p>{date ? fmt.dateLabel(date) : "No date"}</p>
+          <p>{terms ? `Due in ${terms} days` : ""}</p>
+          {reference && <p>Ref. {reference}</p>}
+        </div>
+      </div>
+      <div className="mt-8">
+        <p className="text-xs text-muted-foreground">Bill to</p>
+        <p className="font-medium">{customer.name || "Customer"}</p>
+        {customer.address && <p className="text-muted-foreground">{customer.address}</p>}
+        {customer.tin && <p className="text-muted-foreground">TIN {customer.tin}</p>}
+      </div>
+      <table className="mt-8 w-full">
+        <thead>
+          <tr className="border-b text-left text-xs text-muted-foreground">
+            <th className="py-2 font-normal">Description</th>
+            <th className="py-2 text-right font-normal">Qty</th>
+            <th className="py-2 text-right font-normal">Price</th>
+            <th className="py-2 text-right font-normal">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key} className="border-b">
+              <td className="py-2 pr-2">{r.description || <span className="text-muted-foreground">Item</span>}</td>
+              <td className="py-2 text-right tabular-nums">{r.qty}</td>
+              <td className="py-2 text-right tabular-nums">{fmt.peso(r.price)}</td>
+              <td className="py-2 text-right tabular-nums">{fmt.peso(r.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="mt-4 ml-auto w-64 space-y-1">
+        <div className="flex justify-between text-base font-medium">
+          <span>Total</span>
+          <span className="tabular-nums">{fmt.peso(total)}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">VAT is worked out when the draft is saved.</p>
+      </div>
+      {notes && <p className="mt-8 border-t pt-4 whitespace-pre-wrap text-muted-foreground">{notes}</p>}
+    </aside>
   );
 }

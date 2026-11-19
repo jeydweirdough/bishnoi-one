@@ -69,7 +69,7 @@ export function BatchActions({ id, lotNo, status }: { id: string; lotNo: string;
       <button suppressHydrationWarning type="button" className="font-semibold text-danger hover:underline" onClick={() => ask("recalled")}>
         Recall
       </button>
-      <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-[3px] bg-sheet p-0 text-left shadow-lg backdrop:bg-ink/30">
+      <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-lg bg-sheet p-0 text-left shadow-lg backdrop:bg-ink/30">
         <form
           method="dialog"
           className="space-y-4 p-5"

@@ -108,7 +108,7 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
 
   return (
     <div className="space-y-5">
-      <p className="rounded-[3px] border-l-4 border-hema bg-sheet px-4 py-3 text-sm text-ink-2 shadow-sheet">
+      <p className="rounded-lg border-l-4 border-hema bg-sheet px-4 py-3 text-sm text-ink-2 shadow-sheet">
         Copies one Sales Relief CSV into a DAT <b>exactly as it is</b>, with no corrections. For filing, use <b>Prepare monthly DAT</b>, which applies the confirmed rules and checks the result against the Income Statement.
       </p>
       <Sheet className="space-y-3 px-5 py-4">

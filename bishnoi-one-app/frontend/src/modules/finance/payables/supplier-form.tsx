@@ -211,7 +211,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
                 {contacts.map((c, i) => (
                   <tr key={i}>
                     <td className="py-1.5 pr-2">
-                      <select suppressHydrationWarning aria-label={`Contact ${i + 1}: salutation`} value={c.salutation ?? ""} onChange={(e) => setContact(i, { salutation: e.target.value || null })} className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+                      <select suppressHydrationWarning aria-label={`Contact ${i + 1}: salutation`} value={c.salutation ?? ""} onChange={(e) => setContact(i, { salutation: e.target.value || null })} className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm">
                         <option value="" />
                         {SALUTATIONS.map((s) => (
                           <option key={s} value={s}>

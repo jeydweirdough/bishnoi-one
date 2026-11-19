@@ -30,8 +30,8 @@ const BOOKS = [
   { value: "general-ledger", label: "General ledger" },
 ] as const;
 
-const inputClass = "ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm";
-const buttonClass = "h-8 rounded-[3px] border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control";
+const inputClass = "ml-2 h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm";
+const buttonClass = "h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control";
 
 /** Who files: the registration the forms carry, and what's missing from it. */
 function TaxpayerLine({ who }: { who: Taxpayer }) {
@@ -899,7 +899,7 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
                 <li key={s.id}>
                   <Link
                     href={`/finance/bir/withholding?${keep}&supplierId=${encodeURIComponent(s.id)}`}
-                    className={`block rounded-[3px] px-3 py-2 text-sm ${c?.payee.id === s.id ? "bg-hema-tint font-semibold text-hema" : "hover:bg-sheet"}`}
+                    className={`block rounded-lg px-3 py-2 text-sm ${c?.payee.id === s.id ? "bg-hema-tint font-semibold text-hema" : "hover:bg-sheet"}`}
                   >
                     {s.name}
                     <span className="block text-meta font-normal text-ink-3">{fmt.peso(s.taxCentavos)} withheld</span>

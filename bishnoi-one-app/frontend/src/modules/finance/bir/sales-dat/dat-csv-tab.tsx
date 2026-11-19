@@ -65,7 +65,7 @@ export function DatCsvTab() {
 
   return (
     <div className="space-y-5">
-      <p className="rounded-[3px] border-l-4 border-hema bg-sheet px-4 py-3 text-sm text-ink-2 shadow-sheet">
+      <p className="rounded-lg border-l-4 border-hema bg-sheet px-4 py-3 text-sm text-ink-2 shadow-sheet">
         Turns a sales DAT back into a CSV in the Sales Relief layout, for example to check a filed DAT in Excel.
       </p>
       <Sheet className="space-y-3 px-5 py-4">

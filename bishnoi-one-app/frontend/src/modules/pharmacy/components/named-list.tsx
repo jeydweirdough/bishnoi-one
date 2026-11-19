@@ -75,7 +75,7 @@ export function NamedList({ kind, rows, canCreate, canEdit, canDelete }: { kind:
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className={`font-semibold ${row.isActive ? "text-ink" : "text-ink-3"}`}>{row.name}</span>
                   {canEdit && (
-                    <button suppressHydrationWarning type="button" onClick={() => begin(row)} title={`Rename ${row.name}`} aria-label={`Rename ${row.name}`} className="rounded-[3px] p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
+                    <button suppressHydrationWarning type="button" onClick={() => begin(row)} title={`Rename ${row.name}`} aria-label={`Rename ${row.name}`} className="rounded-lg p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
                       <Pencil className="size-3.5" aria-hidden />
                     </button>
                   )}

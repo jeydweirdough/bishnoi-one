@@ -189,7 +189,7 @@ export function PrescriptionForm({
       <fieldset className="space-y-3">
         <legend className="mb-2 text-heading text-ink">Medicines, as written</legend>
         {rows.map((row, n) => (
-          <div key={n} className="grid gap-3 rounded-[3px] border border-rule p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_6rem_auto]">
+          <div key={n} className="grid gap-3 rounded-lg border border-rule p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_6rem_auto]">
             <Field label="Written as" error={fields[`items.${n}.writtenAs`]}>
               {(p) => <Input {...p} value={row.writtenAs} onChange={(e) => setRow(n, { writtenAs: e.target.value })} placeholder="Amoxicillin 500mg cap" />}
             </Field>

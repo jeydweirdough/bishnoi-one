@@ -108,7 +108,7 @@ export function VoucherEditor({ voucher, choices: first, preselect, org }: { vou
   const s = choices.supplier;
   return (
     <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-5">
-      <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <Field label="Supplier" error={fields.supplierId} hint={choices.suppliers.length || voucher ? undefined : "No supplier has recorded bills left to pay."}>
           {(p) => (
             <Select {...p} value={supplierId} disabled={!!voucher} onChange={(e) => pickSupplier(e.target.value)}>
@@ -209,7 +209,7 @@ export function VoucherEditor({ voucher, choices: first, preselect, org }: { vou
         )}
       </section>
 
-      <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <Choice
           name="method"
           legend="How it's paid"

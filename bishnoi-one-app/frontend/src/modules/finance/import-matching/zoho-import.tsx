@@ -72,7 +72,7 @@ export function ZohoImport({kind}:{kind:ImportKind}){
    <FormError message={error}/>
    {shown&&<div className="space-y-4 border-t border-rule pt-4">
     {done&&<p role="status" className="font-semibold">{done.counts.ready} {setup.noun} imported. {done.counts.held} held · {done.counts.skipped} skipped · {done.counts.imported} already imported.</p>}
-    {shown.notice&&<p className="rounded-[3px] bg-promo-tint px-4 py-2 text-sm text-ink">{shown.notice}</p>}
+    {shown.notice&&<p className="rounded-lg bg-promo-tint px-4 py-2 text-sm text-ink">{shown.notice}</p>}
     {shown.parts?shown.parts.map(p=><div key={p.label}><p className="mb-1 text-sm font-semibold">{p.label}</p><div className="overflow-hidden rounded-xl border border-rule"><FigureStrip figures={strip(p.counts)}/></div></div>)
      :<div className="overflow-hidden rounded-xl border border-rule"><FigureStrip figures={strip(shown.counts)}/></div>}
     {shown.figures&&<p className="text-sm text-ink-2">Would post: sales {money(shown.figures.amountCentavos)}, of which Output VAT {money(shown.figures.vatCentavos)}. Money received {money(shown.figures.cashCentavos)}, tax withheld {money(shown.figures.cwtCentavos)}.</p>}

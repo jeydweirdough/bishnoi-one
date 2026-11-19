@@ -70,7 +70,7 @@ export function ReceivedProof({ name, at, image }: { name: string; at: string; i
   return (
     <div className="flex flex-wrap items-end gap-4">
       {image && (
-        <div className={`rounded-[3px] border border-rule px-4 py-2 ${CHECKER}`}>
+        <div className={`rounded-lg border border-rule px-4 py-2 ${CHECKER}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={image} alt={`${name}'s signature`} className="h-12 max-w-64 object-contain" />
         </div>

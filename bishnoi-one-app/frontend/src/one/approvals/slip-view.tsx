@@ -21,7 +21,7 @@ export const SLIP_TONE: Record<SlipBrief["status"], string> = {
 
 export function SlipStamp({ slip }: { slip: Pick<SlipBrief, "status" | "statusLabel" | "waitingOn"> }) {
   return (
-    <span className={`inline-block rounded-[3px] border px-1.5 text-meta font-semibold ${SLIP_TONE[slip.status]}`}>
+    <span className={`inline-block rounded-lg border px-1.5 text-meta font-semibold ${SLIP_TONE[slip.status]}`}>
       {slip.status === "pending" && slip.waitingOn ? `Waiting on ${slip.waitingOn}` : slip.statusLabel}
     </span>
   );
@@ -70,7 +70,7 @@ export function SlipSteps({ slip }: { slip: Slip }) {
               ) : (
                 <p className="text-meta text-ink-3">{s.current ? "Waiting" : s.status === "skipped" ? "Not needed" : "Next"}</p>
               )}
-              {s.note && <p className="mt-1 rounded-[3px] bg-bench px-2 py-1 text-sm text-ink-2">{s.note}</p>}
+              {s.note && <p className="mt-1 rounded-lg bg-bench px-2 py-1 text-sm text-ink-2">{s.note}</p>}
               {s.signature && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={s.signature} alt={`Signature of ${s.actedBy ?? "the signer"}`} className="mt-1 h-10 max-w-[12rem] object-contain" />

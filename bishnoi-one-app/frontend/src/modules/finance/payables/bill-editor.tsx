@@ -151,7 +151,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
 
   return (
     <form onSubmit={submit} noValidate className="space-y-5">
-      <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
           <Field
             label="Supplier"
@@ -216,7 +216,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
         </div>
       </section>
 
-      <section className="space-y-3 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-3 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <Choice
           name="includeVat"
           legend="The amounts below"
@@ -249,7 +249,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
                       aria-invalid={fields[`lines.${i}.accountId`] ? true : undefined}
                       value={l.accountId}
                       onChange={(e) => setLine(l.key, { accountId: e.target.value })}
-                      className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm aria-[invalid=true]:border-danger"
+                      className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm aria-[invalid=true]:border-danger"
                     >
                       <option value="">Pick an account…</option>
                       {(["expense", "asset"] as const).map((t) =>
@@ -270,12 +270,12 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
                     <CellInput aria-label={`Line ${i + 1}: description`} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value })} maxLength={200} className="w-full !text-left" />
                   </td>
                   <td className="px-2 py-1.5">
-                    <select suppressHydrationWarning aria-label={`Line ${i + 1}: purchase type`} value={l.purchaseType} onChange={(e) => setLine(l.key, { purchaseType: e.target.value as PurchaseType })} className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+                    <select suppressHydrationWarning aria-label={`Line ${i + 1}: purchase type`} value={l.purchaseType} onChange={(e) => setLine(l.key, { purchaseType: e.target.value as PurchaseType })} className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm">
                       {choices.purchaseTypes.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
                     </select>
                   </td>
                   <td className="px-2 py-1.5">
-                    <select suppressHydrationWarning aria-label={`Line ${i + 1}: VAT`} value={l.vat} onChange={(e) => setLine(l.key, { vat: e.target.value as VatKind })} className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+                    <select suppressHydrationWarning aria-label={`Line ${i + 1}: VAT`} value={l.vat} onChange={(e) => setLine(l.key, { vat: e.target.value as VatKind })} className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm">
                       <option value="">Choose VAT</option>
                       {choices.vatKinds.map((k) => (
                         <option key={k.key} value={k.key}>
@@ -289,7 +289,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
                       aria-label={`Line ${i + 1}: tax withheld`}
                       value={l.withholding}
                       onChange={(e) => setLine(l.key, { withholding: e.target.value })}
-                      className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
+                      className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm"
                     >
                       <option value="unconfirmed">Choose withholding</option><option value="">None</option>
                       {choices.withholding.map((w) => (
@@ -344,7 +344,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
         </div>
       </section>
 
-      <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Zoho reference" optional error={fields.zohoRef} hint="The same bill's number in Zoho, while both are used.">
             {(p) => <Input {...p} value={v.zohoRef} onChange={(e) => set({ zohoRef: e.target.value })} maxLength={60} />}

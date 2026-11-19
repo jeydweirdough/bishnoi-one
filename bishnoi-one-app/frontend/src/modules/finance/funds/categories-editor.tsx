@@ -138,7 +138,7 @@ function CategoryForm({
   }
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-4 rounded-[3px] border border-rule bg-sheet p-4">
+    <form onSubmit={submit} noValidate className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-4">
       <FormGrid>
         <Field label={sub ? "Sub-category name" : "Category name"} size="md" error={fields.name}>
           {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder={sub ? "Dining" : "Food"} autoFocus />}

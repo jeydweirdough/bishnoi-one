@@ -274,7 +274,7 @@ export async function PurchaseOrderPage({ params }: { params: Params<{ id: strin
       </PageHeader>
       {(po.reason || po.salesOrder || po.replenishment) && (
         // Why the system made it (2026-11-18): read-only; the buyer's own notes are below.
-        <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
+        <p className="mb-4 rounded-lg bg-hema-tint px-4 py-2 text-sm text-ink">
           {po.reason ?? (po.replenishment ? "Made by replenishment from use and lead time." : null)}
           {po.salesOrder && (
             <>
@@ -446,7 +446,7 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
       <DocumentHeaderStrip header={r.header} source={r.order && <Link href={`/inventory/purchase-orders/${r.order.id}`} className="hover:underline">{r.order.number}</Link>} />
       {/* Receive → check → store (step 14a): waiting on hold until its quality check. */}
       {r.qualityCheck && (
-        <p className={`mb-4 rounded-[3px] px-4 py-2 text-sm text-ink ${r.qualityCheck.status === "waiting" ? "bg-promo-tint" : "bg-hema-tint"}`}>
+        <p className={`mb-4 rounded-lg px-4 py-2 text-sm text-ink ${r.qualityCheck.status === "waiting" ? "bg-promo-tint" : "bg-hema-tint"}`}>
           {r.qualityCheck.status === "waiting" ? "On hold until its quality check: " : "Checked on arrival: "}
           <Link href={`/inventory/quality-checks/${r.qualityCheck.id}`} className="font-semibold text-hema hover:underline">{r.qualityCheck.number}</Link>
         </p>

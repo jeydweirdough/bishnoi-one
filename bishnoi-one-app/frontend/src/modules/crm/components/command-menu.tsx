@@ -86,7 +86,7 @@ function Marked({ text, q }: { text: string; q: string }) {
   return (
     <>
       {text.slice(0, at)}
-      <mark className="rounded-[3px] bg-[#f6e7a8] px-px text-inherit">{text.slice(at, at + q.length)}</mark>
+      <mark className="rounded-lg bg-[#f6e7a8] px-px text-inherit">{text.slice(at, at + q.length)}</mark>
       {text.slice(at + q.length)}
     </>
   );

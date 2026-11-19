@@ -131,7 +131,7 @@ export function CheckForm({ rx, medicines, canCheck }: { rx: Prescription; medic
             </button>
           )}
         </legend>
-        <ul className="divide-y divide-rule rounded-[3px] border border-rule">
+        <ul className="divide-y divide-rule rounded-lg border border-rule">
           {rx.checks.map((c) => (
             <li key={c.key} className="px-3 py-2.5">
               <label className={`flex items-start gap-3 text-sm ${locked || standing ? "" : "cursor-pointer"}`}>

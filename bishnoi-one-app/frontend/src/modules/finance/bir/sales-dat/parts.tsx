@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 /** A section folded away until opened, with a short note beside its title. */
 export function Fold({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
-    <details className="rounded-[3px] bg-sheet shadow-sheet">
+    <details className="rounded-lg bg-sheet shadow-sheet">
       <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
         {title}
         {note && <span className="font-normal text-ink-3"> · {note}</span>}

@@ -78,7 +78,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
           <Field label="TIN" optional error={fields.tin} hint="123-456-789-00000, as on its invoices.">{(p) => <Input {...p} {...text("tin")} placeholder="123-456-789-00000" />}</Field>
           <Field label="VAT" error={fields.vatStatus}>
             {(p) => (
-              <select suppressHydrationWarning {...p} value={d.vatStatus} onChange={(e) => setD({ ...d, vatStatus: e.target.value as "vat" | "non_vat" })} className="h-9 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+              <select suppressHydrationWarning {...p} value={d.vatStatus} onChange={(e) => setD({ ...d, vatStatus: e.target.value as "vat" | "non_vat" })} className="h-9 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm">
                 <option value="vat">VAT-registered</option>
                 <option value="non_vat">Not VAT-registered</option>
               </select>

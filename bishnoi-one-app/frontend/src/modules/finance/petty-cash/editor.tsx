@@ -150,7 +150,7 @@ export function PettyCashEditor({ voucher, choices, org, today }: { voucher: Pet
 
   return (
     <form onSubmit={submit} noValidate className="space-y-5">
-      <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <p className="text-sm text-ink-2">
           <span className="font-semibold text-ink">Step 1 of 3 · The voucher.</span> Copy what&apos;s on the paper petty cash voucher.
         </p>
@@ -206,7 +206,7 @@ export function PettyCashEditor({ voucher, choices, org, today }: { voucher: Pet
         </datalist>
       </section>
 
-      <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <p className="text-sm text-ink-2">
           <span className="font-semibold text-ink">Step 2 of 3 · The receipts.</span> One line for each official receipt. Every line needs its receipt number;
           without an official receipt it can&apos;t be entered.
@@ -226,7 +226,7 @@ export function PettyCashEditor({ voucher, choices, org, today }: { voucher: Pet
             const err = (name: string) => fields[`lines.${i}.${name}`];
             const file = savedFile(l.id);
             return (
-              <li key={l.key} className="rounded-[3px] border border-rule p-4">
+              <li key={l.key} className="rounded-lg border border-rule p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold">Receipt {i + 1}</p>
                   {lines.length > 1 && (
@@ -307,7 +307,7 @@ export function PettyCashEditor({ voucher, choices, org, today }: { voucher: Pet
                       )}
                     </Field>
                   </FormGrid>
-                  <div className="rounded-[3px] bg-bench/60 p-3">
+                  <div className="rounded-lg bg-bench/60 p-3">
                     <p className="mb-2 text-meta font-semibold text-ink-2">Step 3 · Its receipt</p>
                     {voucher && l.id && editable ? (
                       <ReceiptSlot voucherId={voucher.id} lineId={l.id} position={i + 1} file={file} />
@@ -350,7 +350,7 @@ export function PettyCashEditor({ voucher, choices, org, today }: { voucher: Pet
         </div>
       </section>
 
-      <section className="rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <Field label="Notes" optional error={fields.notes}>
           {(p) => <Textarea {...p} value={v.notes} onChange={(e) => set({ notes: e.target.value })} maxLength={500} />}
         </Field>

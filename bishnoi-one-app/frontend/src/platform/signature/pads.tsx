@@ -51,7 +51,7 @@ export function DrawPad({ onChange }: { onChange: (c: Cleaned | null) => void })
         width={900}
         height={300}
         aria-label="Signing pad: sign here"
-        className="h-48 w-full touch-none rounded-[3px] border border-rule-strong bg-white"
+        className="h-48 w-full touch-none rounded-lg border border-rule-strong bg-white"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           drawing.current = at(e);
@@ -117,7 +117,7 @@ export function UploadPicker({ onChange }: { onChange: (c: Cleaned | null) => vo
       {problem && <p className="text-meta text-danger">{problem}</p>}
       {result && (
         <>
-          <div className={`flex min-h-28 items-center justify-center rounded-[3px] border border-rule p-3 ${CHECKER}`}>
+          <div className={`flex min-h-28 items-center justify-center rounded-lg border border-rule p-3 ${CHECKER}`}>
             {result.empty ? (
               <p className="text-meta text-danger">No signature found. Try &quot;Keep more&quot;, or a clearer photo.</p>
             ) : (

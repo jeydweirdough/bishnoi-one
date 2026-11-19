@@ -102,7 +102,7 @@ export async function ImportedExpensePage({ params }: { params: Promise<{ id: st
         <StatusPill tone={x.status === "void" ? "bad" : "good"}>{x.status === "void" ? "Void" : "Posted"}</StatusPill>
         {x.status === "void" && <span className="ml-2 text-meta text-danger">Voided by {x.voidedBy}: {x.voidReason}</span>}
       </PageHeader>
-      <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
+      <p className="mb-4 rounded-lg bg-hema-tint px-4 py-2 text-sm text-ink">
         Imported from {x.source.file}, Zoho ID {x.source.zohoId}, by {x.source.by} on {fmt.dateLabel(x.source.at.slice(0, 10))}. No approval took place in Finance, and the export has no receipt file.{" "}
         {x.entryId && <Link href={`/finance/ledger/voucher/${x.entryId}`} className="font-semibold text-hema hover:underline">Open its journal entry</Link>}
       </p>
