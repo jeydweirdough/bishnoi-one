@@ -34,7 +34,6 @@ export async function ShellLayout({ children, waiting, unset, bell, footer }: Pr
   return (
     <>
       <AppShell nav={<Nav me={me} mine={mine} waiting={waiting} unset={unset} rail={rail} actions={actions} footer={footer} />} actions={actions}>
-            <div role="status" className="mb-4 rounded-lg border border-rule bg-surface px-4 py-3 text-sm print:hidden"><strong>{me.dataEnvironment === "official" ? "Official Finance · Neon" : "Local test Finance · SQLite"}</strong><span className="ml-2 text-ink-2">{me.dataEnvironment === "official" ? "Records entered here are real company records. Use the separate local site for testing." : "Test entries stay in the local database. Zoho sending is disabled."}</span></div>
             <div className="finance-shell-notices"><Notices timeZone={me.org?.timezone} /></div>
             <FinancePrintFrame org={me.org} company={account.company}>{children}</FinancePrintFrame>
           </AppShell>
