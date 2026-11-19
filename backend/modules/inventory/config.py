@@ -22,6 +22,7 @@ def on_a_server() -> bool:
 
 
 class Settings(BaseSettings):
+    purchase_handoff_enabled: bool = False
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     @classmethod

@@ -17,6 +17,7 @@ ACTION_LABELS = {
     "approve": "Approve",
     "manage": "Manage",
     "receive": "Receive",
+    "send_to_finance": "Send received purchases to Finance",
     "issue": "Issue",
     "dispatch": "Dispatch",
     "export": "Export",
@@ -47,7 +48,7 @@ AREAS: tuple[Area, ...] = (
     Area("counts", "Inventory counts", "Inventory", ("view", "create", "approve")),
     Area("suppliers", "Suppliers & supplier prices", "Purchasing", CRUD),
     Area("purchasing", "Purchase orders", "Purchasing", ("view", "create", "edit", "approve")),
-    Area("receiving", "Receiving", "Purchasing", ("view", "receive")),
+    Area("receiving", "Receiving", "Purchasing", ("view", "receive", "send_to_finance")),
     # The Sales app's sales orders (step 11): approve confirms one and makes its delivery.
     Area("sales", "Sales orders", "Sales", ("view", "create", "edit", "approve")),
     Area("orders", "Deliveries, reservations & issuance", "Orders", ("view", "create", "edit", "approve", "issue")),

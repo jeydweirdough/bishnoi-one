@@ -24,6 +24,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import Field
 from sqlalchemy import func, or_, select
 
+from modules.finance import company_scope
 from modules.finance.access import access_of, permitted
 from modules.finance.audit import audit
 from modules.finance.deps import DB, CurrentUser, SettingsDep
@@ -90,8 +91,8 @@ def paying_accounts(db: DB) -> list[Account]:
     defaults = {x for x in (s.cash_account_id, s.bank_account_id, s.ewallet_account_id, s.check_account_id) if x}
     ids = money_account_ids(db)
     if not ids - defaults:
-        return list(db.scalars(select(Account).where(Account.type == "asset", Account.is_active).order_by(Account.code)))
-    return list(db.scalars(select(Account).where(Account.id.in_(ids), Account.is_active).order_by(Account.code)))
+        return list(db.scalars(select(Account).where(Account.type == "asset", Account.is_active, company_scope.usable_clause("account", Account.id)).order_by(Account.code)))
+    return list(db.scalars(select(Account).where(Account.id.in_(ids), Account.is_active, company_scope.usable_clause("account", Account.id)).order_by(Account.code)))
 
 
 def bill_payables(db: DB, b: Bill) -> Account | None:
@@ -244,6 +245,8 @@ def voucher_choices(user: permitted("vouchers.view"), db: DB, settings: Settings
     held = set_aside(db, [b.id for b in open_bills], exclude_voucher=voucher)
     per_supplier: dict[str, int] = {}
     for b in open_bills:
+        if company_scope.scope_for(db, 'supplier', b.supplier_id) != '2mg':
+            continue
         left = b.payable_centavos - b.paid_centavos - held.get(b.id, 0)
         if left > 0:
             per_supplier[b.supplier_id] = per_supplier.get(b.supplier_id, 0) + left
@@ -310,6 +313,7 @@ def check_amounts(db: DB, v: PaymentVoucher, pairs: list[tuple[Bill, int]]) -> N
 
 
 def apply(db: DB, v: PaymentVoucher, body: VoucherIn) -> None:
+    company_scope.require_ids(db, 'supplier', [body.supplier_id], status_code=422)
     supplier = db.get(Supplier, body.supplier_id)
     if supplier is None:
         raise field_error("supplierId", "Pick a supplier.")
@@ -360,6 +364,9 @@ def change_voucher(user: permitted("vouchers.prepare"), db: DB, voucher_id: str,
 def submit(user: permitted("vouchers.prepare"), db: DB, voucher_id: str) -> dict:
     v = found(db, voucher_id)
     expect(v, "draft", "returned")
+    company_scope.require_ids(db, 'supplier', [v.supplier_id])
+    for ln in v.lines:
+        company_scope.require_bill(db, ln.bill)
     if not v.lines:
         raise HTTPException(status.HTTP_409_CONFLICT, "Add the bills it pays first.")
     if not v.paid_from_id:
@@ -422,6 +429,9 @@ def release(user: permitted("vouchers.release"), db: DB, settings: SettingsDep, 
     locked(db, PaymentVoucher, [v.id])
     locked(db, Bill, [ln.bill_id for ln in v.lines])
     expect(v, "to_release")
+    company_scope.require_ids(db, 'supplier', [v.supplier_id])
+    for ln in v.lines:
+        company_scope.require_bill(db, ln.bill)
     if body.paid_on > today(settings):
         raise field_error("paidOn", "The payment date can't be in the future.")
     if v.method == "check" and not (body.check_number or "").strip():

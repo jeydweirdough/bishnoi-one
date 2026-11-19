@@ -1,5 +1,6 @@
 "use client";
 
+import { buildAsIsDAT, type Header } from "./source-safety";
 import { useMemo, useState } from "react";
 import { Button } from "@/src/modules/finance/platform/ui/button";
 import { Field, Input } from "@/src/modules/finance/platform/ui/field";
@@ -7,14 +8,13 @@ import { SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { Drop } from "@/src/modules/finance/bir/sales-dat/drop";
 import { csvName, saveText } from "@/src/modules/finance/bir/sales-dat/download";
 import { Fold, Table, pl } from "@/src/modules/finance/bir/sales-dat/parts";
-import { addressBook, buildDAT, checkDAT, clean, datToSalesReliefCSV, fmt, nameChanges, oneRowPerCustomer, parseCSV, parseOojeema, splitAddr, tin9, tinMap, validate, type Company } from "@/src/modules/finance/bir/sales-dat/index";
+import { addressBook, clean, datToSalesReliefCSV, fmt, nameChanges, parseOojeema, splitAddr, tin9, tinMap, type Company } from "@/src/modules/finance/bir/sales-dat/index";
 
 // "Convert as-is": one Sales Relief CSV into a DAT exactly as it is, no corrections
 // (the converter's second tab: its fillSetup and run, followed line by line).
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any;
-type Header = { tin: string; name: string; trade: string; a1: string; a2: string; period: string; rdo: string; fy: string; rate: string };
 
 export function AsIsTab({ companies }: { companies: Company[] }) {
   const [parsed, setParsed] = useState<Any>(null);
@@ -46,7 +46,7 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
   }
 
   async function addCsv(files: File[]) {
-    setError(null);
+    setError(null); setParsed(null); setH(null); setCsvFile(null);
     try {
       const p = parseOojeema(await files[0].text());
       if (!p.rows.length) throw new Error("No sales rows found. Is this the Sales Relief CSV export?");
@@ -58,7 +58,7 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
     }
   }
   async function addDat(files: File[]) {
-    setError(null);
+    setError(null); setBook(null); setDatFile(null);
     try {
       const b = addressBook(await files[0].text());
       if (!Object.keys(b.byTin).length && !b.header) throw new Error("No H or D records found. Is this a RELIEF DAT file?");
@@ -72,28 +72,8 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
 
   const result: Any = useMemo(() => {
     if (!parsed || !h) return null;
-    const p = JSON.parse(JSON.stringify(parsed));
-    const merge = perCustomer ? oneRowPerCustomer(p.rows) : null;
-    if (merge) p.rows = merge.rows;
-    p.taxpayer.tin = h.tin;
-    p.taxpayer.name = h.name;
-    p.taxpayer.tradeName = h.trade;
-    const rate = parseFloat(h.rate) || 12, per = h.period.trim(), m = per.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     try {
-      const out: Any = buildDAT(p, { book, rdo: h.rdo.trim() || "53A", fyMonth: h.fy, day: m ? parseInt(m[2], 10) : null });
-      if (m) {
-        out.text = out.text.replace(/\d{2}\/\d{2}\/\d{4}/g, per);
-        out.filename = tin9(p.taxpayer.tin) + "S" + m[1] + m[3] + ".DAT";
-      }
-      // the taxpayer's address, as typed
-      const lines = out.text.split("\r\n");
-      const head = parseCSV(lines[0] + "\n")[0];
-      head[8] = clean(h.a1, 30);
-      head[9] = clean(h.a2, 30);
-      lines[0] = head.map((v: string, i: number) => ([2, 3, 4, 5, 6, 7, 8, 9, 14].indexOf(i) >= 0 ? '"' + v + '"' : v)).join(",");
-      out.text = lines.join("\r\n");
-      out.checks = checkDAT(out.text, out.filename, p.rows.length);
-      return { out, merge, rows: p.rows, issues: validate(parsed, rate) as Any[] };
+      return buildAsIsDAT(parsed, h, book, perCustomer);
     } catch (e) {
       return { error: (e as Error).message };
     }
@@ -103,7 +83,7 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
   const out = result?.out ?? null;
   const issues: Any[] = result?.issues ?? [];
   const count = (s: string) => issues.filter((i) => i.sev === s).length;
-  const blocked = !h || !h.rdo.trim() || !h.fy;
+  const blocked = !!error || !h || !h.rdo.trim() || !h.fy;
   const tins = parsed ? parsed.rows.map((r: Any) => r.tin).concat([parsed.taxpayer.tin]) : [];
 
   return (
@@ -115,7 +95,8 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
         <SectionTitle icon="lists">1. Sales Relief CSV</SectionTitle>
         <Drop title={csvFile || "Drop the CSV here, or choose it"} hint="Exported from Oojeema: Tax Reports → Sales Relief → CSV" accept=".csv,text/csv" multiple={false} onFiles={addCsv} />
         <Drop title={datFile || "Optional: add Oojeema's DAT for the same month"} hint="Reuses its exact address split" accept=".dat,.DAT,text/plain" multiple={false} onFiles={addDat} />
-        {error && <p className="text-meta text-danger">{error}</p>}
+        {error && <p role="alert" className="text-meta text-danger">{error}</p>}
+        {error && parsed && <Button onClick={() => { setError(null); setBook(null); setDatFile(null); fill(parsed, null); }}>Continue without supporting DAT</Button>}
       </Sheet>
 
       {h && result && (
@@ -123,7 +104,7 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
           <div className="px-5 pt-4">
             <SectionTitle icon="approvals">2. Check and download</SectionTitle>
           </div>
-          {result.error && <p className="px-5 pb-3 text-sm text-danger">The DAT could not be built. {result.error}</p>}
+          {result.error && <p role="alert" className="px-5 pb-3 text-sm text-danger">The DAT could not be built. {result.error}</p>}
           {out && (
             <>
               <div className="grid grid-cols-2 divide-x divide-rule border-t border-rule sm:grid-cols-6">
@@ -151,7 +132,7 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
               <div className="flex flex-wrap items-center gap-2 border-t border-rule px-5 py-4">
                 <Button variant="primary" disabled={blocked} onClick={() => saveText(out.text, out.filename)}>Download DAT</Button>
                 <Button disabled={blocked} onClick={() => saveText(datToSalesReliefCSV(out.text, tinMap(tins)).text, csvName(out.filename), "text/csv;charset=utf-8")}>Sales Relief (CSV)</Button>
-                <Button onClick={() => navigator.clipboard.writeText(out.text)}>Copy text</Button>
+                <Button disabled={blocked} onClick={() => navigator.clipboard.writeText(out.text)}>Copy text</Button>
                 <span className="font-mono text-meta text-ink-3">{out.filename}</span>
               </div>
               {blocked && <p className="px-5 pb-4 text-meta text-danger">Fill in the RDO code and year-end month under Header details to download.</p>}

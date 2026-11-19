@@ -78,7 +78,7 @@ export function DatCsvTab() {
         />
         {(error || convertError) && <p className="text-meta text-danger">{error || convertError}</p>}
       </Sheet>
-      {out && dat && (
+      {out && dat && !error && (
         <Sheet>
           <div className="px-5 pt-4">
             <SectionTitle icon="approvals">2. Download the CSV</SectionTitle>

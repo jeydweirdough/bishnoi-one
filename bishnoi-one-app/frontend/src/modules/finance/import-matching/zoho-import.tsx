@@ -27,7 +27,7 @@ const SETUP:Record<ImportKind,Setup>={
  'oojeema-sales':{button:'Import Oojeema sales',title:'Import Oojeema sales',noun:'invoices and receipts',files:2,field:'Two CSV files',hint:"Oojeema's Sales Journal and Receipt Journal, chosen together, up to 8 MB.",record:'Invoice or receipt',party:'Customer',source:'Oojeema number',ask:"Choose both files together: Oojeema's Sales Journal and Receipt Journal.",
   about:<><p>One invoice for each SI/BI number, with that number and the amounts Oojeema shows. No number is taken from Finance&apos;s BIR series.</p><p>Each receipt comes in whole, or not at all. A receipt that settles an older invoice waits for opening balances.</p><p>Records already imported are never imported twice. Deposit accounts are matched and confirmed first on {MATCHING}.</p></>},
  expenses:{button:'Import from Zoho export',title:'Import expenses from a Zoho export',noun:'expenses',files:1,field:'One CSV file',hint:'The Zoho Expenses export, up to 8 MB.',record:'Expense',party:'Vendor',source:'Zoho ID',ask:'Choose the Zoho Expenses export.',
-  about:<><p>Imported expenses are read-only history: they aren&apos;t petty cash, and they have no receipt files.</p><p>Records already imported are never imported twice. Labels must be matched and confirmed first on {MATCHING}.</p></>},
+  about:<><p>Zoho expense history is read-only: they aren&apos;t petty cash, and they have no receipt files.</p><p>Records already imported are never imported twice. Labels must be matched and confirmed first on {MATCHING}.</p></>},
 };
 
 function RowDetail({row,source}:{row:ImportRow;source:string}){

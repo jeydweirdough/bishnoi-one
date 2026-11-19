@@ -3,7 +3,9 @@
 import { Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { preparePurchase } from "./purchase-actions";
+import type { PurchaseSource } from "./purchase-types";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/finance/platform/ui/button";
 import { CellInput, Choice, Field, FormError, Input, Select, Textarea } from "@/src/modules/finance/platform/ui/field";
@@ -11,10 +13,11 @@ import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
 import { saveBill } from "@/src/modules/finance/payables/actions";
 import { ImportedDetails } from "./import-details";
-import { billTaxDefaults } from "./bill-tax";
+import { FOREIGN, billTaxDefaults, withholdingChoice, withholdingPayload } from "./bill-tax";
 import type { Bill, BillChoices, PurchaseType, Supplier, VatKind } from "@/src/modules/finance/payables/types";
 
-type Line = { key: number; accountId: string; description: string; amount: string; vat: VatKind | ""; withholding: string; purchaseType: PurchaseType };
+// withholding: a code, "none:<reason>" or "unconfirmed" (bill-tax.ts); note: why, when the reason is "other".
+type Line = { key: number; accountId: string; description: string; amount: string; vat: VatKind | ""; withholding: string; note: string; purchaseType: PurchaseType };
 
 const addDays = (day: string, n: number) => {
   const d = new Date(`${day}T00:00:00Z`);
@@ -28,11 +31,15 @@ const addDays = (day: string, n: number) => {
  * their terms, whether they charge VAT and the tax usually withheld. The totals below are a
  * guide while typing; the API works the bill out exactly when it's saved.
  */
-export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices: BillChoices; org: Org }) {
+export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null; choices: BillChoices; org: Org; purchase?: PurchaseSource }) {
   const fmt = makeFormat(org);
   const router = useRouter();
   const money = (minor: number) => (minor ? String(minor / 10 ** (org.minorUnits ?? 2)) : "");
-  const [supplierId, setSupplierId] = useState(bill?.supplier.id ?? "");
+  const [supplierId, setSupplierId] = useState(bill?.supplier.id ?? purchase?.supplierId ?? "");
+  const [sourceReviewed,setSourceReviewed]=useState(false);
+  const [sourceQuantities,setSourceQuantities]=useState(purchase?.rows.map(r=>r.quantity)??[]);
+  const request=useRef<{id:string;payload:string;uncertain:boolean}|null>(null);
+  const sourceLocked=!!purchase||!!bill?.purchaseEvidence?.length;
   const supplier: Supplier | undefined = choices.suppliers.find((s) => s.id === supplierId) ?? (bill?.supplier.id === supplierId ? bill?.supplier : undefined);
   const lineFor = (key: number, s?: Supplier): Line => ({
     key,
@@ -40,6 +47,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
     description: "",
     amount: "",
     purchaseType: "other_goods",
+    note: "",
     ...billTaxDefaults(s),
   });
   const [v, setV] = useState({
@@ -57,8 +65,8 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
   });
   const [lines, setLines] = useState<Line[]>(
     bill?.lines.length
-      ? bill.lines.map((l, i) => ({ key: i, accountId: l.accountId, description: l.description ?? "", amount: money(l.amountCentavos), vat: l.vat, withholding: l.withholding ?? "", purchaseType: l.purchaseType ?? "other_goods" }))
-      : [lineFor(0)],
+      ? bill.lines.map((l, i) => ({ key: i, accountId: l.accountId, description: l.description ?? "", amount: money(l.amountCentavos), vat: l.vat, withholding: withholdingChoice(l), note: l.noWithholdingNote ?? "", purchaseType: l.purchaseType ?? "other_goods" }))
+      : purchase ? purchase.rows.map((r,i)=>({...lineFor(i,supplier),description:r.label,amount:money(r.unitCost*r.quantity)})) : [lineFor(0)],
   );
   const [fields, setFields] = useState<Record<string, string>>({});
   const [taxReviewed, setTaxReviewed] = useState(bill?.taxReviewed ?? false);
@@ -68,14 +76,17 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
   const [error, setError] = useState<string | null>(bill?.problem ?? null);
   const [pending, start] = useTransition();
   const set = (patch: Partial<typeof v>) => { if ("includeVat" in patch || "billDate" in patch) setTaxReviewed(false); setV({ ...v, ...patch }); };
-  const setLine = (key: number, patch: Partial<Line>) => { setTaxReviewed(false); setLines(lines.map((l) => (l.key === key ? { ...l, ...patch } : l))); };
+  const setLine = (key: number, patch: Partial<Line>) => { setSourceReviewed(false);setTaxReviewed(false); setLines(lines.map((l) => (l.key === key ? { ...l, ...patch } : l))); };
 
   function pickSupplier(id: string) {
     setTaxReviewed(false); setSaveDefaults(false); setDefaultVat(""); setDefaultWithholding("");
     setSupplierId(id);
     const s = choices.suppliers.find((x) => x.id === id);
-    // Lines not filled in yet take the supplier's VAT and usual withholding.
-    if (s) setLines(lines.map((l) => (l.amount.trim() || l.accountId ? l : lineFor(l.key, s))));
+    // Lines not filled in yet take the supplier's VAT and usual withholding. Filled ones keep theirs, except that a
+    // foreign supplier is never withheld from, and a local one's lines then need a choice again.
+    const foreign = s?.origin === "foreign";
+    if (s) setLines(lines.map((l) => (!(l.amount.trim() || l.accountId) ? lineFor(l.key, s)
+      : foreign ? { ...l, withholding: FOREIGN } : l.withholding === FOREIGN ? { ...l, withholding: "unconfirmed" } : l)));
   }
 
   // A guide while typing (12%): the API works the bill out exactly when it's saved.
@@ -97,10 +108,13 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
     const used = lines.filter((l) => l.accountId || l.amount.trim() || l.description.trim());
     const problems: Record<string, string> = {};
     if (!supplierId) problems.supplierId = "Pick the supplier.";
+    if(purchase&&!sourceReviewed) problems.source="Confirm the received quantities, invoice currency, units and prices.";
+    if(purchase&&sourceQuantities.some((q,i)=>!Number.isInteger(q)||q<=0||q>purchase.rows[i].maximum)) problems.source="Use positive whole quantities within the received remainder.";
     if (!v.billNumber.trim()) problems.billNumber = "Enter the number on the supplier's invoice.";
     if (!used.length) problems.lines = "Add at least one line.";
     used.forEach((l, i) => {
-      if (!l.vat || l.withholding === "unconfirmed") problems[`lines.${i}.vat`] = "Choose VAT and withholding (including none) from this bill.";
+      if (!l.vat || l.withholding === "unconfirmed") problems[`lines.${i}.vat`] = "Choose VAT, and the tax withheld or why none is, from this bill.";
+      if (l.withholding === "none:other" && !l.note.trim()) problems[`lines.${i}.noWithholdingNote`] = "Say why no tax is withheld.";
       if (!l.accountId) problems[`lines.${i}.accountId`] = "Pick an account.";
       if (!fmt.toCentavos(l.amount)) problems[`lines.${i}.amountCentavos`] = "Enter the amount.";
     });
@@ -111,7 +125,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
       return;
     }
     start(async () => {
-      const result = await saveBill(bill?.id ?? null, {
+      const input = {
         taxReviewed,
         saveSupplierDefaults: saveDefaults,
         supplierVatRegistered: saveDefaults ? defaultVat === "yes" : null,
@@ -134,10 +148,16 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
           amountCentavos: fmt.toCentavos(l.amount) ?? 0,
           vat: l.vat as VatKind,
           purchaseType: l.purchaseType,
-          withholding: l.withholding || null,
+          ...withholdingPayload(l.withholding, l.note),
         })),
-      });
+      };
+      const allocations=purchase?.rows.map((r,i)=>({intakeId:r.intakeId,sourceLineId:r.sourceLineId,version:r.version,quantity:sourceQuantities[i]}))??[];
+      const payload=JSON.stringify({input,allocations});
+      if(request.current?.uncertain&&request.current.payload!==payload){setError("An earlier preparation result is unknown. Check From Inventory before changing or starting another bill.");return;}
+      if(!request.current||request.current.payload!==payload)request.current={id:crypto.randomUUID(),payload,uncertain:false};
+      const result = purchase ? await preparePurchase(request.current.id,allocations,input) : await saveBill(bill?.id ?? null,input);
       if (!result.ok) {
+        request.current.uncertain="uncertain" in result&&!!result.uncertain;
         setError(result.error);
         setFields(result.fields ?? {});
         return;
@@ -151,6 +171,8 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
 
   return (
     <form onSubmit={submit} noValidate className="space-y-5">
+      {!!bill?.purchaseEvidence?.length&&<p className="text-sm">Received quantities and invoice identity stay linked. To correct that identity, cancel an unsubmitted draft and prepare it again.</p>}
+      {purchase&&<section className="space-y-3 rounded border border-rule bg-sheet p-4" aria-label="Received quantity allocations"><h2 className="font-semibold">Received evidence and invoice quantities</h2><p>Allocate only what this invoice covers. Amounts copied from receiving are a starting reference: verify invoice prices, currency and whether they include tax.</p>{purchase.rows.map((r,i)=><label key={r.intakeId+r.sourceLineId} className="grid gap-1 text-sm">{r.label} · available {r.maximum} {r.unit}<input aria-label={`Invoice quantity for ${r.label}`} type="number" min={1} max={r.maximum} step={1} value={sourceQuantities[i]} onChange={e=>{setSourceReviewed(false);setSourceQuantities(sourceQuantities.map((q,j)=>j===i?Number(e.target.value):q));}}/></label>)}<label className="flex gap-2"><input type="checkbox" checked={sourceReviewed} onChange={e=>setSourceReviewed(e.target.checked)}/>I checked received quantities against this invoice, units, currency and prices.</label>{fields.source&&<p role="alert">{fields.source}</p>}</section>}
       <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
           <Field
@@ -169,7 +191,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
             }
           >
             {(p) => (
-              <Select {...p} value={supplierId} onChange={(e) => pickSupplier(e.target.value)}>
+              <Select {...p} value={supplierId} disabled={sourceLocked} onChange={(e) => pickSupplier(e.target.value)}>
                 <option value="">Pick a supplier…</option>
                 {choices.suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -181,23 +203,25 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
             )}
           </Field>
           <Field label="Their invoice number" error={fields.billNumber}>
-            {(p) => <Input {...p} value={v.billNumber} onChange={(e) => set({ billNumber: e.target.value })} maxLength={60} placeholder="SI-004512" />}
+            {(p) => <Input {...p} value={v.billNumber} disabled={!!bill?.purchaseEvidence?.length} onChange={(e) => set({ billNumber: e.target.value })} maxLength={60} placeholder="SI-004512" />}
           </Field>
         </div>
         {supplier && (
           <p className="text-meta text-ink-3">
+            {supplier.origin === "foreign" ? "Foreign supplier: nothing is withheld · " : ""}
+            {supplier.vatVariesByItem ? "VAT differs by item: choose it on each line · " : ""}
             {supplier.taxDefaultsConfirmed ? `${supplier.vatRegistered ? "VAT-registered" : "Not VAT-registered"} · usual withholding: ${supplier.withholding?.code ?? "none"}` : "Tax defaults not confirmed — choose the VAT and withholding shown for this bill."} · terms {supplier.termsDays} days
             {!supplier.tin && <span className="block">Supplier TIN is missing or unresolved; directory import did not verify BIR details.</span>}
           </p>
         )}
         <div className="grid gap-4 sm:grid-cols-4">
           <Field label="Bill date" error={fields.billDate}>
-            {(p) => <Input {...p} type="date" max={choices.today} value={v.billDate} onChange={(e) => set({ billDate: e.target.value })} />}
+            {(p) => <Input {...p} type="date" max={choices.today} value={v.billDate} disabled={!!bill?.purchaseEvidence?.length} onChange={(e) => set({ billDate: e.target.value })} />}
           </Field>
           <Field label="Due date" error={fields.dueDate} hint={v.dueDate ? undefined : "From the supplier's terms."}>
             {(p) => <Input {...p} type="date" value={dueShown} onChange={(e) => set({ dueDate: e.target.value })} />}
           </Field>
-          <Field label="PO number" optional error={fields.poNumber}>
+          <Field label="Supplier PO number" optional error={fields.poNumber} hint="Our purchase order to this supplier (Inventory → Purchasing), not a customer's PO.">
             {(p) => <Input {...p} value={v.poNumber} onChange={(e) => set({ poNumber: e.target.value })} maxLength={60} />}
           </Field>
           <Field label="Delivery receipt number" optional error={fields.drNumber}>
@@ -207,7 +231,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <label className="flex items-center gap-2">
             <input suppressHydrationWarning type="checkbox" checked={v.checkedPo} onChange={(e) => set({ checkedPo: e.target.checked })} className="size-4 accent-hema" />
-            Checked against the PO
+            Checked against our supplier PO
           </label>
           <label className="flex items-center gap-2">
             <input suppressHydrationWarning type="checkbox" checked={v.checkedDr} onChange={(e) => set({ checkedDr: e.target.checked })} className="size-4 accent-hema" />
@@ -285,19 +309,42 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
                     </select>
                   </td>
                   <td className="px-2 py-1.5">
-                    <select suppressHydrationWarning
-                      aria-label={`Line ${i + 1}: tax withheld`}
-                      value={l.withholding}
-                      onChange={(e) => setLine(l.key, { withholding: e.target.value })}
-                      className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
-                    >
-                      <option value="unconfirmed">Choose withholding</option><option value="">None</option>
-                      {choices.withholding.map((w) => (
-                        <option key={w.code} value={w.code}>
-                          {w.code} · {w.rateBp / 100}%
-                        </option>
-                      ))}
-                    </select>
+                    {supplier?.origin === "foreign" ? (
+                      // Sir Mel (2026-11-04): nothing is withheld from a foreign supplier.
+                      <select suppressHydrationWarning aria-label={`Line ${i + 1}: tax withheld`} value={FOREIGN} disabled className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm text-ink-2">
+                        <option value={FOREIGN}>None · foreign supplier</option>
+                      </select>
+                    ) : (
+                      <>
+                        <select suppressHydrationWarning
+                          aria-label={`Line ${i + 1}: tax withheld`}
+                          aria-invalid={fields[`lines.${i}.vat`] && l.withholding === "unconfirmed" ? true : undefined}
+                          value={l.withholding}
+                          onChange={(e) => setLine(l.key, { withholding: e.target.value })}
+                          className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
+                        >
+                          <option value="unconfirmed">Choose withholding</option>
+                          {choices.withholding.map((w) => (
+                            <option key={w.code} value={w.code}>
+                              {w.code} · {w.rateBp / 100}%
+                            </option>
+                          ))}
+                          {(choices.noWithholding ?? []).map((r) => (
+                            <option key={r.key} value={`none:${r.key}`}>None · {r.label.toLowerCase()}</option>
+                          ))}
+                        </select>
+                        {l.withholding === "none:other" && (
+                          <CellInput
+                            aria-label={`Line ${i + 1}: why no tax is withheld`}
+                            aria-invalid={fields[`lines.${i}.noWithholdingNote`] ? true : undefined}
+                            placeholder="Why none is withheld"
+                            value={l.note}
+                            onChange={(e) => setLine(l.key, { note: e.target.value })}
+                            className="mt-1 w-full"
+                          />
+                        )}
+                      </>
+                    )}
                   </td>
                   <td className="px-2 py-1.5">
                     <CellInput
@@ -310,7 +357,7 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
                     />
                   </td>
                   <td className="py-1.5">
-                    {lines.length > 1 && (
+                    {!sourceLocked && lines.length > 1 && (
                       <Button size="sm" variant="quiet" className="!px-1.5 !text-ink-3 hover:!text-danger" aria-label={`Remove line ${i + 1}`} onClick={() => { setTaxReviewed(false); setLines(lines.filter((x) => x.key !== l.key)); }}>
                         <Trash2 className="size-4" aria-hidden />
                       </Button>
@@ -321,9 +368,9 @@ export function BillEditor({ bill, choices, org }: { bill: Bill | null; choices:
             </tbody>
           </table>
         </div>
-        <Button size="sm" variant="quiet" className="-ml-3" icon={<Plus className="size-4" aria-hidden />} onClick={() => { setTaxReviewed(false); setLines([...lines, lineFor(Math.max(...lines.map((l) => l.key)) + 1, supplier)]); }}>
+        {!sourceLocked && <Button size="sm" variant="quiet" className="-ml-3" icon={<Plus className="size-4" aria-hidden />} onClick={() => { setTaxReviewed(false); setLines([...lines, lineFor(Math.max(...lines.map((l) => l.key)) + 1, supplier)]); }}>
           Add a line
-        </Button>
+        </Button>}
         <div className="ml-auto max-w-sm space-y-1 text-sm" hidden={lines.some(line => !line.vat || line.withholding === "unconfirmed")}>
           <p className="flex justify-between gap-6">
             <span className="text-ink-2">Before VAT</span>

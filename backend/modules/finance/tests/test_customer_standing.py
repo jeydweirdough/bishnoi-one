@@ -14,8 +14,10 @@ def issue(client, who, **extra) -> dict:  # noqa: F811 (a fixture)
     return client.post(f"/finance/invoices/{draft(client, who, **extra)['id']}/issue", json={}, headers=who).json()
 
 
-def test_a_customers_standing_is_read_by_the_crm(client, ana):  # noqa: F811 (fixtures)
+def test_a_customers_standing_is_read_by_the_crm(client, ana, monkeypatch):  # noqa: F811 (fixtures)
     ready(client, ana)
+    from .cost_fixture import known_product_cost
+    known_product_cost(client, ana, monkeypatch)
     old = (date.today() - timedelta(days=100)).isoformat()
     # 100 days ago on 30-day terms: 70 days late, nothing paid.
     issue(client, ana, customerId="crm-1", invoiceDate=old, termsDays=30, lines=[{"ref": "AMX-500", "description": "Amoxicillin 500 mg", "quantity": 1, "unitPriceCentavos": 100000}])

@@ -4,6 +4,7 @@ from pydantic import Field
 from typing import Literal
 from sqlalchemy import select
 from modules.finance.api import Api
+from modules.finance import company_scope
 from modules.finance.access import permitted,access_of
 from modules.finance.deps import DB,SettingsDep
 from modules.finance.models import Account,ZohoSourceDocument
@@ -34,7 +35,8 @@ Pack.model_rebuild()
 def inspect_pack(body,db,settings):
     money=money_account_ids(db);all_accounts=list(db.scalars(select(Account)))
     parents={a.parent_id for a in all_accounts if a.parent_id}
-    accounts=[{'id':a.id,'code':a.code,'name':a.name,'type':a.type,'active':a.is_active,'posting':a.id not in parents,'money':a.id in money} for a in all_accounts]
+    eligible=set(db.scalars(company_scope.reviewed_ids('account','2mg')))
+    accounts=[{'id':a.id,'code':a.code,'name':a.name,'type':a.type,'active':a.is_active,'posting':a.id not in parents,'money':a.id in money} for a in all_accounts if a.id in eligible]
     # Do not mix identities across organisations, or call Zoho to enrich an upload.
     from modules.finance.zoho_connection import saved_record
     try:org=((saved_record(settings).get('connection') or {}).get('organization') or {}).get('id')

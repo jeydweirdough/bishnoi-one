@@ -134,7 +134,7 @@ export function ImportMatching({data}:{data:Matching}){
  </Sheet>}
  {SECTIONS.filter(s=>s.area===area).map(section=><MatchSection key={`${section.key}-${section.role}`} section={section} data={data} files={files[area]??[]} onFiles={read=>setFiles(f=>({...f,[area]:read}))}/>)}
  <Sheet className="space-y-3 p-5"><SectionTitle>Recent imports</SectionTitle>
-  {data.runs.length===0?<p className="text-sm text-ink-3">No imports yet. Each import has its button on its own page: Bills, Payment vouchers, Sales invoices, Imported expenses.</p>:
+  {data.runs.length===0?<p className="text-sm text-ink-3">No imports yet. Each import has its button on its own page: Bills, Payment vouchers, Sales invoices, Zoho expense history.</p>:
   <div className="overflow-x-auto"><table className="w-full min-w-[36rem] text-left text-sm"><thead><tr className="text-meta text-ink-3"><th className="py-2 font-semibold">What</th><th className="font-semibold">Result</th><th className="font-semibold">By</th><th className="font-semibold">When</th></tr></thead><tbody>{data.runs.map(r=><tr key={r.id} className="border-t border-rule"><td className="py-2">{KINDS[r.kind]||r.kind}<span className="block text-meta text-ink-3">{r.files.join(' · ')}</span></td><td>{Object.entries(r.counts).filter(([,n])=>n).map(([k,n])=>`${n} ${COUNT_WORDS[k]||k}`).join(' · ')||'Nothing imported'}</td><td>{r.by}</td><td>{day(r.at)}</td></tr>)}</tbody></table></div>}
  </Sheet>
  </div>;

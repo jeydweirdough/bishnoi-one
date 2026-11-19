@@ -25,6 +25,7 @@ from modules.finance.models import Notification, User, utcnow
 # What asks something of the person: these count in the bell's red number.
 # (News, not counted: entry.approved, calendar.on, calendar.shared, calendar.done.)
 ACTIONABLE = (
+    "purchase.received",
     "entry.waiting", "entry.rejected", "fund.to_release", "fund.to_check", "fund.to_settle", "calendar.reminder",
     # Supplier bills and payment vouchers (2026-10-23, Aubrey's flow): waiting on a step, or back
     # with whoever made it.
@@ -36,6 +37,7 @@ ACTIONABLE = (
 
 # Several unread of one of these kinds show as one line, linking to the list.
 GROUPS = {
+    "purchase.received": ("{n} received purchases are waiting for Finance validation.", "/purchase-intakes"),
     "entry.waiting": ("{n} journal entries are waiting for your approval.", "/ledger?status=waiting"),
     "fund.to_release": ("{n} cash advances are ready for release.", "/funds"),
     "fund.to_check": ("{n} liquidations are waiting for review.", "/funds/review"),

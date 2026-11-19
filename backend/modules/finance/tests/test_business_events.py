@@ -62,9 +62,9 @@ def test_a_delivery_is_taken_once(app, client, monkeypatch):  # noqa: F811
     monkeypatch.setitem(business_events.HANDLERS, "delivery.done", lambda db, data, slug: heard.append((data, slug)))
     event = {"id": "ev-11111111", "kind": "delivery.done", "source": "inventory", "data": {"order": "SO-1"}, "occurredAt": "2026-10-28T00:00:00+00:00"}
     for _ in range(2):
-        r = client.post("/platform/events", json={"pass": note("event", event=event)})
+        r = client.post("/platform/events", json={"pass": note("event", event=event, slug="2mg")})
         assert r.status_code == 204, r.text
-    assert heard == [({"order": "SO-1"}, "getmeds")]
+    assert heard == [({"order": "SO-1"}, "2mg")]
     with app.state.sessions() as db:
         assert db.get(InboxEvent, "ev-11111111").source == "inventory"
     # Signed for another purpose: answered as if the address didn't exist.

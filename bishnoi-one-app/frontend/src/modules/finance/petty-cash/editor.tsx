@@ -12,6 +12,7 @@ import type { Org } from "@/src/modules/finance/platform/lib/types";
 import { savePettyCash } from "@/src/modules/finance/petty-cash/actions";
 import { ReceiptSlot } from "@/src/modules/finance/petty-cash/receipt-slot";
 import type { PettyCashChoices, PettyCashVoucher } from "@/src/modules/finance/petty-cash/types";
+import { withholdingChoice, withholdingPayload } from "@/src/modules/finance/payables/bill-tax";
 
 type Line = {
   key: number;
@@ -25,11 +26,13 @@ type Line = {
   description: string;
   purchaseType: string;
   vat: string;
+  // A code, "none:<reason>" or "unconfirmed" (payables/bill-tax.ts); note: why, when the reason is "other".
   withholding: string;
+  note: string;
   amount: string;
 };
 
-const blank = (key: number): Line => ({ key, spentOn: "", store: "", storeTin: "", receiptNumber: "", accountId: "", description: "", purchaseType: "", vat: "", withholding: "", amount: "" });
+const blank = (key: number): Line => ({ key, spentOn: "", store: "", storeTin: "", receiptNumber: "", accountId: "", description: "", purchaseType: "", vat: "", withholding: "unconfirmed", note: "", amount: "" });
 
 /**
  * A petty cash voucher, as the paper one reads: its number, the fund it's paid from, the date, who
@@ -62,7 +65,8 @@ export function PettyCashEditor({ voucher, choices, org, today }: { voucher: Pet
           description: l.description ?? "",
           purchaseType: l.purchaseType,
           vat: l.vat,
-          withholding: l.withholding ?? "",
+          withholding: withholdingChoice({ withholding: l.withholding, noWithholding: l.noWithholdingReason }),
+          note: l.noWithholdingNote ?? "",
           amount: fmt.pesosText(l.amountCentavos),
         }))
       : [blank(0)],
@@ -102,6 +106,8 @@ export function PettyCashEditor({ voucher, choices, org, today }: { voucher: Pet
       if (!l.accountId) problems[`lines.${i}.accountId`] = "Pick an account.";
       if (!l.purchaseType) problems[`lines.${i}.purchaseType`] = "Pick the purchase type.";
       if (!l.vat) problems[`lines.${i}.vat`] = "Pick the VAT on the receipt.";
+      if (l.withholding === "unconfirmed") problems[`lines.${i}.withholding`] = "Pick the tax withheld, or why none is.";
+      else if (l.withholding === "none:other" && !l.note.trim()) problems[`lines.${i}.noWithholdingNote`] = "Say why no tax is withheld.";
       if (!fmt.toCentavos(l.amount)) problems[`lines.${i}.amountCentavos`] = "Enter the amount.";
     });
     if (Object.keys(problems).length) {
@@ -128,7 +134,7 @@ export function PettyCashEditor({ voucher, choices, org, today }: { voucher: Pet
           description: l.description.trim() || null,
           purchaseType: l.purchaseType,
           vat: l.vat,
-          withholding: l.withholding || null,
+          ...withholdingPayload(l.withholding, l.note),
           amountCentavos: fmt.toCentavos(l.amount) ?? 0,
         })),
       });
@@ -294,18 +300,26 @@ export function PettyCashEditor({ voucher, choices, org, today }: { voucher: Pet
                         </Select>
                       )}
                     </Field>
-                    <Field label="Tax withheld" size="sm" optional error={err("withholding")}>
+                    <Field label="Tax withheld" size="sm" error={err("withholding")}>
                       {(p) => (
                         <Select {...p} value={l.withholding} onChange={(e) => setLine(l.key, { withholding: e.target.value })}>
-                          <option value="">None</option>
+                          <option value="unconfirmed">Choose, or say why none</option>
                           {choices.withholding.map((w) => (
                             <option key={w.code} value={w.code}>
                               {w.code} · {w.rateBp / 100}% · {w.name}
                             </option>
                           ))}
+                          {(choices.noWithholding ?? []).map((r) => (
+                            <option key={r.key} value={`none:${r.key}`}>None · {r.label.toLowerCase()}</option>
+                          ))}
                         </Select>
                       )}
                     </Field>
+                    {l.withholding === "none:other" && (
+                      <Field label="Why none is withheld" size="sm" error={err("noWithholdingNote")}>
+                        {(p) => <Input {...p} value={l.note} onChange={(e) => setLine(l.key, { note: e.target.value })} />}
+                      </Field>
+                    )}
                   </FormGrid>
                   <div className="rounded-[3px] bg-bench/60 p-3">
                     <p className="mb-2 text-meta font-semibold text-ink-2">Step 3 · Its receipt</p>

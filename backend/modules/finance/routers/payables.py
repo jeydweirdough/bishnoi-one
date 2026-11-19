@@ -18,6 +18,8 @@ Included in Finance's own router (app/routers/finance.py), so main.py is untouch
 
 import re
 import secrets
+import hashlib
+import json
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
@@ -25,6 +27,8 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import Field, field_validator
 from sqlalchemy import case, func, or_, select, text
 
+from modules.finance import company_scope
+from modules.finance.locks import locked
 from modules.finance.access import access_of, permissions_of, permitted
 from modules.finance.audit import audit
 from modules.finance.deps import DB, CurrentUser, SettingsDep
@@ -32,7 +36,9 @@ from modules.finance.funds import RECEIPT_TYPES, decode
 from modules.finance.ledger import Leg, post
 from modules.finance.ledger import settings as posting_settings
 from modules.finance.models import OPEN_VOUCHERS, Account, Bill, BillEvent, BillFile, JournalEntry, PaymentVoucher, StoredFile, Supplier, SupplierFile, VoucherLine
-from modules.finance.payables import PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, withholding_out, work_out
+from modules.finance.models import CompanyReviewBatch, CompanyReviewRow, CompanyScopeReview
+from modules.finance import budget_watch
+from modules.finance.payables import NO_WITHHOLDING, PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, no_withholding_out, origin_by_name, withholding_decision, withholding_out, work_out
 from modules.finance.notify import done, holders, tell
 from modules.finance.routers.funds import today
 from modules.finance.routers.tax import Api, field_error, split_tin
@@ -134,7 +140,7 @@ def supplier_out(db: DB, s: Supplier, owed: int | None = None) -> dict:
         "id": s.id, "no": s.no, "name": s.name, "companyName": s.company_name,
         "salutation": s.salutation, "firstName": s.first_name, "lastName": s.last_name,
         "tin": s.tin, "branchCode": s.branch_code, "address": s.address,
-        "vatRegistered": s.vat_registered,
+        "vatRegistered": s.vat_registered, "origin": s.origin, "vatVariesByItem": s.vat_varies_by_item,
         "taxDefaultsConfirmed": s.tax_defaults_confirmed, "importDetails": s.import_details,
         "withholding": {"code": code, "name": WITHHOLDING[code][0], "rateBp": WITHHOLDING[code][1]} if code in WITHHOLDING else None,
         "termsDays": s.terms_days, "email": s.email, "phone": s.phone, "mobile": s.mobile,
@@ -154,14 +160,21 @@ def may_do(user) -> dict:
 
 def payables_accounts(db: DB) -> list[dict]:
     """The accounts a supplier's bills may post to instead of the default: active liabilities."""
-    return [{"id": a.id, "code": a.code, "name": a.name} for a in db.scalars(select(Account).where(Account.is_active, Account.type == "liability").order_by(Account.code))]
+    return [{"id": a.id, "code": a.code, "name": a.name} for a in db.scalars(select(Account).where(Account.is_active, Account.type == "liability", company_scope.usable_clause("account", Account.id)).order_by(Account.code))]
 
 
 @router.get("/suppliers")
-def list_suppliers(user: permitted("suppliers.view"), db: DB, q: str | None = Query(None, max_length=100), active: bool | None = None) -> dict:
+def list_suppliers(user: permitted("suppliers.view"), db: DB, q: str | None = Query(None, max_length=100), active: bool | None = None,
+                   origin: Literal["local", "foreign"] | None = None, company_use: Literal["2mg", "history", "all"] = "2mg") -> dict:
     query = select(Supplier)
+    if company_use == "2mg":
+        query = query.where(company_scope.usable_clause("supplier", Supplier.id))
+    elif company_use == "history":
+        query = query.where(~company_scope.usable_clause("supplier", Supplier.id))
     if active is not None:
         query = query.where(Supplier.is_active == active)
+    if origin is not None:
+        query = query.where(Supplier.origin == origin)
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(Supplier.name).like(like), func.lower(func.coalesce(Supplier.company_name, "")).like(like),
@@ -169,7 +182,7 @@ def list_suppliers(user: permitted("suppliers.view"), db: DB, q: str | None = Qu
     items = db.scalars(query.order_by(func.lower(Supplier.name)).limit(500)).all()
     owed = owed_by_supplier(db)
     return {"items": [supplier_out(db, s, owed.get(s.id, 0)) for s in items], "withholding": withholding_out(),
-            "payablesAccounts": payables_accounts(db)} | may_do(user)
+            "payablesAccounts": payables_accounts(db)} | may_do(user) | ({"canEdit": False, "canDeactivate": False} if company_use != "2mg" else {})
 
 
 class ContactIn(Api):
@@ -193,6 +206,9 @@ class SupplierIn(Api):
     branch_code: str | None = Field(None, max_length=5)
     address: str | None = Field(None, max_length=300)
     vat_registered: bool = True
+    # Local or foreign: when not given, from the name (Ltd or Limited: foreign; app/payables.py origin_by_name).
+    origin: Literal["local", "foreign"] | None = None
+    vat_varies_by_item: bool = False
     withholding: str | None = Field(None, max_length=10)
     terms_days: int = Field(30, ge=0, le=365)
     email: str | None = Field(None, max_length=254)
@@ -237,11 +253,15 @@ def apply_supplier(db: DB, s: Supplier, body: SupplierIn) -> list[str]:
     if twin := db.scalar(others.where(func.lower(Supplier.name) == body.name.strip().lower())):
         raise field_error("name", f"There's already a supplier called {twin.name}.")
     if body.payables_account_id:
+        company_scope.require_ids(db, 'account', [body.payables_account_id], status_code=422)
         a = db.get(Account, body.payables_account_id)
         if a is None or not a.is_active or a.type != "liability":
             raise field_error("payablesAccountId", "Pick an active liability account, or leave it to the default.")
     contacts = [c.model_dump(by_alias=True) for c in body.contacts if any(v for v in c.model_dump().values())]
-    values = body.model_dump(exclude={"contacts"}) | {"tin": tin, "branch_code": branch if tin else body.branch_code, "contacts": contacts}
+    origin = body.origin or origin_by_name(body.name)
+    if origin == "foreign" and body.withholding:
+        raise field_error("withholding", "A foreign supplier has no tax withheld: leave the usual withholding empty.")
+    values = body.model_dump(exclude={"contacts"}) | {"tin": tin, "branch_code": branch if tin else body.branch_code, "contacts": contacts, "origin": origin}
     changed = [k for k, v in values.items() if getattr(s, k) != v]
     for k, v in values.items():
         setattr(s, k, v)
@@ -254,6 +274,9 @@ def add_supplier(user: permitted("suppliers.add"), db: DB, body: SupplierIn) -> 
     apply_supplier(db, s, body)
     db.add(s)
     db.flush()
+    # Explicit manual entry in this 2MG workspace.
+    db.add(CompanyScopeReview(subject_kind='supplier', subject_id=s.id, scope='2mg',
+                             evidence={'source':'manual entry in 2MG Finance'}, reviewed_by=user.full_name))
     audit(db, user, "supplier.created", target=s.name, target_type="supplier", target_id=s.id)
     db.commit()
     return supplier_out(db, s, 0)
@@ -359,17 +382,130 @@ def found_supplier(db: DB, supplier_id: str) -> Supplier:
     return s
 
 
+def supplier_review_version(s: Supplier) -> str:
+    values = [s.id, s.name, s.tin, s.branch_code, s.origin, s.withholding, s.tax_defaults_confirmed, s.vat_registered, s.vat_varies_by_item]
+    return hashlib.sha256(json.dumps(values, ensure_ascii=False).encode()).hexdigest()
+
+
+def supplier_review_row(s: Supplier, owed: int = 0) -> dict:
+    return {"id": s.id, "name": s.name, "origin": s.origin, "withholding": s.withholding,
+            "tin": s.tin, "branchCode": s.branch_code,
+            "companyName": s.company_name, "email": s.email, "phone": s.phone or s.mobile, "owedCentavos": owed,
+            "taxDefaultsConfirmed": s.tax_defaults_confirmed, "isActive": s.is_active,
+            "version": supplier_review_version(s)}
+
+
+@router.get("/suppliers/review")
+def review_suppliers(user: permitted("suppliers.view"), db: DB, q: str = "",
+                     origin: Literal["local", "foreign", "unset"] | None = None,
+                     no_code: bool = False, page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=100),
+                     company_use: Literal['2mg', 'history', 'review', 'legacy', 'all'] = '2mg') -> dict:
+    query = select(Supplier)
+    if company_use == '2mg':
+        query = query.where(company_scope.usable_clause('supplier', Supplier.id))
+    elif company_use == 'history':
+        query = query.where(~company_scope.usable_clause('supplier', Supplier.id))
+    elif company_use != 'all':
+        query = query.where(Supplier.id.in_(company_scope.reviewed_ids('supplier', company_use)))
+    if q.strip():
+        like = f"%{q.strip().lower()}%"
+        query = query.where(or_(func.lower(Supplier.name).like(like), func.lower(func.coalesce(Supplier.company_name, "")).like(like),
+                               func.coalesce(Supplier.tin, "").like(like)))
+    if origin == "unset":
+        query = query.where(Supplier.origin.is_(None))
+    elif origin:
+        query = query.where(Supplier.origin == origin)
+    if no_code:
+        query = query.where(Supplier.withholding.is_(None))
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, pages)
+    rows = db.scalars(query.order_by(func.lower(Supplier.name), Supplier.id).offset((page - 1) * page_size).limit(page_size)).all()
+    owed = owed_by_supplier(db)
+    batch = db.scalar(select(CompanyReviewBatch).where(CompanyReviewBatch.company == '2mg').order_by(CompanyReviewBatch.created_at.desc()).limit(1))
+    reconciliation = None
+    if batch:
+        source_rows = db.scalars(select(CompanyReviewRow).where(CompanyReviewRow.batch_id == batch.id).order_by(CompanyReviewRow.source_line)).all()
+        reconciliation = {'sourceRows': len(source_rows), 'matchedRows': sum(r.status == 'matched' for r in source_rows),
+                          'createdRows': sum(r.status == 'created' for r in source_rows),
+                          'issues': [{'line': r.source_line, 'code': r.data.get('Code'), 'name': r.data.get('Trade Name'),
+                                      'tin': r.data.get('TIN'), 'reason': r.data.get('reviewReason', 'Identity needs confirmation')}
+                                     for r in source_rows if r.status == 'held']}
+    return {"items": [supplier_review_row(s, owed.get(s.id, 0)) for s in rows], "total": total, "page": page, "pages": pages,
+            "reconciliation": reconciliation,
+            "pageSize": page_size, "withholding": withholding_out()} | may_do(user) | ({"canEdit": False, "canDeactivate": False} if company_use != "2mg" else {})
+
+
+class SupplierReviewChange(Api):
+    id: str
+    version: str
+    origin: Literal["local", "foreign"] | None = None
+    withholding: str | None = None
+
+
+class SupplierReviewIn(Api):
+    changes: list[SupplierReviewChange] = Field(min_length=1, max_length=100)
+
+
+@router.post("/suppliers/review")
+def save_supplier_review(user: permitted("suppliers.edit"), db: DB, body: SupplierReviewIn) -> dict:
+    ids = [c.id for c in body.changes]
+    company_scope.require_ids(db, 'supplier', ids)
+    if len(set(ids)) != len(ids):
+        raise HTTPException(422, "A supplier appears twice. Nothing was saved.")
+    try:
+        rows = {s.id: s for s in locked(db, Supplier, ids)}
+        prepared = []
+        for change in body.changes:
+            s = rows.get(change.id)
+            if s is None:
+                raise HTTPException(409, "A supplier no longer exists. Reload the list; nothing was saved.")
+            if supplier_review_version(s) != change.version:
+                raise HTTPException(409, f"{s.name} changed since you loaded it. Reload the list; nothing was saved.")
+            fields = change.model_fields_set - {"id", "version"}
+            if not fields or ("origin" in fields and change.origin is None):
+                raise HTTPException(422, "Choose a classification or tax-code change. Nothing was saved.")
+            origin = change.origin if "origin" in fields else s.origin
+            code = change.withholding if "withholding" in fields else s.withholding
+            if code is not None and code not in WITHHOLDING:
+                raise HTTPException(422, "Choose a recognised withholding code. Nothing was saved.")
+            if origin == "foreign" and code:
+                raise HTTPException(422, f"{s.name}: a foreign supplier cannot have withholding. Explicitly clear its code or keep it Local. Nothing was saved.")
+            prepared.append((s, origin, code))
+        changed_count = 0
+        for s, origin, code in prepared:
+            changed = []
+            for field, value in (("origin", origin), ("withholding", code)):
+                if getattr(s, field) != value:
+                    setattr(s, field, value)
+                    changed.append(field)
+            if changed:
+                # As in the supplier form, edited tax defaults need confirmation on a bill.
+                if s.tax_defaults_confirmed:
+                    s.tax_defaults_confirmed = False
+                    changed.append("tax_defaults_confirmed")
+                audit(db, user, "supplier.updated", target=s.name, target_type="supplier", target_id=s.id, fields=changed)
+                changed_count += 1
+        db.commit()
+        owed = owed_by_supplier(db)
+        return {"changed": changed_count, "items": [supplier_review_row(rows[i], owed.get(i, 0)) for i in ids]}
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.get("/suppliers/{supplier_id}")
 def read_supplier(user: permitted("suppliers.view"), db: DB, supplier_id: str) -> dict:
     s = found_supplier(db, supplier_id)
     bills = db.scalars(select(Bill).where(Bill.supplier_id == s.id).order_by(Bill.bill_date.desc(), Bill.no.desc()).limit(50)).all()
     held = set_aside(db, [b.id for b in bills])
     return supplier_out(db, s) | {"bills": [bill_summary(b, held.get(b.id, 0)) for b in bills], "withholdingChoices": withholding_out(),
-                                  "payablesAccounts": payables_accounts(db)} | may_do(user)
+                                  "payablesAccounts": payables_accounts(db)} | may_do(user) | ({"canEdit": False, "canDeactivate": False} if company_scope.scope_for(db, "supplier", s.id) != "2mg" else {})
 
 
 @router.put("/suppliers/{supplier_id}")
 def change_supplier(user: permitted("suppliers.edit"), db: DB, supplier_id: str, body: SupplierIn) -> dict:
+    company_scope.require_ids(db, 'supplier', [supplier_id])
     s = found_supplier(db, supplier_id)
     changed = apply_supplier(db, s, body)
     audit(db, user, "supplier.updated", target=s.name, target_type="supplier", target_id=s.id, fields=changed)
@@ -384,6 +520,7 @@ class ActiveIn(Api):
 @router.post("/suppliers/{supplier_id}/active")
 def switch_supplier(user: permitted("suppliers.deactivate"), db: DB, supplier_id: str, body: ActiveIn) -> dict:
     """Switched off: not offered on new bills; their bills stay as they are. Never deleted."""
+    company_scope.require_ids(db, 'supplier', [supplier_id])
     s = found_supplier(db, supplier_id)
     if s.is_active != body.is_active:
         s.is_active = body.is_active
@@ -395,6 +532,7 @@ def switch_supplier(user: permitted("suppliers.deactivate"), db: DB, supplier_id
 @router.post("/suppliers/{supplier_id}/files", status_code=status.HTTP_201_CREATED)
 def attach_to_supplier(user: permitted("suppliers.edit"), db: DB, supplier_id: str, body: FileIn) -> dict:
     """The supplier's papers: their BIR 2303, accreditation, a contract."""
+    company_scope.require_ids(db, 'supplier', [supplier_id])
     s = found_supplier(db, supplier_id)
     if len(s.files) >= MAX_FILES:
         raise HTTPException(status.HTTP_409_CONFLICT, f"A supplier keeps up to {MAX_FILES} files. Remove one first.")
@@ -412,6 +550,7 @@ def open_supplier_file(user: permitted("suppliers.view"), db: DB, supplier_id: s
 
 @router.delete("/suppliers/{supplier_id}/files/{file_id}")
 def remove_supplier_file(user: permitted("suppliers.edit"), db: DB, supplier_id: str, file_id: str) -> dict:
+    company_scope.require_ids(db, 'supplier', [supplier_id])
     s = found_supplier(db, supplier_id)
     f = found_file(s.files, file_id)
     if stored := db.get(StoredFile, f.ref):
@@ -428,7 +567,7 @@ STATUS_LABELS = {"draft": "Draft", "recorded": "Recorded", "void": "Void"}
 # Where a bill stands, as the lists and tabs show it (Aubrey's flow, 2026-10-23): made, approved,
 # checked if tax is withheld; posted when it clears and then ready to pay.
 STATE_LABELS = {
-    "draft": "Draft", "returned": "Returned", "to_approve": "To approve", "to_check": "To check",
+    "draft": "Draft", "returned": "Returned", "to_approve": "To approve", "to_check": "Tax check",
     "ready": "Ready to pay", "partly_paid": "Partly paid", "paid": "Paid", "void": "Void",
 }
 STATE = case(
@@ -483,6 +622,14 @@ def may_bill(user, b: Bill) -> dict:
     }
 
 
+def spent_by_account(lines: list[dict]) -> dict[str, int]:
+    """What worked-out lines put on each account, before VAT (VAT goes to input VAT)."""
+    out: dict[str, int] = {}
+    for ln in lines:
+        out[ln["accountId"]] = out.get(ln["accountId"], 0) + ln.get("netCentavos", 0)
+    return out
+
+
 def bill_out(db: DB, b: Bill, user=None) -> dict:
     from modules.finance.zoho_outbox import summary as delivery_summary
     accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_({ln["accountId"] for ln in b.lines})))} if b.lines else {}
@@ -493,9 +640,22 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
             worked = (w.lines, w.net, w.vat, w.withheld, w.total, w.payable)
         except HTTPException as refused:
             problem = refused.detail
+    from modules.finance.purchase_intake import evidence_for
+    purchase_evidence=evidence_for(db,b.id,include_inactive=True)
+    flags = may_bill(user, b) if user is not None else {}
+    company_hold = None
+    if company_scope.scope_for(db, 'supplier', b.supplier_id) != '2mg' or any(company_scope.scope_for(db, 'account', ln.get('accountId')) != '2mg' for ln in b.lines or []):
+        company_hold = 'This saved bill has a supplier or account not verified for 2MG. Its history is retained; company review is needed before new approval, posting or payment.'
+        flags.update({key: False for key in ('canEdit', 'canSubmit', 'canApprove', 'canCheck', 'canPay')})
+    if purchase_evidence:
+        from modules.finance.purchase_intake import guard_bill
+        try:guard_bill(db,b,lock=False)
+        except HTTPException as held:
+            company_hold=str(held.detail)
+            flags.update({key:False for key in ('canEdit','canSubmit','canApprove','canCheck','canPay')})
     lines = worked[0] if worked else b.lines
     totals = worked[1:] if worked else (b.net_centavos, b.vat_centavos, b.withheld_centavos, b.total_centavos, b.payable_centavos)
-    return bill_summary(b, set_aside(db, [b.id]).get(b.id, 0)) | (may_bill(user, b) if user is not None else {}) | {
+    return bill_summary(b, set_aside(db, [b.id]).get(b.id, 0)) | flags | {"companyHold": company_hold,"purchaseEvidence":purchase_evidence,
         "supplier": supplier_out(db, b.supplier), "taxReviewed": b.tax_reviewed,
         "zohoSync": delivery_summary(db,'bill',b.id),
         "poNumber": b.po_number, "drNumber": b.dr_number, "checkedPo": b.checked_po, "checkedDr": b.checked_dr,
@@ -507,6 +667,7 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
                 "purchaseType": ln.get("purchaseType", "other_goods"),
                 "purchaseTypeLabel": PURCHASE_TYPES[ln.get("purchaseType", "other_goods")],
                 "withholdingRateBp": WITHHOLDING[ln["withholding"]][1] if ln.get("withholding") in WITHHOLDING else None,
+                "noWithholdingLabel": NO_WITHHOLDING.get(ln.get("noWithholding") or ""),
             }
             for ln in lines
         ],
@@ -514,6 +675,8 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
         # Bills with tax withheld are checked after approval (Mel); the others skip it.
         "needsCheck": totals[2] > 0,
         "problem": problem,
+        # Over-budget warning (recording 12): drafts only; a posted bill is already in the books.
+        "overBudget": budget_watch.over_budget(db, b.bill_date, spent_by_account(lines)) if worked else [],
         "files": files_out(b.files),
         "entryId": b.entry_id,
         "vouchers": [
@@ -532,17 +695,24 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
 
 
 @router.get("/bills/choices")
-def bill_choices(user: permitted("bills.view"), db: DB, settings: SettingsDep) -> dict:
+def bill_choices(user: permitted("bills.view"), db: DB, settings: SettingsDep, bill_id: str | None = Query(None, alias='billId')) -> dict:
     """What the bill form offers: active suppliers, the accounts a line can go to (expenses
     and assets), the VAT kinds and the withholding codes."""
-    suppliers = db.scalars(select(Supplier).where(Supplier.is_active).order_by(func.lower(Supplier.name))).all()
-    accounts = db.scalars(select(Account).where(Account.is_active, Account.type.in_(("expense", "asset"))).order_by(Account.code)).all()
+    current = db.get(Bill, bill_id) if bill_id else None
+    eligible = company_scope.usable_clause('supplier', Supplier.id)
+    if current is not None:
+        eligible = or_(eligible, Supplier.id == current.supplier_id)
+    suppliers = db.scalars(select(Supplier).where(Supplier.is_active, eligible).order_by(func.lower(Supplier.name))).all()
+    eligible_accounts = company_scope.usable_clause('account', Account.id)
+    if current is not None:
+        eligible_accounts = or_(eligible_accounts, Account.id.in_([line['accountId'] for line in current.lines]))
+    accounts = db.scalars(select(Account).where(Account.is_active, Account.type.in_(("expense", "asset")), eligible_accounts).order_by(Account.code)).all()
     return {
         "suppliers": [supplier_out(db, s, 0) for s in suppliers],
         "accounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in accounts],
         "vatKinds": [{"key": k, "label": v} for k, v in VAT_KINDS.items()],
         "purchaseTypes": [{"key": k, "label": v} for k, v in PURCHASE_TYPES.items()],
-        "withholding": withholding_out(), "canEditSuppliers": access_of(user).can("suppliers.edit"),
+        "withholding": withholding_out(), "noWithholding": no_withholding_out(), "canEditSuppliers": access_of(user).can("suppliers.edit"),
         "today": today(settings).isoformat(),
     }
 
@@ -601,6 +771,9 @@ class BillLineIn(Api):
     amount_centavos: int = Field(gt=0, lt=10**11)
     vat: Literal["vat", "zero", "exempt", "none"] = "vat"
     withholding: str | None = Field(None, max_length=10)
+    # No withholding, and why (app/payables.py NO_WITHHOLDING): needed for a local supplier's line before submitting.
+    no_withholding_reason: str | None = Field(None, max_length=20)
+    no_withholding_note: str | None = Field(None, max_length=200)
 
 
 class BillIn(Api):
@@ -628,9 +801,16 @@ def line_error(i: int, field: str, message: str) -> HTTPException:
 
 
 def apply_bill(db: DB, settings, b: Bill, body: BillIn, user) -> None:
+    from modules.finance.purchase_intake import linked,guard_bill
+    if b.id and linked(db,b.id):
+        guard_bill(db,b)
+        if (body.supplier_id != b.supplier_id or len(body.lines) != len(b.lines) or body.bill_number!=b.bill_number
+                or body.bill_date!=b.bill_date):
+            raise HTTPException(409,"Keep source-linked supplier, invoice identity, currency and line allocations. Cancel an unsubmitted draft and prepare it again for an identity correction.")
     supplier = db.get(Supplier, body.supplier_id)
     if supplier is None or not supplier.is_active:
         raise field_error("supplierId", "Pick an active supplier.")
+    company_scope.require_ids(db, 'supplier', [supplier.id], status_code=422)
     if body.bill_date > today(settings):
         raise field_error("billDate", "The bill date can't be in the future.")
     due = body.due_date or body.bill_date + timedelta(days=supplier.terms_days)
@@ -644,12 +824,23 @@ def apply_bill(db: DB, settings, b: Bill, body: BillIn, user) -> None:
         raise field_error("billNumber", f"This invoice from {supplier.name} is already here: bill {twin.no} ({STATE_LABELS[bill_state(twin)].lower()}).")
     lines = []
     for i, line in enumerate(body.lines):
+        company_scope.require_ids(db, 'account', [line.account_id], status_code=422)
         a = db.get(Account, line.account_id)
         if a is None or not a.is_active or a.type not in ("expense", "asset"):
             raise line_error(i, "accountId", "Pick an active expense or asset account.")
         if line.withholding and line.withholding not in WITHHOLDING:
             raise line_error(i, "withholding", "Pick a withholding code from the list.")
-        lines.append({"accountId": a.id, "description": line.description, "amountCentavos": line.amount_centavos, "vat": line.vat, "withholding": line.withholding, "purchaseType": line.purchase_type})
+        # A decision on every line before it's confirmed (Batch A): a code, or why none; never a code for a foreign supplier.
+        try:
+            code, reason, note = withholding_decision(supplier.origin, line.withholding, line.no_withholding_reason, line.no_withholding_note, complete=body.tax_reviewed)
+        except ValueError as problem:
+            raise line_error(i, "noWithholdingReason" if not line.withholding else "withholding", str(problem)) from None
+        entry = {"accountId": a.id, "description": line.description, "amountCentavos": line.amount_centavos, "vat": line.vat, "withholding": code, "purchaseType": line.purchase_type}
+        if reason:
+            entry["noWithholding"] = reason
+        if note:
+            entry["noWithholdingNote"] = note
+        lines.append(entry)
     b.tax_reviewed = body.tax_reviewed and all("vat" in line.model_fields_set and "withholding" in line.model_fields_set for line in body.lines)
     b.supplier_id, b.bill_number, b.bill_date, b.due_date = supplier.id, number, body.bill_date, due
     b.po_number, b.dr_number, b.checked_po, b.checked_dr = body.po_number, body.dr_number, body.checked_po, body.checked_dr
@@ -690,6 +881,8 @@ def add_bill(user: permitted("bills.create"), db: DB, settings: SettingsDep, bod
     db.add(b)
     db.flush()
     audit(db, user, "bill.created", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
+    from modules.finance.purchase_intake import updated_bill
+    updated_bill(db,b)
     db.commit()
     return bill_out(db, b, user)
 
@@ -705,6 +898,8 @@ def change_bill(user: permitted("bills.create"), db: DB, settings: SettingsDep, 
     editable(b)
     apply_bill(db, settings, b, body, user)
     audit(db, user, "bill.updated", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
+    from modules.finance.purchase_intake import updated_bill
+    updated_bill(db,b)
     db.commit()
     return bill_out(db, b, user)
 
@@ -713,6 +908,8 @@ def change_bill(user: permitted("bills.create"), db: DB, settings: SettingsDep, 
 def delete_bill(user: permitted("bills.create"), db: DB, bill_id: str) -> Response:
     b = found_bill(db, bill_id)
     editable(b)
+    from modules.finance.purchase_intake import protect_bill
+    protect_bill(db,b.id)
     refs = [f.ref for f in b.files]
     audit(db, user, "bill.deleted", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
     done(db, "bill.returned", bill_link(b))
@@ -745,7 +942,11 @@ def bill_event(b: Bill, kind: str, user, text: str | None = None) -> None:
 
 def bill_content(b: Bill) -> dict:
     """What a bill says: what each signature on it vouches for."""
+    from sqlalchemy.orm import object_session
+    from modules.finance.purchase_intake import evidence_for
+    evidence=evidence_for(object_session(b),b.id)
     return {
+        **({"purchaseEvidence":evidence} if evidence else {}),
         "supplier": b.supplier.name, "number": b.bill_number, "date": b.bill_date.isoformat(), "due": b.due_date.isoformat(),
         "lines": [[ln["accountId"], ln["amountCentavos"], ln["vat"], ln.get("withholding")] for ln in b.lines],
         "net": b.net_centavos, "vat": b.vat_centavos, "withheld": b.withheld_centavos, "payable": b.payable_centavos,
@@ -767,8 +968,15 @@ def submit_bill(user: permitted("bills.create"), db: DB, bill_id: str) -> dict:
     """For approval: Malou is told first (bills.first); the other approvers are backup (Cristal)."""
     b = found_bill(db, bill_id)
     editable(b)
+    company_scope.require_bill(db, b)
     if not b.tax_reviewed:
         raise HTTPException(409, "Open this draft and confirm its VAT and withholding choices before submitting.")
+    # Drafts confirmed before Batch A (2026-11-05), or a supplier whose origin changed since: checked again here.
+    for n, ln in enumerate(b.lines, start=1):
+        try:
+            withholding_decision(b.supplier.origin, ln.get("withholding"), ln.get("noWithholding"), ln.get("noWithholdingNote"), complete=True)
+        except ValueError as problem:
+            raise HTTPException(409, f"Line {n}: {problem} Open the draft to fix it.") from None
     if not b.supplier.is_active:
         raise HTTPException(status.HTTP_409_CONFLICT, f"{b.supplier.name} is switched off. Switch the supplier back on, or pick another.")
     w = work_out(db, b.lines, b.bill_date, b.amounts_include_vat)
@@ -784,6 +992,8 @@ def submit_bill(user: permitted("bills.create"), db: DB, bill_id: str) -> dict:
     tell(db, first or approvers, "bill.to_approve",
          f"{user.full_name} {'resubmitted' if again else 'submitted'} {bill_name(b)}. Waiting for your approval.", link=bill_link(b))
     audit(db, user, "bill.submitted", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
+    from modules.finance.purchase_intake import updated_bill
+    updated_bill(db,b)
     db.commit()
     return bill_out(db, b, user)
 
@@ -812,6 +1022,7 @@ def clear(db: DB, user, b: Bill, settings=None) -> None:
     withholding tax payable (Reconciler rule 3). Then ready to pay: Cristal is told."""
     if not b.supplier.is_active:
         raise HTTPException(status.HTTP_409_CONFLICT, f"{b.supplier.name} is switched off. Switch the supplier back on, or return the bill.")
+    company_scope.require_bill(db, b)
     w = work_out(db, b.lines, b.bill_date, b.amounts_include_vat)
     legs, payables = bill_posting(db, b, w)
     e = post(db, b.bill_date, f"Bill from {b.supplier.name}, invoice {b.bill_number}", legs, user.full_name, reference=b.bill_number[:80], source="bill", by_id=user.id)
@@ -833,6 +1044,7 @@ def approve_bill(user: permitted("bills.approve"), db: DB, settings: SettingsDep
     """Malou (Cristal backup). With tax withheld, it goes to be checked (Mel); else it clears."""
     b = found_bill(db, bill_id)
     at_stage(b, "to_approve")
+    company_scope.require_bill(db, b)
     not_submitter(user, b)
     b.approved_by, b.approved_by_id, b.approved_at = user.full_name[:120], user.id, datetime.now(UTC)
     bill_event(b, "approved", user)
@@ -845,6 +1057,8 @@ def approve_bill(user: permitted("bills.approve"), db: DB, settings: SettingsDep
     else:
         clear(db, user, b, settings)
     audit(db, user, "bill.approved", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
+    from modules.finance.purchase_intake import updated_bill
+    updated_bill(db,b)
     db.commit()
     return bill_out(db, b, user)
 
@@ -854,6 +1068,7 @@ def check_bill(user: permitted("bills.check"), db: DB, settings: SettingsDep, bi
     """Mel checks the tax withheld (the BIR code and rate); then it clears."""
     b = found_bill(db, bill_id)
     at_stage(b, "to_check")
+    company_scope.require_bill(db, b)
     not_submitter(user, b)
     if b.approved_by_id == user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You approved this bill, so someone else checks it.")
@@ -863,6 +1078,8 @@ def check_bill(user: permitted("bills.check"), db: DB, settings: SettingsDep, bi
     done(db, "bill.to_check", bill_link(b))
     clear(db, user, b, settings)
     audit(db, user, "bill.checked", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
+    from modules.finance.purchase_intake import updated_bill
+    updated_bill(db,b)
     db.commit()
     return bill_out(db, b, user)
 
@@ -888,6 +1105,8 @@ def return_bill(user: CurrentUser, db: DB, bill_id: str, body: ReasonIn) -> dict
         done(db, kind, bill_link(b))
     tell(db, [b.submitted_by_id], "bill.returned", f"{user.full_name} returned {bill_name(b)} ({STATE_LABELS[was].lower()}): {reason}", link=bill_link(b), not_to=[user.id])
     audit(db, user, "bill.returned", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id, fields=["reason"])
+    from modules.finance.purchase_intake import updated_bill
+    updated_bill(db,b)
     db.commit()
     return bill_out(db, b, user)
 
@@ -920,6 +1139,8 @@ def void_bill(user: permitted("bills.void"), db: DB, settings: SettingsDep, bill
     bill_event(b, "voided", user, reason)
     done(db, "bill.ready", bill_link(b))
     audit(db, user, "bill.voided", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
+    from modules.finance.purchase_intake import updated_bill
+    updated_bill(db,b)
     db.commit()
     return bill_out(db, b, user)
 
@@ -938,6 +1159,8 @@ def attach(user: permitted("bills.create"), db: DB, bill_id: str, body: FileIn) 
     ref, size = store_file(db, body)
     b.files.append(BillFile(ref=ref, name=body.name.strip(), content_type=body.content_type, size=size, uploaded_by=user.full_name))
     audit(db, user, "bill.file_added", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
+    from modules.finance.purchase_intake import updated_bill
+    updated_bill(db,b)
     db.commit()
     return bill_out(db, b, user)
 
@@ -957,5 +1180,7 @@ def remove_file(user: permitted("bills.create"), db: DB, bill_id: str, file_id: 
         db.delete(stored)
     b.files.remove(f)
     audit(db, user, "bill.file_removed", target=f"{b.supplier.name} {b.bill_number}", target_type="bill", target_id=b.id)
+    from modules.finance.purchase_intake import updated_bill
+    updated_bill(db,b)
     db.commit()
     return bill_out(db, b, user)

@@ -29,7 +29,7 @@ def test_preview_requires_explicit_tax_and_missing_tin_choices_without_writes(cl
     assert row["supplier"]["withholding"] is None
     assert any("Missing TIN" in v for v in row["reviews"])
     assert run(client, ana, [{"name": "Example"}]).status_code == 409
-    assert client.get("/finance/suppliers", headers=ana).json()["items"] == []
+    assert client.get("/finance/suppliers?company_use=all", headers=ana).json()["items"] == []
     assert client.post("/finance/suppliers/import", json={"suppliers": [{"name": "Bypass"}]}, headers=ana).status_code == 422
 
 
@@ -60,7 +60,7 @@ def test_extra_numbers_labels_and_inactive_currency_survive(client, ana, app):
     assert not value["isActive"] and "pesos only" in value["notes"]
     assert run(client, ana, [row], False).status_code == 422
     assert run(client, ana, [row]).status_code == 201
-    saved = client.get("/finance/suppliers", headers=ana).json()["items"][0]
+    saved = client.get("/finance/suppliers?company_use=all", headers=ana).json()["items"][0]
     assert saved["vatRegistered"] is False and saved["withholding"] is None and saved["contacts"][0]["phone"] == "09990000000"
     with app.state.sessions() as db:
         for model in (Bill, PaymentVoucher, JournalEntry):
@@ -88,7 +88,7 @@ def test_terms_shipping_and_accounts_require_resolution(client, ana):
     assert result["status"] == "new" and result["supplier"]["address"] == "Test shipping address"
     row["review"]["payablesAccountId"] = account(client, ana, "6500")
     assert preview(client, ana, [row])["rows"][0]["status"] == "problem"
-    liability = client.get("/finance/suppliers", headers=ana).json()["payablesAccounts"][0]
+    liability = client.get("/finance/suppliers?company_use=all", headers=ana).json()["payablesAccounts"][0]
     row["accountsPayable"] = liability["code"]
     row["review"]["payablesAccountId"] = liability["id"]
     result = preview(client, ana, [row])["rows"][0]
@@ -105,7 +105,7 @@ def test_duplicates_existing_branch_and_all_or_none(client, ana):
     assert [r["status"] for r in rows] == ["new", "duplicate", "here"]
     assert "record 12" in rows[1]["note"]
     assert run(client, ana, [good, existing]).status_code == 409
-    assert len(client.get("/finance/suppliers", headers=ana).json()["items"]) == 1
+    assert len(client.get("/finance/suppliers?company_use=all", headers=ana).json()["items"]) == 1
     assert run(client, ana, [good]).status_code == 201
     assert run(client, ana, [good]).status_code == 409
     branch = reviewed("Separate example branch", tin="999888777000")
@@ -121,16 +121,16 @@ def test_import_permission_and_concurrent_identity_recheck(client, ana):
     with ThreadPoolExecutor(max_workers=2) as pool:
         outcomes = list(pool.map(lambda _: run(client, ana, [deepcopy(row)]).status_code, range(2)))
     assert sorted(outcomes) == [201, 409]
-    assert len(client.get("/finance/suppliers", headers=ana).json()["items"]) == 1
+    assert len(client.get("/finance/suppliers?company_use=all", headers=ana).json()["items"]) == 1
 
 
 def test_confirmed_tax_persists_and_stale_account_mapping_is_rejected(client, ana, app):
     row = reviewed("Confirmed tax example", tin="88877766600000")
     row["review"].update(vatRegistered=True, withholding="WC158")
     assert run(client, ana, [row]).status_code == 201
-    saved = client.get("/finance/suppliers", headers=ana).json()["items"][0]
+    saved = client.get("/finance/suppliers?company_use=all", headers=ana).json()["items"][0]
     assert saved["vatRegistered"] is True and saved["withholding"]["code"] == "WC158"
-    liability = client.get("/finance/suppliers", headers=ana).json()["payablesAccounts"][0]
+    liability = client.get("/finance/suppliers?company_use=all", headers=ana).json()["payablesAccounts"][0]
     other = reviewed("Stale account example", accountsPayable=liability["code"])
     other["review"].update(payablesAccountId=liability["id"], accountConfirmed=True)
     assert preview(client, ana, [other])["rows"][0]["status"] == "new"
@@ -138,4 +138,4 @@ def test_confirmed_tax_persists_and_stale_account_mapping_is_rejected(client, an
         db.get(Account, liability["id"]).is_active = False
         db.commit()
     assert run(client, ana, [other]).status_code == 409
-    assert len(client.get("/finance/suppliers", headers=ana).json()["items"]) == 1
+    assert len(client.get("/finance/suppliers?company_use=all", headers=ana).json()["items"]) == 1

@@ -18,7 +18,7 @@ debits; liabilities, equity and income with credits.
 
 import re
 from datetime import UTC, date, datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -26,13 +26,14 @@ from pydantic import Field, model_validator
 from sqlalchemy import func, or_, select, update
 
 from modules.finance.access import access_of, permissions_of, permitted, settings_permitted
+from modules.finance import company_scope
 from modules.finance.audit import audit
 from modules.finance.config import Settings
 from modules.finance.deps import DB, SettingsDep
 from modules.finance.ledger import Leg, account_out, entry_out, post
 from modules.finance.ledger import settings as posting_settings
 from modules.finance.ledger import locked_settings, require_open_period
-from modules.finance.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Notification, User
+from modules.finance.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Notification, User, CompanyScopeReview
 from modules.finance.notify import done, holders, tell
 from modules.finance.routers.funds import today
 from modules.finance.signatures import journal_content, sign
@@ -53,9 +54,16 @@ def balance(type_: str, debit: int, credit: int) -> int:
 
 
 @router.get("/accounts")
-def list_accounts(user: permitted("accounts.view"), db: DB) -> dict:
-    items = db.scalars(select(Account).order_by(Account.code)).all()
-    return {"items": [account_out(a) for a in items], "types": [{"key": k, "label": v} for k, v in TYPE_LABELS.items()], "canEdit": access_of(user).can("accounts.manage")}
+def list_accounts(user: permitted("accounts.view"), db: DB, company_use: Literal['2mg', 'history', 'review', 'legacy', 'all'] = '2mg') -> dict:
+    query = select(Account)
+    if company_use == '2mg':
+        query = query.where(company_scope.usable_clause('account', Account.id))
+    elif company_use == 'history':
+        query = query.where(~company_scope.usable_clause('account', Account.id))
+    elif company_use != 'all':
+        query = query.where(Account.id.in_(company_scope.reviewed_ids('account', company_use)))
+    items = db.scalars(query.order_by(Account.code)).all()
+    return {"items": [account_out(a) for a in items], "types": [{"key": k, "label": v} for k, v in TYPE_LABELS.items()], "canEdit": company_use == "2mg" and access_of(user).can("accounts.manage")}
 
 
 class AccountIn(Api):
@@ -85,6 +93,7 @@ def check_parent(db: DB, account_id: str | None, parent_id: str | None) -> None:
     """A parent that exists, and isn't the account itself or one of the accounts under it."""
     if parent_id is None:
         return
+    company_scope.require_ids(db, 'account', [parent_id], status_code=422)
     seen = {account_id}
     at = db.get(Account, parent_id)
     if at is None:
@@ -104,6 +113,9 @@ def add_account(user: permitted("accounts.manage"), db: DB, body: AccountIn) -> 
     a = Account(**body.model_dump())
     db.add(a)
     db.flush()
+    # Explicit manual entry in this 2MG workspace.
+    db.add(CompanyScopeReview(subject_kind='account', subject_id=a.id, scope='2mg',
+                             evidence={'source':'manual entry in 2MG Finance'}, reviewed_by=user.full_name))
     audit(db, user, "account.created", target=f"{a.code} {a.name}", target_type="account", target_id=a.id)
     db.commit()
     return account_out(a)
@@ -111,6 +123,7 @@ def add_account(user: permitted("accounts.manage"), db: DB, body: AccountIn) -> 
 
 @router.put("/accounts/{account_id}")
 def change_account(user: permitted("accounts.manage"), db: DB, account_id: str, body: AccountIn) -> dict:
+    company_scope.require_ids(db, 'account', [account_id])
     a = db.get(Account, account_id)
     if a is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "There's no such account.")
@@ -326,6 +339,7 @@ class PostingIn(Api):
 @router.put("/posting")
 def change_posting(user: settings_permitted("accounts.manage"), db: DB, body: PostingIn) -> dict:
     s = posting_settings(db)
+    company_scope.require_ids(db, 'account', [id for id in body.accounts.values() if id], status_code=422)
     for key, account_id in body.accounts.items():
         if key not in POSTING:
             raise field_error("accounts", f"Unknown default account: {key}.")
@@ -350,6 +364,7 @@ def list_entries(
     source: Literal["manual", "fund", "invoice", "bill", "voucher", "petty_cash", "expense"] | None = None,
     q: str | None = Query(None, max_length=100),
     limit: int = Query(100, ge=1, le=500),
+    offset: Annotated[int, Query(ge=0)] = 0,
     state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),
 ) -> dict:
     query = select(JournalEntry)
@@ -364,11 +379,12 @@ def list_entries(
     if q:
         like = f"%{q.lower()}%"
         query = query.where(or_(func.lower(JournalEntry.number).like(like), func.lower(JournalEntry.memo).like(like), func.lower(JournalEntry.reference).like(like)))
-    items = db.scalars(query.order_by(JournalEntry.entry_date.desc(), JournalEntry.number.desc()).limit(limit)).all()
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    items = db.scalars(query.order_by(JournalEntry.entry_date.desc(), JournalEntry.number.desc(), JournalEntry.id.desc()).offset(offset).limit(limit)).all()
     # Where each reversal stands, so an entry whose reversal still waits isn't shown as reversed.
     reversals = [e.reversed_by_id for e in items if e.reversed_by_id]
     standing = dict(db.execute(select(JournalEntry.id, JournalEntry.status).where(JournalEntry.id.in_(reversals))).all()) if reversals else {}
-    return {"items": [entry_for(user, e, standing.get(e.reversed_by_id)) for e in items]}
+    return {"items": [entry_for(user, e, standing.get(e.reversed_by_id)) for e in items], "total": total}
 
 
 def entry_for(user: User, e: JournalEntry, reversal_status: str | None = None) -> dict:
@@ -549,6 +565,7 @@ def decide(db: DB, settings: Settings, user: User, entry_id: str, to: Literal["a
         if original is not None and original.reversed_by_id == e.id:
             original.reversed_by_id = None
     if to == "approved":
+        company_scope.require_posting(db, [Leg(ln.account, debit=ln.debit_centavos, credit=ln.credit_centavos) for ln in e.lines], db.get(JournalEntry, e.reverses_id) if e.reverses_id else None)
         # The approver's signature, on what they approved (decided 2026-10-22: placed by their own step).
         sign(db, user, "journal_entry", e.id, "approved", journal_content(e))
     audit(db, user, f"entry.{to}", target=e.number, target_type="journal_entry", target_id=e.id, fields=["reason"] if reason else ())

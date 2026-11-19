@@ -9,6 +9,7 @@ import { CellInput, Choice, Field, FormError, Input, Select, Textarea } from "@/
 import { formatTin } from "@/src/modules/finance/lib/tin";
 import { saveSupplier, switchSupplier } from "@/src/modules/finance/payables/actions";
 import type { Supplier, SupplierContact, Withholding } from "@/src/modules/finance/payables/types";
+import { originByName } from "@/src/modules/finance/payables/bill-tax";
 
 const SALUTATIONS = ["Mr.", "Ms.", "Mrs.", "Dr.", "Engr.", "Atty."];
 const blankContact = (): SupplierContact => ({ salutation: null, firstName: null, lastName: null, email: null, phone: null, mobile: null, designation: null });
@@ -36,6 +37,9 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
     address: supplier?.address ?? "",
     vat: supplier?.taxDefaultsConfirmed ? (supplier.vatRegistered ? "yes" : "no") : "",
     withholding: supplier?.withholding?.code ?? "",
+    // "": not chosen here, so it follows the name (bill-tax.ts originByName) until someone picks.
+    origin: supplier?.origin ?? "",
+    vatVariesByItem: supplier?.vatVariesByItem ?? false,
     terms: String(supplier?.termsDays ?? 30),
     payablesAccountId: supplier?.payablesAccount?.id ?? "",
     bankName: supplier?.bankName ?? "",
@@ -50,6 +54,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
   const [pending, start] = useTransition();
   const set = (patch: Partial<typeof v>) => setV({ ...v, ...patch });
   const blank = (s: string) => s.trim() || null;
+  const origin: "local" | "foreign" = v.origin === "local" || v.origin === "foreign" ? v.origin : originByName(v.name.trim() || v.companyName.trim());
   const setContact = (i: number, patch: Partial<SupplierContact>) => setContacts(contacts.map((c, n) => (n === i ? { ...c, ...patch } : c)));
 
   function submit(e: React.FormEvent) {
@@ -73,7 +78,9 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
         address: blank(v.address),
         vatRegistered: v.vat ? v.vat === "yes" : supplier?.vatRegistered ?? true,
         taxDefaultsConfirmed: taxConfirmed && !!v.vat,
-        withholding: v.withholding || null,
+        withholding: origin === "foreign" ? null : v.withholding || null,
+        origin,
+        vatVariesByItem: v.vatVariesByItem,
         termsDays: Number(v.terms) || 0,
         email: blank(v.email),
         phone: blank(v.phone),
@@ -150,6 +157,17 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
           </Field>
         </div>
         <Choice
+          name="origin"
+          legend="Where are they?"
+          value={origin}
+          onChange={(o) => set({ origin: o, ...(o === "foreign" ? { withholding: "" } : {}) })}
+          options={[
+            { value: "local", label: "Local" },
+            { value: "foreign", label: "Foreign (no tax withheld)" },
+          ]}
+        />
+        {!v.origin && <p className="-mt-2 text-meta text-ink-3">Set from the name: &quot;Ltd&quot; or &quot;Limited&quot; means foreign. Change it if that&apos;s wrong, e.g. a Philippine branch.</p>}
+        <Choice
           name="vat"
           legend="Do they charge VAT?"
           value={v.vat}
@@ -160,9 +178,9 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
           ]}
         />
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
-          <Field label="Usual tax withheld" optional error={fields.withholding} hint="Filled in on each new bill from them; a line can use another. The 1% and 2% apply when the company is a top withholding agent.">
+          <Field label="Usual tax withheld" optional error={fields.withholding} hint={origin === "foreign" ? "Nothing is withheld from a foreign supplier." : "Filled in on each new bill from them; a line can use another. The 1% and 2% apply when the company is a top withholding agent."}>
             {(p) => (
-              <Select {...p} value={v.withholding} onChange={(e) => { setTaxConfirmed(false); set({ withholding: e.target.value }); }}>
+              <Select {...p} value={origin === "foreign" ? "" : v.withholding} disabled={origin === "foreign"} onChange={(e) => { setTaxConfirmed(false); set({ withholding: e.target.value }); }}>
                 <option value="">None</option>
                 {withholding.map((w) => (
                   <option key={w.code} value={w.code}>
@@ -176,6 +194,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
             {(p) => <Input {...p} inputMode="numeric" value={v.terms} onChange={(e) => set({ terms: e.target.value.replace(/\D/g, "") })} maxLength={3} />}
           </Field>
         </div>
+        <label className="flex gap-2 text-sm"><input suppressHydrationWarning type="checkbox" checked={v.vatVariesByItem} onChange={(e) => set({ vatVariesByItem: e.target.checked })} />VAT differs by item (e.g. VAT-exempt medicines beside VATable goods): choose VAT on each bill line</label>
         <label className="flex gap-2 text-sm"><input suppressHydrationWarning type="checkbox" checked={taxConfirmed} disabled={!v.vat} onChange={event => setTaxConfirmed(event.target.checked)} />Confirm these supplier VAT/withholding defaults for future bills (optional)</label>
         <Field label="Accounts payable" optional error={fields.payablesAccountId} hint="Where their bills post what's owed. Left empty: the default (Accounting → Default accounts).">
           {(p) => (

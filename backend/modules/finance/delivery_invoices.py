@@ -58,6 +58,8 @@ def from_delivery(db: Session, data: dict, slug: str | None) -> Invoice | None:
     from modules.finance.routers.funds import today
     from modules.finance.routers.invoices import issue_now
 
+    if slug != '2mg':
+        raise HTTPException(409, 'Only a verified 2MG company event may prepare a Finance invoice.')
     sale = data.get("salesOrder") or None
     delivery_id = str(data.get("orderId") or "")[:36]
     if not sale or not delivery_id:

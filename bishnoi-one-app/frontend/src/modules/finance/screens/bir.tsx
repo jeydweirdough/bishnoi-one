@@ -1,10 +1,10 @@
+import { ContainedTable } from "@/src/modules/finance/bir/contained-table";
 import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import { Empty, PageHeader, Sheet } from "@/src/modules/finance/platform/ui/sheet";
-import { ToggleLinks } from "@/src/modules/finance/platform/ui/toggle-links";
 import type {
   AtcRow, BalanceSheet, Book, CashDisbursements, CashReceipts, GeneralJournal, GeneralLedger, IncomeStatement, PurchaseJournal, SalesJournal, SummaryList, Taxpayer, VatReturn,
   Withholding0619E, Withholding1601EQ, Withholding1604E, Withholding2307,
@@ -32,6 +32,12 @@ const BOOKS = [
 
 const inputClass = "ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm";
 const buttonClass = "h-8 rounded-[3px] border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control";
+
+function ReportTabs({ current, options }: { current: string; options: { value: string; label: string; href: string }[] }) {
+  return <nav aria-label="Report sections" className="flex max-w-full flex-wrap gap-1.5 print:hidden">{options.map(o =>
+    <Link key={o.value} href={o.href} aria-current={current === o.value ? "page" : undefined} className={`rounded-lg border px-3 py-2 text-meta ${current === o.value ? "border-ink bg-ink font-semibold text-white" : "border-rule bg-sheet text-ink-2 hover:border-control"}`}>{o.label}</Link>
+  )}</nav>;
+}
 
 /** Who files: the registration the forms carry, and what's missing from it. */
 function TaxpayerLine({ who }: { who: Taxpayer }) {
@@ -126,25 +132,7 @@ const th = "px-3 py-2.5 font-semibold first:pl-5 last:pr-5";
 const td = "px-3 py-2 first:pl-5 last:pr-5";
 const num = "text-right tabular-nums";
 
-function Table({ head, children, foot, wide = "min-w-[48rem]" }: { head: { label: string; right?: boolean }[]; children: ReactNode; foot?: ReactNode; wide?: string }) {
-  return (
-    <Sheet className="overflow-x-auto">
-      <table className={`w-full ${wide} text-sm`}>
-        <thead>
-          <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-            {head.map((h) => (
-              <th key={h.label} className={`${th} ${h.right ? "text-right" : ""}`}>
-                {h.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-rule">{children}</tbody>
-        {foot && <tfoot>{foot}</tfoot>}
-      </table>
-    </Sheet>
-  );
-}
+const Table = ContainedTable;
 
 const money = (fmt: Fmt, c: number) => (c ? fmt.peso(c) : "");
 
@@ -168,7 +156,7 @@ export async function BirBooksPage({ searchParams }: { searchParams: Search }) {
       </PageHeader>
       <TaxpayerLine who={data.taxpayer} />
       <div className="mb-4">
-        <ToggleLinks current={book} options={BOOKS.map((b) => ({ value: b.value, label: b.label, href: `/finance/bir?book=${b.value}&${keepDates}` }))} />
+        <ReportTabs current={book} options={BOOKS.map((b) => ({ value: b.value, label: b.label, href: `/finance/bir?book=${b.value}&${keepDates}` }))} />
       </div>
       <Toolbar file={download(path)}>
         <DatesForm action="/finance/bir" start={data.period.start} end={data.period.end} keep={{ book }} />
@@ -314,6 +302,7 @@ function GeneralJournalTable({ data, fmt }: { data: GeneralJournal; fmt: Fmt }) 
   if (data.entries.length === 0) return <Sheet><Empty title="No entries in this period" icon="lists" /></Sheet>;
   return (
     <Table
+      grouped
       head={[{ label: "Date" }, { label: "Entry no." }, { label: "Account" }, { label: "Debit", right: true }, { label: "Credit", right: true }]}
       foot={
         <tr className="border-t-2 border-ink font-semibold tabular-nums">
@@ -486,25 +475,8 @@ export async function BirVatPage({ searchParams }: { searchParams: Search }) {
       {isVat && <FilingNotice form="2550Q" />}
       <ReviewExports dates={false} filters={`year=${vat.year}&quarter=${vat.quarter}`} options={[["vat", "Return figures and monthly breakdown"], ["vat-sources", "Records behind the VAT figures"]]} />
       {isVat && <p className="mb-4 text-sm text-ink-2">Review copy only: missing credits, adjustments and payment details stay blank. The PDF is not a filing-ready return.</p>}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-start">
-        <Sheet className="overflow-x-auto">
-          <h2 className="px-5 pt-4 text-base font-semibold text-ink">For the return</h2>
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-rule">
-              {vat.lines.map((l) => (
-                <tr key={l.key} className={l.key === "payable" || l.key === "due" ? "border-t-2 border-ink font-semibold" : ""}>
-                  <td className={td}>
-                    {l.label}
-                  </td>
-                  <td className={`${td} ${num}`}>{l.rateBp !== undefined ? `${(l.rateBp / 100).toFixed(2)}%` : fmt.peso(l.amountCentavos ?? 0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {vat.notes.map((n) => (
-            <p key={n} className="px-5 pb-4 text-meta text-ink-3">{n}</p>
-          ))}
-        </Sheet>
+      <div className="space-y-5">
+        <section className="min-w-0"><h2 className="mb-2 text-base font-semibold text-ink">Monthly breakdown</h2>
         <Table
           wide="min-w-[36rem]"
           head={isVat ? [{ label: "Month" }, { label: "VATable sales", right: true }, { label: "Output VAT", right: true }, { label: "Purchases", right: true }, { label: "Input VAT", right: true }] : [{ label: "Month" }, { label: "Gross sales", right: true }]}
@@ -525,6 +497,25 @@ export async function BirVatPage({ searchParams }: { searchParams: Search }) {
             </tr>
           ))}
         </Table>
+        </section>
+        <section className="min-w-0">
+          <h2 className="mb-2 text-base font-semibold text-ink">Return figures</h2>
+          <Table wide="min-w-[28rem]" head={[{label: "Return item"}, {label: "Amount", right: true}]}>
+
+              {vat.lines.map((l) => (
+                <tr key={l.key} className={l.key === "payable" || l.key === "due" ? "border-t-2 border-ink font-semibold" : ""}>
+                  <td className={td}>
+                    {l.label}
+                  </td>
+                  <td className={`${td} ${num}`}>{l.rateBp !== undefined ? `${(l.rateBp / 100).toFixed(2)}%` : fmt.peso(l.amountCentavos ?? 0)}</td>
+                </tr>
+              ))}
+
+          </Table>
+          {vat.notes.map((n) => (
+            <p key={n} className="px-5 pb-4 text-meta text-ink-3">{n}</p>
+          ))}
+        </section>
       </div>
     </>
   );
@@ -564,7 +555,7 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
       </PageHeader>
       <TaxpayerLine who={data.taxpayer} />
       <div className="mb-4">
-        <ToggleLinks
+        <ReportTabs
           current={which}
           options={[
             { value: "sls", label: "Sales (SLS)", href: `/finance/bir/lists?list=sls&${keep}` },
@@ -697,7 +688,10 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
 
 async function FilingNotice({ form }: { form: string }) {
   const g=await load<{ online: string; attachments: string; kind: string }>(`/finance/bir/filing-guidance?form=${encodeURIComponent(form)}`);
-  return <Sheet className="mb-4 px-4 py-3"><p className="text-sm font-semibold">Prepared: review draft ? Online validation: not verified ? Filing evidence: not recorded here</p><p className="mt-2 text-meta text-ink-2">{g.online}</p><p className="mt-1 text-meta text-ink-3">{g.attachments}</p></Sheet>;
+  return <section className="mb-4 rounded-xl border border-rule bg-sheet px-4 py-3">
+    <div className="flex flex-wrap gap-x-5 gap-y-2 text-meta"><span className="font-semibold">Prepared: review draft</span><span>Online validation: not verified</span><span>Filing evidence: not recorded here</span></div>
+    <details className="mt-2 text-meta text-ink-2"><summary className="cursor-pointer">How to validate and file</summary><p className="mt-2">{g.online}</p><p className="mt-1">{g.attachments}</p></details>
+  </section>;
 }
 
 function WithholdingPdf({ form, year, quarter, month, supplierId }: { form: string; year: number; quarter?: number; month?: number; supplierId?: string }) {
@@ -769,7 +763,19 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
   const fmt = makeFormat(me.org);
   const sp = await searchParams;
   const form = FORMS.find((f) => f.value === one(sp.form))?.value ?? "2307";
-  const tabs = <ToggleLinks current={form} options={FORMS.map((f) => ({ value: f.value, label: f.label, href: `/finance/bir/withholding?form=${f.value}` }))} />;
+  const tabs = <ReportTabs current={form} options={FORMS.map((f) => {
+    const query = new URLSearchParams({ form: f.value });
+    if (/^\d{4}$/.test(one(sp.year))) query.set("year", one(sp.year));
+    const month = Number(one(sp.month)), quarter = Number(one(sp.quarter));
+    if (f.value === "0619e") {
+      if (month >= 1 && month <= 12) query.set("month", String(month));
+      else if (quarter >= 1 && quarter <= 4) query.set("month", String((quarter - 1) * 3 + 1));
+    } else if (f.value !== "1604e") {
+      if (quarter >= 1 && quarter <= 4) query.set("quarter", String(quarter));
+      else if (month >= 1 && month <= 12) query.set("quarter", String(Math.ceil(month / 3)));
+    }
+    return { value: f.value, label: f.label, href: `/finance/bir/withholding?${query}` };
+  })} />;
   const header = (title: string, says: ReactNode) => (
     <>
       <PageHeader title={title}>{says}</PageHeader>
@@ -786,8 +792,8 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
       <>
         {header("Withholding tax", <>Monthly remittance (BIR Form 0619E) for {d.period.label}: the expanded withholding on bills dated in the month. Filed for the quarter&apos;s first two months; the third is on the 1601EQ.</>)}
         <TaxpayerLine who={d.taxpayer} />
-        <WithholdingPdf form="0619e" year={d.year} month={d.month} />
         <Toolbar><MonthForm year={d.year} month={d.month} /></Toolbar>
+        <WithholdingPdf form="0619e" year={d.year} month={d.month} />
         <ReviewExports dates={false} filters={`year=${d.year}&month=${d.month}`} options={[["0619e", "Monthly withholding review"], ["withholding-sources", "Records behind monthly withholding"]]} />
         <AtcTable rows={d.rows} fmt={fmt} total={d.totalCentavos} />
       </>
@@ -800,14 +806,14 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
       <>
         {header("Withholding tax", <>Quarterly return of expanded withholding (BIR Form 1601EQ), {d.period.label}. The Quarterly Alphalist of Payees (QAP) goes with it: under Summary lists.</>)}
         <TaxpayerLine who={d.taxpayer} />
-        <WithholdingPdf form="1601eq" year={d.year} quarter={d.quarter} />
         <Toolbar file={download(`/finance/bir/lists/qap?year=${d.year}&quarter=${d.quarter}`)}>
           <QuarterForm action="/finance/bir/withholding" year={d.year} quarter={d.quarter} keep={{ form: "1601eq" }} />
         </Toolbar>
+        <WithholdingPdf form="1601eq" year={d.year} quarter={d.quarter} />
         <ReviewExports dates={false} filters={`year=${d.year}&quarter=${d.quarter}`} options={[["1601eq", "Quarterly withholding review"], ["withholding-sources", "Records behind quarterly withholding"]]} />
-        <div className="space-y-5">
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] xl:items-start">
           <AtcTable rows={d.rows} fmt={fmt} total={d.totalCentavos} />
-          <Sheet className="max-w-xl overflow-x-auto">
+          <Sheet className="min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <tbody className="divide-y divide-rule">
                 <tr><td className={td}>Total withheld for the quarter</td><td className={`${td} ${num}`}>{fmt.peso(d.totalCentavos)}</td></tr>
@@ -832,7 +838,6 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
       <>
         {header("Withholding tax", <>Annual information return of expanded withholding (BIR Form 1604E) for {d.year}, with its alphalist of payees.</>)}
         <TaxpayerLine who={d.taxpayer} />
-        <WithholdingPdf form="1604e" year={d.year}  />
         <Toolbar file={download(`/finance/bir/withholding/1604e?year=${d.year}`)}>
           <form className="flex items-end gap-3" action="/finance/bir/withholding">
             <input suppressHydrationWarning type="hidden" name="form" value="1604e" />
@@ -845,6 +850,7 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
             <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
           </form>
         </Toolbar>
+        <WithholdingPdf form="1604e" year={d.year}  />
         <div className="space-y-5">
           <AtcTable rows={d.byAtc} fmt={fmt} total={d.totals.taxCentavos} />
           {d.payees.length > 0 && (
@@ -884,22 +890,24 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
     <>
       {header("Withholding tax", <>Certificates of creditable tax withheld at source (BIR Form 2307), {d.period.label}: one for each supplier you withheld from, to give them.</>)}
       <TaxpayerLine who={d.taxpayer} />
-      {c && <WithholdingPdf form="2307" year={d.year} quarter={d.quarter} supplierId={c.payee.id} />}
       <ReviewExports dates={false} filters={q.toString()} options={[["2307", "2307 supporting figures"], ["withholding-sources", "Records behind the certificates"]]} />
       <Toolbar>
         <QuarterForm action="/finance/bir/withholding" year={d.year} quarter={d.quarter} keep={{ form: "2307" }} />
       </Toolbar>
+      {c && <WithholdingPdf form="2307" year={d.year} quarter={d.quarter} supplierId={c.payee.id} />}
       {d.suppliers.length === 0 ? (
         <Sheet><Empty title="No tax withheld from suppliers this quarter" icon="lists">Bills with an ATC (expanded withholding) appear here.</Empty></Sheet>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-          <Sheet className="px-2 py-2">
-            <ul>
+        <div className={c ? "grid min-w-0 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start" : "max-w-3xl space-y-3"}>
+          <Sheet className="min-w-0 px-2 py-2">
+            <h2 className="px-3 py-2 text-sm font-semibold">Suppliers ({d.suppliers.length})</h2>
+            <ul aria-label="Choose a supplier" className="max-h-[50vh] overflow-y-auto overscroll-contain">
               {d.suppliers.map((s) => (
                 <li key={s.id}>
                   <Link
                     href={`/finance/bir/withholding?${keep}&supplierId=${encodeURIComponent(s.id)}`}
-                    className={`block rounded-[3px] px-3 py-2 text-sm ${c?.payee.id === s.id ? "bg-hema-tint font-semibold text-hema" : "hover:bg-sheet"}`}
+                    aria-current={c?.payee.id === s.id ? "page" : undefined}
+                    className={`block break-words rounded-[3px] px-3 py-2 text-sm ${c?.payee.id === s.id ? "bg-hema-tint font-semibold text-hema" : "hover:bg-sheet"}`}
                   >
                     {s.name}
                     <span className="block text-meta font-normal text-ink-3">{fmt.peso(s.taxCentavos)} withheld</span>
@@ -909,7 +917,7 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
             </ul>
           </Sheet>
           {c ? (
-            <Sheet className="overflow-x-auto px-5 py-4 print:shadow-none">
+            <Sheet className="min-w-0 overflow-x-auto px-5 py-4 print:shadow-none">
               <h2 className="text-base font-semibold text-ink">BIR Form 2307: {c.title}</h2>
               <p className="mt-1 text-meta text-ink-2">For {d.period.label} ({fmt.dateLabel(d.period.start)} to {fmt.dateLabel(d.period.end)})</p>
               <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
@@ -958,7 +966,7 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
               </p>
             </Sheet>
           ) : (
-            <Sheet><Empty title="Pick a supplier" icon="lists">Their certificate for the quarter shows here.</Empty></Sheet>
+            <p className="text-sm text-ink-2">Choose a supplier above to review their certificate and download its PDF.</p>
           )}
         </div>
       )}
@@ -974,7 +982,13 @@ type ReadinessCheck = {
   accounts: { id: string; code: string; name: string }[];
   otherSources: { source: string; name: string; entries: number; centavos: number; listed: { id: string; number: string; date: string; memo: string; centavos: number }[] }[];
 };
-type Readiness = { checks: ReadinessCheck[]; counts: Record<"agrees" | "differs" | "not_set", number>; note: string; period: { start: string; end: string; label: string } };
+// Batch A (2026-11-05): whether every local purchase says what was withheld, or why nothing was.
+type WithholdingReview = {
+  status: "reviewed" | "needs_review"; missingCount: number;
+  missing: { kind: "bill" | "petty_cash"; id: string; label: string; line: number; date: string; centavos: number; href: string }[];
+  originNotSet: { id: string; name: string; bills: number }[]; foreignLines: number; importedWithoutWithholding: number;
+};
+type Readiness = { checks: ReadinessCheck[]; counts: Record<"agrees" | "differs" | "not_set", number>; note: string; period: { start: string; end: string; label: string }; withholdingReview?: WithholdingReview };
 const STATUS: Record<ReadinessCheck["status"], { label: string; tone: string }> = {
   agrees: { label: "Agrees with the books", tone: "bg-mint-2 text-sage-deep" },
   differs: { label: "Differs from the books", tone: "bg-due-today/10 text-due-today" },
@@ -997,34 +1011,57 @@ export async function BirReadinessPage({ searchParams }: { searchParams: Search 
         <DatesForm action="/finance/bir/readiness" start={data.period.start} end={data.period.end} />
       </Toolbar>
       <p className="mb-4 text-sm">{data.counts.agrees} agree · {data.counts.differs} differ · {data.counts.not_set} can&apos;t be compared yet</p>
-      <div className="space-y-4">
-        {data.checks.map((c) => (
-          <Sheet key={c.key} className="space-y-3 p-5">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div><h2 className="text-base font-semibold text-ink">{c.title}</h2><p className="text-meta text-ink-3">{c.says}</p></div>
-              <span className={`rounded-md px-2 py-1 text-meta font-semibold ${STATUS[c.status].tone}`}>{STATUS[c.status].label}</span>
-            </div>
-            {c.message ? <p className="text-sm text-ink-2">{c.message}</p> : (
-              <div className="grid gap-3 sm:grid-cols-3">
-                <p className="text-sm">{c.listName}<span className="block text-lg font-semibold tabular-nums">{fmt.peso(c.listCentavos)}</span></p>
-                <p className="text-sm">Books ({c.accounts.map((a) => `${a.code} ${a.name}`).join(", ")})<span className="block text-lg font-semibold tabular-nums">{fmt.peso(c.booksCentavos ?? 0)}</span></p>
-                <p className="text-sm">Difference<span className={`block text-lg font-semibold tabular-nums ${c.differenceCentavos ? "text-due-today" : ""}`}>{fmt.peso(c.differenceCentavos ?? 0)}</span></p>
-              </div>
-            )}
-            {c.causes.length > 0 && <div><p className="text-sm font-semibold">Possible reasons</p><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink-2">{c.causes.map((x) => <li key={x}>{x}</li>)}</ul></div>}
-            {c.otherSources.map((o) => (
-              <details key={o.source} className="rounded-lg border border-rule p-3">
-                <summary className="cursor-pointer text-sm"><strong>{o.name}</strong>: {o.entries} {o.entries === 1 ? "entry" : "entries"}, {fmt.peso(o.centavos)}, not in the tax list</summary>
-                <table className="mt-2 w-full text-sm"><tbody className="divide-y divide-rule">{o.listed.map((e) => (
-                  <tr key={e.id}><td className="py-1.5 pr-3"><Link href={`/finance/ledger?q=${encodeURIComponent(e.number)}`} className="text-hema hover:underline">{e.number}</Link></td><td className="pr-3">{fmt.dateLabel(e.date)}</td><td className="pr-3">{e.memo}</td><td className={num}>{fmt.peso(e.centavos)}</td></tr>
-                ))}</tbody></table>
-                {o.entries > o.listed.length && <p className="mt-1 text-meta text-ink-3">The first {o.listed.length} are listed.</p>}
-              </details>
-            ))}
-          </Sheet>
-        ))}
-      </div>
+      {data.checks.every(c => c.listCentavos === 0 && c.booksCentavos === 0) && <p className="mb-4 rounded-lg border border-rule bg-sheet px-4 py-3 text-sm text-ink-2">No amounts in this period. Matching zero totals do not prove that populated records are correct; choose the period you want to review.</p>}
+      <Table wide="min-w-[56rem]" head={[{label:"Check"},{label:"Report",right:true},{label:"Books",right:true},{label:"Difference",right:true},{label:"Result"}]}>
+        {data.checks.map(c => <tr key={c.key}>
+          <td className={td + " max-w-md align-top"}><h2 className="text-sm font-semibold">{c.title}</h2><p className="mt-1 text-meta text-ink-3">{c.listName}</p>
+            {c.message && <p className="mt-2 text-meta">{c.message}</p>}
+            <details className="mt-2 text-meta"><summary className="cursor-pointer text-hema">Comparison details</summary><p className="mt-2">{c.says}</p><p className="mt-1 text-ink-3">Accounts: {c.accounts.map(a => a.code + " " + a.name).join(", ") || "Not set"}</p>
+              {c.causes.length > 0 && <ul className="mt-2 list-disc pl-4">{c.causes.map(cause => <li key={cause}>{cause}</li>)}</ul>}
+              {c.otherSources.map(o => <div key={o.source} className="mt-3"><p className="font-semibold">{o.name}: {o.entries} entries, {fmt.peso(o.centavos)}, outside the tax list</p><ul className="mt-1 space-y-1">{o.listed.map(e => <li key={e.id}><Link href={"/finance/ledger?q=" + encodeURIComponent(e.number)} className="text-hema underline">{e.number}</Link> / {fmt.dateLabel(e.date)} / {e.memo} / {fmt.peso(e.centavos)}</li>)}</ul>{o.entries > o.listed.length && <p>First {o.listed.length} shown; open Journal entries for more.</p>}</div>)}
+            </details>
+          </td>
+          <td className={td + " " + num + " align-top whitespace-nowrap"}>{fmt.peso(c.listCentavos)}</td>
+          <td className={td + " " + num + " align-top whitespace-nowrap"}>{c.booksCentavos === null ? "Not available" : fmt.peso(c.booksCentavos)}</td>
+          <td className={td + " " + num + " align-top whitespace-nowrap"}>{c.differenceCentavos === null ? "Not available" : fmt.peso(c.differenceCentavos)}</td>
+          <td className={td + " align-top"}><span className={"inline-block rounded-md px-2 py-1 text-meta font-semibold " + STATUS[c.status].tone}>{STATUS[c.status].label}</span></td>
+        </tr>)}
+      </Table>
+      {data.withholdingReview && <WithholdingReviewPanel review={data.withholdingReview} fmt={fmt} />}
       <p className="mt-4 text-meta text-ink-3">{data.note}</p>
     </>
+  );
+}
+
+/** Totals can agree while tax that should have been withheld is missing (two zeros agree): this lists the posted
+ *  local lines with no withholding code and no reason, so Sir Mel reviews them instead of hunting for them. */
+function WithholdingReviewPanel({ review, fmt }: { review: WithholdingReview; fmt: ReturnType<typeof makeFormat> }) {
+  const done = review.status === "reviewed";
+  return (
+    <section className="mt-6 rounded-lg border border-rule bg-sheet p-4" aria-labelledby="withholding-review">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="withholding-review" className="text-sm font-semibold">Withholding reviewed</h2>
+        <span className={"inline-block rounded-md px-2 py-1 text-meta font-semibold " + (done ? "bg-mint-2 text-sage-deep" : "bg-due-today/10 text-due-today")}>
+          {done ? "Every local purchase has a decision" : `${review.missingCount + review.originNotSet.length} to review`}
+        </span>
+      </div>
+      <p className="mt-1 text-meta text-ink-3">Posted bill lines and petty cash receipts from local suppliers need a withholding code, or a reason why none is withheld. Foreign suppliers are never withheld from ({review.foreignLines} {review.foreignLines === 1 ? "line" : "lines"} this period).</p>
+      {review.missingCount > 0 && (
+        <div className="mt-3 text-sm">
+          <p className="font-semibold">{review.missingCount} {review.missingCount === 1 ? "line has" : "lines have"} no withholding and no reason</p>
+          <ul className="mt-1 space-y-1 text-meta">
+            {review.missing.map((m) => <li key={`${m.kind}-${m.id}-${m.line}`}><Link href={`/finance${m.href}`} className="text-hema underline">{m.label}</Link> · line {m.line} · {fmt.dateLabel(m.date)} · {fmt.peso(m.centavos)}</li>)}
+          </ul>
+          {review.missingCount > review.missing.length && <p className="mt-1 text-meta text-ink-3">First {review.missing.length} shown.</p>}
+          <p className="mt-1 text-meta text-ink-3">Already posted, so they aren&apos;t changed here: a wrong one is voided and entered again.</p>
+        </div>
+      )}
+      {review.originNotSet.length > 0 && (
+        <p className="mt-3 text-sm">Suppliers with no local or foreign set: {review.originNotSet.map((s) => <Link key={s.id} href={`/finance/suppliers/${s.id}`} className="mr-2 text-hema underline">{s.name}</Link>)}</p>
+      )}
+      {review.importedWithoutWithholding > 0 && (
+        <p className="mt-3 text-meta text-ink-3">Also: {review.importedWithoutWithholding} imported Zoho expense {review.importedWithoutWithholding === 1 ? "line has" : "lines have"} no withholding. They came in as history, without reasons.</p>
+      )}
+    </section>
   );
 }

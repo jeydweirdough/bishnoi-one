@@ -10,7 +10,8 @@ import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import { ZohoImport } from "@/src/modules/finance/import-matching/zoho-import";
 import { VoidImportedExpense } from "@/src/modules/finance/petty-cash/steps";
 
-// Imported expenses (app/routers/imported_expenses.py; decided 2026-10-31, Plans/Plan - Q1 imports per area):
+// Zoho expense history, called Imported expenses until 2026-11-04, when the name read as the costs of
+// importing goods (app/routers/imported_expenses.py; decided 2026-10-31, Plans/Plan - Q1 imports per area):
 // Zoho's Q1 expenses, as read-only history. Nobody adds or edits one here, and they aren't petty cash:
 // the export has no receipt files. A mistake is voided, which reverses its entry on the day it's voided.
 
@@ -46,16 +47,16 @@ export async function ImportedExpensesPage({ searchParams }: { searchParams: Sea
   const href = (key: string) => `${PAGE}?${new URLSearchParams({ show: key, ...(q ? { q } : {}) })}`;
   return (
     <>
-      <PageHeader title="Imported expenses" crumbs={[{ href: "/finance/petty-cash", label: "Petty cash" }]} actions={canImport && <ZohoImport kind="expenses" />}>
+      <PageHeader title="Zoho expense history" crumbs={[{ href: "/finance/petty-cash", label: "Petty cash" }]} actions={canImport && <ZohoImport kind="expenses" />}>
         Zoho&apos;s expenses, kept as read-only history. They post to the books and reach the BIR purchase lists. Nobody adds or edits one here, and new spending still goes through petty cash or bills.
       </PageHeader>
-      <ReviewExports filters={query.toString()} options={[ ["imported-expenses", "Imported expenses: one row per expense"], ["imported-expense-lines", "Imported expense lines"] ]} />
+      <ReviewExports filters={query.toString()} options={[ ["imported-expenses", "Zoho expenses: one row per expense"], ["imported-expense-lines", "Zoho expense lines"] ]} />
       <ListFrame>
         <FigureStrip figures={[{ label: "Posted", value: String(list.counts.posted) }, { label: "Total posted", value: fmt.peso(list.totalCentavos) }]} />
         <UnderlineTabs tabs={TABS.map((t) => ({ href: href(t.key), label: t.label, count: list.counts[t.key], current: show === t.key }))} />
         <ListToolbar q={q} placeholder="Search entry number, vendor or reference" keep={{ show }} />
         {list.items.length === 0 ? (
-          <Empty title={q ? "No matching expenses" : "No imported expenses here"} icon="lists">
+          <Empty title={q ? "No matching expenses" : "No Zoho expenses here"} icon="lists">
             {!q && canImport ? "Bring them in with Import from Zoho export." : null}
           </Empty>
         ) : (
@@ -98,7 +99,7 @@ export async function ImportedExpensePage({ params }: { params: Promise<{ id: st
   const x = await load<Detail>(`/finance/imported-expenses/${enc(id)}`);
   return (
     <>
-      <PageHeader title={`Imported expense ${x.number}`} crumbs={[{ href: "/finance/petty-cash", label: "Petty cash" }, { href: PAGE, label: "Imported expenses" }]} actions={x.canVoid && <VoidImportedExpense id={x.id} number={x.number} />}>
+      <PageHeader title={`Zoho expense ${x.number}`} crumbs={[{ href: "/finance/petty-cash", label: "Petty cash" }, { href: PAGE, label: "Zoho expense history" }]} actions={x.canVoid && <VoidImportedExpense id={x.id} number={x.number} />}>
         <StatusPill tone={x.status === "void" ? "bad" : "good"}>{x.status === "void" ? "Void" : "Posted"}</StatusPill>
         {x.status === "void" && <span className="ml-2 text-meta text-danger">Voided by {x.voidedBy}: {x.voidReason}</span>}
       </PageHeader>

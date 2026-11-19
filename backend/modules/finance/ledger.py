@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from modules.finance.locks import lock_series, locked
+from modules.finance import company_scope
 from modules.finance.models import Account, FundRequest, JournalEntry, JournalLine, LedgerSettings
 
 
@@ -69,6 +70,7 @@ def post(db: Session, on: date, memo: str, legs: list[Leg], who: str, *, referen
     missing = [leg for leg in legs if leg.account is None]
     if missing:
         raise HTTPException(status.HTTP_409_CONFLICT, "A default account is not set. Set it under Accounting → Default accounts, then try again.")
+    company_scope.require_posting(db, legs, reverses)
     debits, credits = sum(leg.debit for leg in legs), sum(leg.credit for leg in legs)
     if not legs or debits != credits:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Total debits must equal total credits, and both must be greater than zero.")

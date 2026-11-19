@@ -1,5 +1,5 @@
-﻿"""Directory-first imports need no vendor-by-vendor accounting decisions."""
-from modules.finance.models import Supplier
+"""Directory-first imports need no vendor-by-vendor accounting decisions."""
+from modules.finance.models import Supplier, CompanyScopeReview
 from .test_tax_api import app, ana, ben, client  # noqa: F401
 from .test_payables import account
 from .test_dashboard import VIEW, person
@@ -20,7 +20,8 @@ def test_directory_import_without_row_reviews_and_repeat_is_idempotent(client,an
     assert response.json()['added']==200
     again=client.post('/finance/suppliers/import',headers=ana,json={'rows':rows,'confirmed':True})
     assert again.json()['added']==0 and again.json()['counts']['here']==200
-    saved=client.get('/finance/suppliers',headers=ana).json()['items']
+    assert client.get('/finance/suppliers',headers=ana).json()['items']==[]
+    saved=client.get('/finance/suppliers?company_use=all',headers=ana).json()['items']
     assert len(saved)==200 and all(not s['taxDefaultsConfirmed'] for s in saved)
     assert all(s['contacts'][0]['phone']=='09990000000' for s in saved)
 
@@ -37,16 +38,18 @@ def test_invalid_tin_and_overflow_are_retained_not_blocked_and_conflicts_are_ski
     assert data['importDetails']['unresolved']['additionalNumbers'][0]['phone']=='1'*50
     response=client.post('/finance/suppliers/import',headers=ana,json={'rows':rows,'confirmed':True})
     assert response.status_code==201 and response.json()['added']==2
-    saved=next(s for s in client.get('/finance/suppliers',headers=ana).json()['items'] if s['name']=='Retained source')
+    saved=next(s for s in client.get('/finance/suppliers?company_use=all',headers=ana).json()['items'] if s['name']=='Retained source')
     assert saved['importDetails']['hints']['tax_name']=='No Tax' and not saved['taxDefaultsConfirmed']
 
 
-def test_unknown_bill_defaults_require_explicit_document_choices_and_cannot_grant_master_edit(client,ana):
+def test_unknown_bill_defaults_require_explicit_document_choices_and_cannot_grant_master_edit(app,client,ana):
     imported=client.post('/finance/suppliers/import',headers=ana,json={'rows':[{'name':'First use example'}],'confirmed':True})
     assert imported.status_code==201
-    vendor=client.get('/finance/suppliers',headers=ana).json()['items'][0]
+    vendor=client.get('/finance/suppliers?company_use=all',headers=ana).json()['items'][0]
+    with app.state.sessions() as db:
+        db.add(CompanyScopeReview(subject_kind='supplier',subject_id=vendor['id'],scope='2mg',reviewed_by='Fixture review',evidence={'fixture':'explicit fictional company review'}));db.commit()
     maker=person(client,ana,'Creates bills only',VIEW+['suppliers.view','bills.view','bills.create'])
-    line={'accountId':account(client,ana,'6500'),'amountCentavos':10000,'vat':'none','withholding':None}
+    line={'accountId':account(client,ana,'6500'),'amountCentavos':10000,'vat':'none','withholding':None,'noWithholdingReason':'not_covered'}
     body={'supplierId':vendor['id'],'billNumber':'TEST-FIRST-USE','billDate':'2026-10-01','lines':[line]}
     response=client.post('/finance/bills',headers=maker,json=body); assert response.status_code==201,response.text
     bill=response.json(); assert not bill['taxReviewed']
@@ -54,7 +57,8 @@ def test_unknown_bill_defaults_require_explicit_document_choices_and_cannot_gran
     # A boolean alone does not certify silently defaulted line VAT/withholding.
     omitted=body|{'taxReviewed':True,'lines':[{'accountId':line['accountId'],'amountCentavos':10000}]}
     response=client.put(f"/finance/bills/{bill['id']}",headers=maker,json=omitted)
-    assert response.status_code==200 and not response.json()['taxReviewed']
+    # Since Batch A (2026-11-05) it's refused outright: a confirmed bill needs a withholding decision on every line.
+    assert response.status_code==422 and 'say why none is withheld' in response.text
     attempts=body|{'taxReviewed':True,'saveSupplierDefaults':True,'supplierVatRegistered':False,'supplierWithholding':None}
     assert client.put(f"/finance/bills/{bill['id']}",headers=maker,json=attempts).status_code==403
     response=client.put(f"/finance/bills/{bill['id']}",headers=maker,json=body|{'taxReviewed':True})

@@ -28,8 +28,8 @@ def delivery(n: int = 1, fee_charged: bool = True) -> dict:
     }
 
 
-def send(client, event):
-    r = client.post("/platform/events", json={"pass": note("event", event=event)})
+def send(client, event, slug="2mg"):
+    r = client.post("/platform/events", json={"pass": note("event", event=event, slug=slug)})
     assert r.status_code == 204, r.text
 
 
@@ -38,9 +38,11 @@ def outbox(app, kind):
         return [e.data for e in db.scalars(select(OutboxEvent).where(OutboxEvent.kind == kind).order_by(OutboxEvent.occurred_at))]
 
 
-def test_a_delivery_becomes_its_invoice_issued_once(app, client, ana):  # noqa: F811
+def test_a_delivery_becomes_its_invoice_issued_once(app, client, ana, monkeypatch):  # noqa: F811
     app.state.settings.platform_public_key = PUBLIC
     ready(client, ana)
+    from .cost_fixture import known_product_cost
+    known_product_cost(client, ana, monkeypatch)
     for _ in range(2):
         send(client, delivery())
     send(client, {**delivery(), "id": "ev-delivery-again"})  # the same delivery told twice: one invoice
@@ -66,7 +68,7 @@ def test_a_delivery_becomes_its_invoice_issued_once(app, client, ana):  # noqa: 
     assert len(paid) == 1 and paid[0]["salesOrderId"] == "so-1"
 
 
-def test_when_it_cant_be_issued_it_waits_as_a_draft_with_why(app, client, ana):  # noqa: F811
+def test_when_it_cant_be_issued_it_waits_as_a_draft_with_why(app, client, ana, monkeypatch):  # noqa: F811
     app.state.settings.platform_public_key = PUBLIC
     # No invoice numbers yet (no BIR series): made, not issued.
     send(client, delivery(2, fee_charged=False))
@@ -77,6 +79,8 @@ def test_when_it_cant_be_issued_it_waits_as_a_draft_with_why(app, client, ana): 
     assert all("Shipping" not in l["description"] for l in client.get(f"/finance/invoices/{inv['id']}", headers=ana).json()["lines"])
     # Fixed: Finance issues it; it's no longer waiting.
     ready(client, ana)
+    from .cost_fixture import known_product_cost
+    known_product_cost(client, ana, monkeypatch)
     r = client.post(f"/finance/invoices/{inv['id']}/issue", json={}, headers=ana)
     assert r.status_code == 200, r.text
     assert r.json()["attention"] is None and client.get("/finance/invoices?attention=true", headers=ana).json()["counts"]["attention"] == 0
@@ -104,8 +108,12 @@ def test_a_consignment_settlement_becomes_a_draft_vendor_bill(app, client, ana):
     event = {"id": "ev-consign-1", "kind": "consignment.billed", "source": "inventory", "occurredAt": "2026-10-29T00:00:00+00:00",
              "data": {"settlementId": "cs-1", "number": "CS-00001", "supplier": {"id": "s-1", "code": "GC045604", "name": "ABC Medical Supply", "tin": None},
                       "lines": [{"productId": "p-1", "sku": "GLV-M", "name": "Gloves M", "quantity": 4, "unitCost": 18500, "total": 74000}], "totalCentavos": 74000}}
+    from .test_payables import supplier
+    supplier(client, ana, name='ABC Medical Supply', tin=None)
+    from .test_payables import account
+    assert client.put('/finance/ledger/posting',headers=ana,json={'accounts':{'cogs_account_id':account(client,ana,'6500')}}).status_code==200
     for _ in range(2):
-        send(client, event)
+        send(client, event, slug='2mg')
     from modules.finance.models import Bill, Supplier
 
     with app.state.sessions() as db:

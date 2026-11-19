@@ -250,14 +250,21 @@ def cost_lines(db: Session, settings, inv: Invoice) -> tuple[list | None, int]:
     """Each line's cost per unit from Inventory (by its item code), and the invoice's total cost."""
     from modules.finance.inventory import unit_costs
 
-    if not (posting_settings(db).cogs_account_id and posting_settings(db).inventory_account_id):
-        return None, 0
     lines = inv.lines or []
-    costs = unit_costs(settings, [str(l.get("ref") or "") for l in lines])
+    refs = [str(l.get("ref") or "").strip().upper() for l in lines]
+    if not any(refs):
+        return None, 0  # No item identity: not an asserted zero-cost product.
+    ledger = posting_settings(db)
+    if not (ledger.cogs_account_id and ledger.inventory_account_id):
+        raise HTTPException(409, "Set the inventory and cost-of-goods accounts before issuing an invoice with product codes.")
+    costs = unit_costs(settings, refs)
     if costs is None:
-        return None, 0
-    per_unit = [costs.get(str(l.get("ref") or "").strip().upper()) for l in lines]
-    return per_unit, sum((c or 0) * int(l.get("quantity") or 0) for c, l in zip(per_unit, lines))
+        raise HTTPException(409, "Inventory costs are unavailable. No invoice was issued; retry after the source is available.")
+    per_unit = [costs.get(ref) if ref else None for ref in refs]
+    if any(ref and (cost is None or not isinstance(cost, int) or cost < 0) for ref, cost in zip(refs, per_unit)):
+        raise HTTPException(409, "A product code has no valid Inventory cost. Confirm the product and cost before issuing.")
+    return per_unit, sum(cost * int(line.get("quantity") or 0) for cost, line in zip(per_unit, lines) if cost is not None)
+
 
 
 def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True, linked: dict | None = None) -> dict:
@@ -446,6 +453,8 @@ def issue_now(db: Session, settings, inv: Invoice, actor, actor_name: str, serie
     computed = work_out(db, settings, sale_of(inv))
     if computed["warnings"]:
         raise HTTPException(status.HTTP_409_CONFLICT, " ".join(computed["warnings"]) + " Go to Tax, Registration, then issue it.")
+    # Validate costs before taking a number or changing draft state.
+    known_costs, total_cost = cost_lines(db, settings, inv)
     # The series, locked while its number is taken, so two invoices issued at once never share one.
     options = usable_series(db)
     s = next((x for x in options if x.id == series_id), None) if series_id else (options[0] if options else None)
@@ -471,7 +480,7 @@ def issue_now(db: Session, settings, inv: Invoice, actor, actor_name: str, serie
     ]
     # The cost of goods sold, from Inventory by each line's item code, in the same entry: a void
     # reverses the sale and its cost together (decided 2026-10-28). Not linked, or no codes: no cost.
-    inv.line_costs, inv.cost_centavos = cost_lines(db, settings, inv)
+    inv.line_costs, inv.cost_centavos = known_costs, total_cost
     if inv.cost_centavos and ledger.cogs_account_id and ledger.inventory_account_id:
         legs += [
             Leg(account(db, ledger.cogs_account_id), debit=inv.cost_centavos, description="Cost of goods sold"),
