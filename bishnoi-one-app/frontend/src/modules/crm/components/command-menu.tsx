@@ -18,6 +18,8 @@ import { Amount } from "@/src/platform/ui/amount";
 // see; the actions are the ones their role allows.
 
 const OPEN_EVENT = "bishnoi:command-menu";
+/** The one search at the top left (src/platform/shell/search-menu.tsx) asks first; on CRM pages this menu answers. */
+const SEARCH_EVENT = "bishnoi:search";
 /** Shown per kind under All; a scope tab shows up to what the API sends (12). */
 const PER_GROUP = 4;
 
@@ -114,21 +116,25 @@ export function CommandMenu({ actions }: { actions: MenuAction[] }) {
 
   // Ctrl+K / ⌘K anywhere; "/" when not typing in a field.
   useEffect(() => {
+    // Ctrl+K / Ctrl+J come through the one search (SEARCH_EVENT); "/" is the CRM's own.
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        setOpen((o) => !o);
-      } else if (e.key === "/" && !open && !typingIn(e.target)) {
+      if (e.key === "/" && !open && !typingIn(e.target)) {
         e.preventDefault();
         setOpen(true);
       }
     };
     const onAsk = () => setOpen(true);
+    const onSearch = (e: Event) => {
+      e.preventDefault();
+      setOpen((o) => !o);
+    };
     window.addEventListener("keydown", onKey);
     window.addEventListener(OPEN_EVENT, onAsk);
+    window.addEventListener(SEARCH_EVENT, onSearch);
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener(OPEN_EVENT, onAsk);
+      window.removeEventListener(SEARCH_EVENT, onSearch);
     };
   }, [open]);
 

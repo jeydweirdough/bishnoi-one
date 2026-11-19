@@ -11,7 +11,7 @@ import { CanProvider } from "@/src/modules/crm/components/quick-add/can";
 import { isFieldAgent } from "@/src/modules/crm/components/field/words";
 import { TermsProvider } from "@/src/modules/crm/components/terms/provider";
 import { termsOf } from "@/src/modules/crm/components/terms/terms";
-import { CommandMenu, CommandMenuButton, type MenuAction } from "@/src/modules/crm/components/command-menu";
+import { CommandMenu, type MenuAction } from "@/src/modules/crm/components/command-menu";
 import type { Me } from "@/src/platform/lib/types";
 import { withCrmPages } from "@/src/modules/crm/lib/page";
 
@@ -52,7 +52,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
   // Named: on the sales order pages the page itself talks to Inventory (modules.ts borrowedOf).
   const notifications = apiFor("crm").get<Prompt[]>("/attention").then(withCrmPages).catch(() => [] as Prompt[]);
   return (
-    <ShellLayout unset={unset} notifications={notifications} allHref="/crm/attention" search={me.org ? <CommandMenuButton /> : undefined}>
+    <ShellLayout unset={unset} notifications={notifications} allHref="/crm/attention">
       <TermsProvider terms={termsOf(me)}>
         <CanProvider permissions={me.permissions ?? []}>{children}</CanProvider>
       </TermsProvider>
