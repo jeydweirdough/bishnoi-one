@@ -1,20 +1,14 @@
 "use client";
 
-import { Button as AntButton } from "antd";
 import { useRouter } from "next/navigation";
 import type { ComponentProps, MouseEvent, ReactNode } from "react";
+import { Button as ShadButton } from "@/src/components/ui/button";
+import { Spinner } from "@/src/components/ui/spinner";
+import { SHAD_SIZE, SHAD_VARIANT, type Size, type Variant } from "./button-look";
 
-// Ant Design's button, with the props every screen already passes.
-export type Variant = "primary" | "default" | "quiet" | "danger";
-export type Size = "md" | "sm" | "lg";
-
-function look(variant: Variant): Pick<ComponentProps<typeof AntButton>, "type" | "danger" | "color" | "variant"> {
-  if (variant === "primary") return { type: "primary" };
-  // Red outline, as the UI kit's; a dialog's final "Delete" stays solid red (ui/confirm.tsx).
-  if (variant === "danger") return { type: "default", danger: true };
-  if (variant === "quiet") return { type: "text" };
-  return { type: "default" };
-}
+// Every screen's button: shadcn/ui's, as Studio Admin uses it (2026-11-19), with the props every screen already
+// passes (it was Ant Design's; the file keeps its name so nothing else changes).
+export type { Size, Variant } from "./button-look";
 
 type ButtonProps = Omit<ComponentProps<"button">, "type" | "color"> & {
   variant?: Variant;
@@ -25,11 +19,20 @@ type ButtonProps = Omit<ComponentProps<"button">, "type" | "color"> & {
   type?: "button" | "submit" | "reset";
 };
 
-export function Button({ variant = "default", size = "md", loading = false, icon, type = "button", children, ...rest }: ButtonProps) {
+export function Button({ variant = "default", size = "md", loading = false, icon, type = "button", disabled, children, ...rest }: ButtonProps) {
   return (
-    <AntButton suppressHydrationWarning {...look(variant)} size={size === "sm" ? "small" : size === "lg" ? "large" : "middle"} htmlType={type} loading={loading} icon={icon} {...rest}>
+    <ShadButton
+      suppressHydrationWarning
+      variant={SHAD_VARIANT[variant]}
+      size={SHAD_SIZE[size]}
+      type={type}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...rest}
+    >
+      {loading ? <Spinner data-icon="inline-start" /> : icon}
       {children}
-    </AntButton>
+    </ShadButton>
   );
 }
 
@@ -43,7 +46,7 @@ type LinkButtonProps = Omit<ComponentProps<"a">, "href" | "type" | "color"> & {
   prefetch?: boolean;
 };
 
-/** A link drawn as an Ant button. A plain click moves within the app; Ctrl-click and the like still open a new tab, and a `download` link fetches its file. */
+/** A link drawn as a button. A plain click moves within the app; Ctrl-click and the like still open a new tab, and a `download` link fetches its file. */
 export function LinkButton({ href, variant = "default", size = "md", icon, children, onClick, scroll, prefetch, ...rest }: LinkButtonProps) {
   const router = useRouter();
   // Load the page ahead when the pointer comes near, as a Next link does.
@@ -55,16 +58,11 @@ export function LinkButton({ href, variant = "default", size = "md", icon, child
     router.push(href, { scroll: scroll ?? true });
   }
   return (
-    <AntButton suppressHydrationWarning
-      {...look(variant)}
-      size={size === "sm" ? "small" : size === "lg" ? "large" : "middle"}
-      href={href}
-      icon={icon}
-      onClick={go as unknown as ComponentProps<typeof AntButton>["onClick"]}
-      onMouseEnter={ahead}
-      {...(rest as Record<string, unknown>)}
-    >
-      {children}
-    </AntButton>
+    <ShadButton asChild variant={SHAD_VARIANT[variant]} size={SHAD_SIZE[size]}>
+      <a suppressHydrationWarning href={href} onClick={go} onMouseEnter={ahead} {...rest}>
+        {icon}
+        {children}
+      </a>
+    </ShadButton>
   );
 }
