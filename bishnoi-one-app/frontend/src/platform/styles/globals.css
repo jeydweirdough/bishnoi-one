@@ -1,4 +1,127 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* shadcn/ui, as Studio Admin sets it up (2026-11-19, owner: the whole UI on shadcn, Studio Admin as the basis):
+   its neutral theme, light and dark. Our own token names below now point at these, so every screen takes the look. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* Default theme styles (used when no data-theme-preset is set or when 'default' is selected).
+These serve as the fallback; there is no separate default.css file. */
+:root {
+  --radius: 0.625rem;
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* fonts */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
 
 /*
  * The sign-in page's look, everywhere (Desktop: bishnoi-one-crm-components.html):
@@ -11,12 +134,12 @@
  */
 @theme {
   /* Executive Admin's sidebar and section colours (its screens, moved in as they are, 2026-10-23). */
-  --color-rail: #fafaf8;
-  --color-section: #4f7f44;
-  --color-section-hover: #3f6f35;
-  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --color-rail: var(--sidebar);
+  --color-section: var(--primary);
+  --color-section-hover: oklch(0.3 0 0);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   /* Codes and figures too: one family everywhere. */
-  --font-mono: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   /*
    * Type roles, named for their job. One family (Poppins), and each role a
@@ -55,25 +178,25 @@
   --text-tick: 0.6875rem;
   --text-tick--line-height: 1.2;
 
-  --color-bench: #fafaf8;
-  --color-sheet: #ffffff;
-  --color-ink: #141414;
-  --color-ink-2: #3b3b3b;
-  --color-ink-3: #6a6a6a;
-  --color-rule: #ececea;
-  --color-rule-strong: #d6d6d4;
+  --color-bench: var(--background);
+  --color-sheet: var(--card);
+  --color-ink: var(--foreground);
+  --color-ink-2: oklch(0.371 0 0);
+  --color-ink-3: var(--muted-foreground);
+  --color-rule: var(--border);
+  --color-rule-strong: oklch(0.87 0 0);
   --color-control: #8a8a8a;
   /* The action colour: ink. Its tint is mint (hover, the current page, selected rows). */
-  --color-hema: #141414;
-  --color-hema-hover: #2b2b2b;
-  --color-hema-tint: #f1f7ee;
-  --color-sage: #a8d69b;
-  --color-sage-deep: #4f7f44;
-  --color-mint: #f1f7ee;
-  --color-mint-2: #e3eedf;
-  --color-eosin: #b42318;
+  --color-hema: var(--primary);
+  --color-hema-hover: oklch(0.3 0 0);
+  --color-hema-tint: var(--accent);
+  --color-sage: oklch(0.87 0 0);
+  --color-sage-deep: var(--primary);
+  --color-mint: var(--accent);
+  --color-mint-2: var(--muted);
+  --color-eosin: var(--destructive);
   --color-eosin-tint: #fde8e6;
-  --color-danger: #b42318;
+  --color-danger: var(--destructive);
   --color-danger-tint: #fde8e6;
   --color-filed: #3f6f35;
   /* The home calendar's key, with eosin for overdue. Checked as a set for colour
@@ -90,7 +213,7 @@
   --color-promo-tint: #fff7da;
   --color-promo-ink: #6b3f00;
 
-  --radius-sheet: 12px;
+  --radius-sheet: calc(var(--radius) + 4px);
   /* Sheets are outlined (border-rule), so their shadow is only a breath. */
   --shadow-sheet: 0 1px 2px 0 rgb(20 20 20 / 0.03);
   --shadow-overlay: 0 6px 16px 0 rgb(0 0 0 / 0.08), 0 3px 6px -4px rgb(0 0 0 / 0.12), 0 9px 28px 8px rgb(0 0 0 / 0.05);

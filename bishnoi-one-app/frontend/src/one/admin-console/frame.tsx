@@ -1,11 +1,10 @@
+import { AppShell } from "@/src/platform/shell/app-shell";
 import { cookies } from "next/headers";
 import { Suspense, type ReactNode } from "react";
-import { NavProgress } from "@/src/platform/shell/nav-progress";
 import { getAccount, type Account } from "@/src/platform/lib/account";
 import { OneActions } from "@/src/one/one-actions";
 import { myModules } from "@/src/one/mine";
 import { ConsoleNav, type ConsoleGroup } from "./nav";
-import { CrumbsSlot } from "@/src/platform/shell/crumbs";
 import { CRM_SETTINGS, FINANCE_SETTINGS, FINANCE_TABS, INVENTORY_SETTINGS, INVENTORY_TABS } from "./app-settings";
 
 /**
@@ -106,16 +105,6 @@ export async function AdminConsoleFrame({ children, console: which = "platform" 
   );
   const groups = which === "operations" ? operationsGroups(me) : consoleGroups(me);
   return (
-    <div className="group/shell lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
-      <ConsoleNav module={which} groups={groups} mine={myModules(me)} company={which === "operations" ? "Bishnoi One" : me.company?.name} rail={rail} actions={actions} />
-      {/* Says at once that a link was clicked: a bar within the console, the 4-dot loader when opening another app. */}
-      <Suspense fallback={null}>
-        <NavProgress />
-      </Suspense>
-      <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
-        <header className="mx-auto mb-4 hidden max-w-[80rem] items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
-        <div className="mx-auto max-w-[80rem]">{children}</div>
-      </main>
-    </div>
+    <AppShell nav={<ConsoleNav module={which} groups={groups} mine={myModules(me)} company={which === "operations" ? "Bishnoi One" : me.company?.name} rail={rail} actions={actions} />} actions={actions}>{children}</AppShell>
   );
 }

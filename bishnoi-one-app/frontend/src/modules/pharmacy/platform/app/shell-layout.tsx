@@ -1,3 +1,4 @@
+import { AppShell } from "@/src/platform/shell/app-shell";
 import { cookies } from "next/headers";
 import { Suspense, type ReactNode } from "react";
 import { Notices } from "@/src/platform/app/notices";
@@ -5,10 +6,8 @@ import { OneActions } from "@/src/one/one-actions";
 import { getAccount } from "@/src/platform/lib/account";
 import { myModules } from "@/src/one/mine";
 import { ModuleActions } from "@/src/platform/shell/module-actions";
-import { NavProgress } from "@/src/platform/shell/nav-progress";
 import { getMe } from "../lib/api";
 import { Nav } from "../shell/nav";
-import { CrumbsSlot } from "@/src/platform/shell/crumbs";
 
 // Pharmacy's frame inside the one app (decided 2026-10-23): its sidebar, its own
 // actions at the top (its bell, your profile here), then the page. The one app's
@@ -30,19 +29,10 @@ export async function ShellLayout({ children, unset, bell }: Props) {
   );
   return (
     <>
-      <Suspense fallback={null}>
-        <NavProgress />
-      </Suspense>
-      <div className="group/shell lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
-        <Nav me={me} mine={mine} unset={unset} rail={rail} actions={actions} />
-        <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
-          <header className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem] mb-4 hidden items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
-          <div className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">
+      <AppShell nav={<Nav me={me} mine={mine} unset={unset} rail={rail} actions={actions} />} actions={actions}>
             <Notices timeZone={me.org?.timezone} />
             {children}
-          </div>
-        </main>
-      </div>
+          </AppShell>
     </>
   );
 }
