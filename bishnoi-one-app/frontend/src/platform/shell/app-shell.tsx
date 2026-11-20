@@ -5,6 +5,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/src/components/
 import { CrumbsSlot } from "./crumbs";
 import { NavProgress } from "./nav-progress";
 import { SearchMenu } from "./search-menu";
+import { ThemeSwitch } from "./theme-switch";
 
 /**
  * The frame round every signed-in page, as Studio Admin's dashboard layout (shadcn/ui, 2026-11-19): the sidebar
@@ -33,7 +34,10 @@ export async function AppShell({ nav, actions, children }: { nav: ReactNode; act
                   <CrumbsSlot />
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">{actions}</div>
+              <div className="flex shrink-0 items-center gap-2">
+                <ThemeSwitch />
+                {actions}
+              </div>
             </div>
           </header>
           <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden p-4 md:p-6">

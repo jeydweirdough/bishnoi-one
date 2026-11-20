@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import type { ReactNode } from "react";
 import { Toaster } from "@/src/components/ui/sonner";
 import { TooltipProvider } from "@/src/components/ui/tooltip";
+import { ThemeProvider } from "next-themes";
 import { APP_NAME } from "../lib/labels";
 
 // Geist, as Studio Admin uses it (shadcn/ui, 2026-11-19), from the geist package: kept with the app, so a
@@ -26,10 +27,13 @@ export const viewport: Viewport = { themeColor: "#ffffff" };
  */
 export function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${fontVars} antialiased`}>
+    <html lang="en" className={`${fontVars} antialiased`} suppressHydrationWarning>
       <body className="min-h-dvh font-sans">
-        <TooltipProvider>{children}</TooltipProvider>
-        <Toaster position="top-center" duration={4000} />
+        {/* Light, dark or as the computer is set (Studio Admin's switch, src/platform/shell/theme-switch.tsx); light until chosen. */}
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+          <TooltipProvider>{children}</TooltipProvider>
+          <Toaster position="top-center" duration={4000} />
+        </ThemeProvider>
       </body>
     </html>
   );

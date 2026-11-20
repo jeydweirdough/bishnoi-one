@@ -36,7 +36,7 @@ export function MonthBars({ points, unit }: { points: { label: string; long: str
           return (
             <div key={p.long} className="group relative flex h-full flex-1 flex-col justify-end">
               <span
-                className={`pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-md bg-ink px-3 py-1.5 text-center whitespace-nowrap text-white shadow-overlay transition-opacity ${
+                className={`pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-md bg-primary px-3 py-1.5 text-center whitespace-nowrap text-primary-foreground shadow-overlay transition-opacity ${
                   on ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}
                 style={{ bottom: `calc(${h}% + 12px)` }}

@@ -12,11 +12,11 @@ export const KINDS: { kind: CrmKind; label: string; icon: IconName; planned: boo
 export const kindOf = (kind: CrmKind) => KINDS.find((k) => k.kind === kind) ?? KINDS[0];
 
 export const TYPE_COLORS: Record<CustomerTypeColor, { label: string; style: string }> = {
-  gray: { label: "Gray", style: "border-transparent bg-[#f0f0ee] text-ink-2" },
+  gray: { label: "Gray", style: "border-transparent bg-muted text-ink-2" },
   brand: { label: "Ink", style: "border-ink bg-sheet text-ink" },
-  green: { label: "Green", style: "border-transparent bg-[#e6f2e1] text-[#3f6f35]" },
-  blue: { label: "Blue", style: "border-transparent bg-[#e7eef8] text-[#1f4f8a]" },
-  amber: { label: "Amber", style: "border-transparent bg-[#fbf0d9] text-[#8a5a00]" },
+  green: { label: "Green", style: "border-transparent bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
+  blue: { label: "Blue", style: "border-transparent bg-[#e7eef8] text-blue-700 dark:text-blue-400" },
+  amber: { label: "Amber", style: "border-transparent bg-amber-500/10 text-amber-700 dark:text-amber-400" },
   red: { label: "Red", style: "border-transparent bg-danger-tint text-danger" },
   purple: { label: "Purple", style: "border-transparent bg-[#f1eaf8] text-[#5b3a8a]" },
   muted: { label: "Faded", style: "border-dashed border-rule-strong text-ink-3" },

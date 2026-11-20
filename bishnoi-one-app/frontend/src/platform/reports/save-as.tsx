@@ -73,7 +73,7 @@ export function SaveAs({
   return (
     <>
       <Dropdown menu={{ items }} trigger={["click"]} placement="bottomRight">
-        <button suppressHydrationWarning type="button" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rule bg-white px-3 text-sm text-ink hover:border-ink">
+        <button suppressHydrationWarning type="button" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rule bg-card px-3 text-sm text-ink hover:border-ink">
           <Save className="size-4" aria-hidden /> Save as <ChevronDown className="size-3.5 text-ink-3" aria-hidden />
         </button>
       </Dropdown>
@@ -180,7 +180,7 @@ function Preview({ title, columns, rows, totals, search, allRows, doc, onClose }
             </div>
           </div>
           <div className="max-h-[70vh] overflow-auto rounded-xl bg-bench p-4">
-            <div className="mx-auto w-full max-w-[210mm] bg-white shadow-sm">{paper}</div>
+            <div className="mx-auto w-full max-w-[210mm] bg-card shadow-sm">{paper}</div>
           </div>
         </div>
       </Modal>

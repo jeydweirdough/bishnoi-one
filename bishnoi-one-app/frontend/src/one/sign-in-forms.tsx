@@ -207,7 +207,7 @@ export function TwoStepSetup({ onDone, compact = false }: { onDone: () => void; 
     >
       <p className="text-sm text-ink-2">1. In the app, add an account and scan this code.</p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={started.qr} alt="QR code to add Bishnoi One to your authenticator app" className="mx-auto size-48 rounded-lg border border-rule bg-white p-1" />
+      <img src={started.qr} alt="QR code to add Bishnoi One to your authenticator app" className="mx-auto size-48 rounded-lg border border-rule bg-card p-1" />
       <p className="text-meta text-ink-3">
         Can&apos;t scan? Enter this key in the app instead: <span className="font-mono break-all text-ink">{started.secret.replace(/(.{4})/g, "$1 ").trim()}</span>
       </p>

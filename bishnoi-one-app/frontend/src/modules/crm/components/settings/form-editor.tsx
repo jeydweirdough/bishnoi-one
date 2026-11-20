@@ -402,17 +402,17 @@ export function FormEditor({
                         value={s.title}
                         onChange={(e) => changeSection(s.ref, { title: e.target.value })}
                         aria-label="Section title"
-                        className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-[0.9375rem] font-medium text-white placeholder:text-white/60 hover:bg-white/10 focus:bg-white/15 focus:outline-none"
+                        className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-[0.9375rem] font-medium text-white placeholder:text-white/60 hover:bg-card/10 focus:bg-card/15 focus:outline-none"
                         placeholder="Section title"
                       />
-                      <div className="flex items-center gap-0.5 rounded-md bg-white/10 p-0.5 text-meta" role="group" aria-label="Columns">
+                      <div className="flex items-center gap-0.5 rounded-md bg-card/10 p-0.5 text-meta" role="group" aria-label="Columns">
                         {([1, 2] as const).map((n) => (
                           <button suppressHydrationWarning
                             key={n}
                             type="button"
                             aria-pressed={s.columns === n}
                             onClick={() => changeSection(s.ref, { columns: n })}
-                            className={`rounded px-2 py-0.5 ${s.columns === n ? "bg-white text-sage-deep" : "text-white/85 hover:bg-white/15"}`}
+                            className={`rounded px-2 py-0.5 ${s.columns === n ? "bg-card text-sage-deep" : "text-white/85 hover:bg-card/15"}`}
                           >
                             {n} {n === 1 ? "column" : "columns"}
                           </button>
@@ -502,7 +502,7 @@ function BandButton({ label, disabled, onClick, children }: { label: string; dis
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="grid size-7 place-items-center rounded-md text-white/85 hover:bg-white/15 hover:text-white disabled:opacity-35 disabled:hover:bg-transparent"
+      className="grid size-7 place-items-center rounded-md text-white/85 hover:bg-card/15 hover:text-white disabled:opacity-35 disabled:hover:bg-transparent"
     >
       {children}
     </button>

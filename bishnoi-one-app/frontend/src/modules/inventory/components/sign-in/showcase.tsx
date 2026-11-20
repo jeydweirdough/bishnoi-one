@@ -35,21 +35,21 @@ export function Showcase() {
   return (
     <aside
       aria-label="What Inventory keeps track of"
-      className="hidden flex-col items-center justify-center rounded-xl bg-[#f1f7ee] px-10 py-12 lg:flex"
+      className="hidden flex-col items-center justify-center rounded-xl bg-emerald-500/10 px-10 py-12 lg:flex"
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
     >
       <div className="relative w-full max-w-[34rem]">
         <Art />
-        <div key={at} className="absolute bottom-[1%] left-[-3%] w-[14rem] rounded-xl border-[1.5px] border-[#141414] bg-white px-5 pt-4 pb-4 motion-safe:animate-[card-in_500ms_ease-out_both]">
+        <div key={at} className="absolute bottom-[1%] left-[-3%] w-[14rem] rounded-xl border-[1.5px] border-foreground bg-card px-5 pt-4 pb-4 motion-safe:animate-[card-in_500ms_ease-out_both]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold text-[#141414]">{slide.title}</p>
-              <p className="mt-0.5 text-meta text-[#545454]">{slide.sub}</p>
+              <p className="truncate text-base font-semibold text-foreground">{slide.title}</p>
+              <p className="mt-0.5 text-meta text-muted-foreground">{slide.sub}</p>
             </div>
             <Ring value={slide.value} />
           </div>
-          <span className="mt-3 inline-flex rounded-md border border-[#141414] px-3 py-0.5 text-meta font-medium text-[#141414]">{slide.chip}</span>
+          <span className="mt-3 inline-flex rounded-md border border-foreground px-3 py-0.5 text-meta font-medium text-foreground">{slide.chip}</span>
         </div>
       </div>
 
@@ -62,11 +62,11 @@ export function Showcase() {
             aria-selected={i === at}
             aria-label={s.title}
             onClick={() => setAt(i)}
-            className={`h-2 rounded-full transition-all focus-visible:ring-2 focus-visible:ring-[#7fb070] focus-visible:outline-none ${i === at ? "w-6 bg-[#141414]" : "w-2 bg-[#c9c9c9] hover:bg-[#9a9a9a]"}`}
+            className={`h-2 rounded-full transition-all focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${i === at ? "w-6 bg-foreground" : "w-2 bg-[#c9c9c9] hover:bg-[#9a9a9a]"}`}
           />
         ))}
       </div>
-      <p className="mt-6 max-w-[26rem] text-center text-[1.45rem] leading-snug text-[#141414]" aria-live="polite">
+      <p className="mt-6 max-w-[26rem] text-center text-[1.45rem] leading-snug text-foreground" aria-live="polite">
         {slide.says} <span className="font-semibold whitespace-nowrap">Bishnoi One Inventory</span>
       </p>
     </aside>

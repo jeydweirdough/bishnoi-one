@@ -19,7 +19,7 @@ export type Tone = "neutral" | "active" | "done" | "attention" | "muted";
 const TONES: Record<Tone, string> = {
   neutral: "bg-[#f1f1ee] text-ink-2",
   active: "bg-hema-tint text-ink",
-  done: "bg-[#e6f2e1] text-[#3f6f35]",
+  done: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   attention: "bg-danger-tint text-danger",
   muted: "bg-bench text-ink-3",
 };

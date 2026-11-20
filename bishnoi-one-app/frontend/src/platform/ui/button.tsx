@@ -26,7 +26,7 @@ const ICON_TONES = {
   soft: "text-muted-foreground hover:bg-background hover:text-foreground",
   danger: "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
   /** On a picture or a dark surface. */
-  solid: "bg-ink text-white hover:bg-hema-hover",
+  solid: "bg-primary text-primary-foreground hover:bg-primary/90",
 } as const;
 
 /** A button that is only an icon (⋯, ✕, ↑ ↓, ‹ ›): round, and named for screen readers by `label`. */

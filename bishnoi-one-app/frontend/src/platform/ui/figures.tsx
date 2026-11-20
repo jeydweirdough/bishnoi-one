@@ -11,8 +11,8 @@ import { Bone } from "./skeleton";
 export type Tone = "good" | "warn" | "bad" | "plain" | "ink";
 
 const TONES: Record<Tone, string> = {
-  good: "bg-[#e6f2e1] text-[#3f6f35]",
-  warn: "bg-[#fbf0d9] text-[#8a5a00]",
+  good: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  warn: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   bad: "bg-danger-tint text-danger",
   plain: "bg-bench text-ink-3",
   ink: "border border-ink bg-sheet text-ink",
@@ -163,7 +163,7 @@ export function TrendCard({ icon, tint, label, value, now, before, since, upIsGo
         {loading ? <Bone className="h-8 w-20" /> : <span className="text-[1.875rem] leading-none font-semibold tracking-[-0.02em] text-ink tabular-nums">{value}</span>}
         {c && !loading && (
           <span className="shrink-0 text-right">
-            <span className={`block text-meta font-semibold ${good === null ? "text-ink-3" : good ? "text-[#3f6f35]" : "text-danger"}`}>
+            <span className={`block text-meta font-semibold ${good === null ? "text-ink-3" : good ? "text-emerald-700 dark:text-emerald-400" : "text-danger"}`}>
               {c.pct === null ? "New" : c.pct === 0 ? "No change" : `${c.up ? "▲" : "▼"} ${Math.abs(c.pct)}%`}
             </span>
             <span className="block text-meta text-ink-3">{since}</span>

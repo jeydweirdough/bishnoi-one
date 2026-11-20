@@ -29,7 +29,7 @@ export default async function FieldAssistancePage({ searchParams }: { searchPara
   const dateLabel = Object.fromEntries([...days].map((d) => [d, fmt.dateLabel(d)]));
   const figures = [
     { value: data.counts.approved, label: "Approved", note: `${month}: 1 point each`, tone: "text-filed" },
-    { value: data.counts.pending, label: "Pending", note: "Follow up weekly", tone: data.counts.pending ? "text-[#8a5a00]" : "text-ink" },
+    { value: data.counts.pending, label: "Pending", note: "Follow up weekly", tone: data.counts.pending ? "text-amber-700 dark:text-amber-400" : "text-ink" },
     { value: data.counts.denied, label: "Denied", note: `${month}: count if resubmitted and approved`, tone: "text-ink" },
     { value: data.counts.submitted, label: "Submitted", note: month, tone: "text-ink" },
   ];

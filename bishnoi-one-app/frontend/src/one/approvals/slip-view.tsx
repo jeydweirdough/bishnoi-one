@@ -52,7 +52,7 @@ export function SlipSteps({ slip }: { slip: Slip }) {
       {slip.steps.map((s) => {
         const Icon = STEP_ICON[s.status];
         const tone =
-          s.status === "signed" ? "bg-hema text-white" : s.status === "returned" ? "bg-danger text-white" : s.current ? "bg-promo-tint text-ink" : "bg-bench text-ink-3";
+          s.status === "signed" ? "bg-primary text-primary-foreground" : s.status === "returned" ? "bg-danger text-white" : s.current ? "bg-promo-tint text-ink" : "bg-bench text-ink-3";
         return (
           <li key={s.id} className="flex gap-3" aria-current={s.current ? "step" : undefined}>
             <span className={`mt-0.5 grid size-6 shrink-0 place-items-center rounded-full ${tone}`} aria-hidden>

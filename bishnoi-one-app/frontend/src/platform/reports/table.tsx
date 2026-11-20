@@ -89,7 +89,7 @@ export function ReportTable({ title, columns, rows, totals, canExport, doc }: { 
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm" style={{ minWidth: `${Math.max(36, columns.length * 8)}rem` }}>
-          <thead className="sticky top-0 bg-white">
+          <thead className="sticky top-0 bg-card">
             <tr className="border-y border-rule text-left text-meta text-ink-3">
               {columns.map((c, i) => {
                 const on = sort?.i === i;
@@ -144,7 +144,7 @@ export function ReportTable({ title, columns, rows, totals, canExport, doc }: { 
         </table>
       </div>
       {/* Zoho-style Total Count & record summary footer */}
-      <div className="flex items-center justify-between border-t border-rule bg-white px-5 py-3 text-meta text-ink-3">
+      <div className="flex items-center justify-between border-t border-rule bg-card px-5 py-3 text-meta text-ink-3">
         <span>Total Count: <strong className="font-semibold text-ink tabular-nums">{shown.length}</strong></span>
         <span>{shown.length === rows.length ? `All ${rows.length} records shown` : `Showing ${shown.length} of ${rows.length} records`}</span>
       </div>

@@ -20,7 +20,7 @@ export function NextSteps({ steps }: { steps: NextStep[] }) {
           key={s.href + s.label}
           href={s.href}
           className={`group inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors ${
-            s.urgent ? "bg-danger text-white hover:bg-danger/90" : i === 0 ? "bg-ink text-white hover:bg-ink/85" : "bg-white text-ink hover:bg-mint-2"
+            s.urgent ? "bg-danger text-primary-foreground hover:bg-danger/90" : i === 0 ? "bg-primary text-primary-foreground hover:bg-ink/85" : "bg-card text-ink hover:bg-mint-2"
           }`}
         >
           <s.icon className="size-4" aria-hidden />

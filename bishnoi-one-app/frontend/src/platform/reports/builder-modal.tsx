@@ -245,7 +245,7 @@ export function ReportBuilderModal({
                       type="button"
                       disabled={index === 0}
                       onClick={() => moveColumn(index, "up")}
-                      className="grid size-7 place-items-center rounded text-ink-3 hover:bg-white hover:text-ink disabled:opacity-30"
+                      className="grid size-7 place-items-center rounded text-ink-3 hover:bg-card hover:text-ink disabled:opacity-30"
                       title="Move up"
                     >
                       <ArrowUp className="size-4" />
@@ -254,7 +254,7 @@ export function ReportBuilderModal({
                       type="button"
                       disabled={index === selectedCols.length - 1}
                       onClick={() => moveColumn(index, "down")}
-                      className="grid size-7 place-items-center rounded text-ink-3 hover:bg-white hover:text-ink disabled:opacity-30"
+                      className="grid size-7 place-items-center rounded text-ink-3 hover:bg-card hover:text-ink disabled:opacity-30"
                       title="Move down"
                     >
                       <ArrowDown className="size-4" />
@@ -270,7 +270,7 @@ export function ReportBuilderModal({
               .map((col) => (
                 <div
                   key={col.key}
-                  className="flex items-center justify-between rounded-lg border border-rule/50 bg-white/50 px-3 py-2 text-sm opacity-60"
+                  className="flex items-center justify-between rounded-lg border border-rule/50 bg-card/50 px-3 py-2 text-sm opacity-60"
                 >
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -371,7 +371,7 @@ export function ReportBuilderModal({
                           updateFilter(idx, "value", e.target.value)
                         }
                         placeholder="Value..."
-                        className="h-9 min-w-32 flex-1 rounded-lg border border-rule bg-white px-2.5 text-sm"
+                        className="h-9 min-w-32 flex-1 rounded-lg border border-rule bg-card px-2.5 text-sm"
                       />
                     )}
 
@@ -526,7 +526,7 @@ export function ReportBuilderModal({
                 className={`rounded-xl border p-4 text-center text-sm font-medium transition-colors ${
                   chart === opt.id
                     ? "border-ink bg-mint-2 font-semibold text-ink"
-                    : "border-rule bg-white text-ink-2 hover:border-ink hover:text-ink"
+                    : "border-rule bg-card text-ink-2 hover:border-ink hover:text-ink"
                 }`}
               >
                 {opt.label}
@@ -583,7 +583,7 @@ export function ReportBuilderModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. High Value Customers"
-                className="bg-white"
+                className="bg-card"
               />
             )}
           </Field>

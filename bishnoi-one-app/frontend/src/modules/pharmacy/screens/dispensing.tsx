@@ -111,7 +111,7 @@ export default async function DispensingPage({ searchParams }: { searchParams: S
                 <div className="flex items-center gap-3 md:justify-end">
                   {view !== "dispensed" && rx.ready === false && <Flag letter="!">Short on stock</Flag>}
                   {view !== "dispensed" && canDispense && (
-                    <Link href={`/pharmacy/dispensing/new?rx=${rx.id}`} className="inline-flex h-8 items-center rounded-lg bg-hema px-3 text-meta font-semibold text-white hover:bg-hema-hover">
+                    <Link href={`/pharmacy/dispensing/new?rx=${rx.id}`} className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-meta font-semibold text-primary-foreground hover:bg-primary/90">
                       {view === "partial" ? "Dispense the rest" : "Dispense"}
                     </Link>
                   )}

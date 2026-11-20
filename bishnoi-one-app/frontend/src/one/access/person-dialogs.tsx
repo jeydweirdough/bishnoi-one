@@ -35,7 +35,7 @@ function showPassword(name: string, password: string) {
             suppressHydrationWarning
             type="button"
             aria-label="Copy password"
-            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-white hover:text-ink"
+            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-card hover:text-ink"
             onClick={() => navigator.clipboard.writeText(password).then(() => toast.success("Password copied"), () => toast.error("Couldn't copy: select it instead."))}
           >
             <Copy className="size-4" aria-hidden />
@@ -68,7 +68,7 @@ async function sendInvitation(person: { id: string; fullName: string }) {
             suppressHydrationWarning
             type="button"
             aria-label="Copy link"
-            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-white hover:text-ink"
+            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-card hover:text-ink"
             onClick={() => navigator.clipboard.writeText(link).then(() => toast.success("Link copied"), () => toast.error("Couldn't copy: select it instead."))}
           >
             <Copy className="size-4" aria-hidden />

@@ -68,7 +68,7 @@ export function WeekBars({ days, today, week, base }: { days: Record<string, num
   );
 }
 
-const SHADES = ["bg-mint-2", "bg-sage/45", "bg-sage", "bg-[#7fae6f]", "bg-sage-deep"];
+const SHADES = ["bg-mint-2", "bg-sage/45", "bg-sage", "bg-emerald-500", "bg-sage-deep"];
 
 /** About three months, a square a day (a column a week, Monday at the top): the darker, the more got done. */
 export function Heatmap({ days, today }: { days: Record<string, number>; today: string }) {

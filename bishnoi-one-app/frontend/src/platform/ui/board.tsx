@@ -166,7 +166,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                 onDragLeave={() => setOver((o) => (o === col.key ? null : o))}
                 onDrop={(e) => drop(e, col.key)}
                 className={`flex min-h-[24rem] min-w-0 flex-col rounded-xl border p-2 transition-colors ${
-                  over === col.key && target ? "border-sage bg-hema-tint" : target ? "border-dashed border-sage bg-[#f4f4f1]" : "border-transparent bg-[#f4f4f1]"
+                  over === col.key && target ? "border-sage bg-hema-tint" : target ? "border-dashed border-sage bg-muted" : "border-transparent bg-muted"
                 }`}
               >
                 <header className="mb-2 px-1.5 pt-1">

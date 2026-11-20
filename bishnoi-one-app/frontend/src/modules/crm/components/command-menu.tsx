@@ -32,7 +32,7 @@ export function CommandMenuButton() {
       <button suppressHydrationWarning
         type="button"
         onClick={ask}
-        className="hidden h-10 items-center gap-2 rounded-[11px] border border-rule bg-bench pr-2 pl-3 text-meta text-ink-3 transition-colors hover:border-[#c9c9c5] hover:bg-sheet hover:text-ink md:inline-flex"
+        className="hidden h-10 items-center gap-2 rounded-[11px] border border-rule bg-bench pr-2 pl-3 text-meta text-ink-3 transition-colors hover:border-input hover:bg-sheet hover:text-ink md:inline-flex"
         aria-keyshortcuts="Control+K"
       >
         <Search className="size-4" aria-hidden />
@@ -273,7 +273,7 @@ export function CommandMenu({ actions }: { actions: MenuAction[] }) {
                 aria-selected={on}
                 onClick={() => setScope(s.key)}
                 className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[9px] border px-3 text-[0.78125rem] font-medium whitespace-nowrap transition-colors ${
-                  on ? "border-ink bg-ink text-white" : "border-rule bg-sheet text-ink-2 hover:border-[#c9c9c5] hover:text-ink"
+                  on ? "border-ink bg-primary text-primary-foreground" : "border-rule bg-sheet text-ink-2 hover:border-input hover:text-ink"
                 }`}
               >
                 {Icon && <Icon className="size-3.5" aria-hidden />}

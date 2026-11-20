@@ -140,7 +140,7 @@ export default async function DealPage({ params }: { params: Params }) {
                 <Tip
                   tip={overdue ? `Overdue by ${fmt.plural(-left, "day")}: move the date, or close the deal` : left === 0 ? "Closes today" : `Closes in ${fmt.plural(left, "day")}`}
                   className={`mt-0.5 inline-flex items-center gap-1 rounded-md text-meta tabular-nums ${
-                    overdue ? "bg-danger-tint px-1.5 font-medium text-danger" : left <= 7 ? "bg-[#fdf3e1] px-1.5 font-medium text-due-today" : "text-ink-3"
+                    overdue ? "bg-danger-tint px-1.5 font-medium text-danger" : left <= 7 ? "bg-amber-500/10 px-1.5 font-medium text-due-today" : "text-ink-3"
                   }`}
                 >
                   <Hourglass className="size-3" aria-hidden />

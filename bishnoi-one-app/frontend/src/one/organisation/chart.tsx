@@ -212,7 +212,7 @@ function UnitTree({ data }: { data: OrgData }) {
   );
 }
 
-const KIND_TONE: Record<UnitKind, string> = { department: "bg-ink text-white", division: "bg-sage-deep text-white", team: "bg-bench text-ink-2" };
+const KIND_TONE: Record<UnitKind, string> = { department: "bg-primary text-primary-foreground", division: "bg-sage-deep text-white", team: "bg-bench text-ink-2" };
 
 /** "Prescription Business" -> "PB": the unit's badge. */
 function initials(name: string): string {

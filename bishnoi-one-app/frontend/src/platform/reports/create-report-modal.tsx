@@ -151,7 +151,7 @@ export function CreateReportModal({
                 onClick={() => setActiveGroup(g)}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   activeGroup === g
-                    ? "bg-ink text-white"
+                    ? "bg-primary text-primary-foreground"
                     : "border border-rule text-ink-2 hover:border-ink hover:text-ink"
                 }`}
               >
@@ -165,7 +165,7 @@ export function CreateReportModal({
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             placeholder="Search templates..."
-            className="h-8 rounded-lg border border-rule bg-white px-3 text-xs outline-none focus:border-ring w-52"
+            className="h-8 rounded-lg border border-rule bg-card px-3 text-xs outline-none focus:border-ring w-52"
           />
         </div>
 
@@ -188,7 +188,7 @@ export function CreateReportModal({
                 key={t.key}
                 type="button"
                 onClick={() => handleSelectTemplate(t.key)}
-                className="group relative flex flex-col justify-between rounded-xl border border-rule bg-white p-4 text-left transition-all hover:border-sage-deep hover:bg-mint-1/30 hover:shadow-sm"
+                className="group relative flex flex-col justify-between rounded-xl border border-rule bg-card p-4 text-left transition-all hover:border-sage-deep hover:bg-mint-1/30 hover:shadow-sm"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1.5">

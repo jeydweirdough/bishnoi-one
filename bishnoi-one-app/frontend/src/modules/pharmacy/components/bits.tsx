@@ -12,7 +12,7 @@ import type { BatchStatus, DispenseState, MaterialReviewStatus, MedicineStatus, 
 // never coloured: solid for the settled state, dashed for waiting, outlined
 // for set aside, and the one red flag for what someone must act on.
 
-const solid = "border border-ink bg-ink text-white";
+const solid = "border border-ink bg-primary text-primary-foreground";
 const dashed = "border border-dashed border-ink-2 text-ink-2";
 const outlined = "border border-rule-strong text-ink-3";
 

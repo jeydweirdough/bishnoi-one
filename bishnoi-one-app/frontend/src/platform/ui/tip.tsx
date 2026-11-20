@@ -98,7 +98,7 @@ export function Tip({
               at.below ? `pt-2 ${shown ? "opacity-100" : "-translate-y-1 opacity-0"}` : `-translate-y-full pb-2 ${shown ? "opacity-100" : "translate-y-[calc(-100%+4px)] opacity-0"}`
             }`}
           >
-            <span className={`relative block max-w-xs rounded-lg bg-ink px-3 py-1.5 text-sm text-white shadow-lg ${strong ? "font-semibold whitespace-nowrap tabular-nums" : "font-medium"}`}>
+            <span className={`relative block max-w-xs rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground shadow-lg ${strong ? "font-semibold whitespace-nowrap tabular-nums" : "font-medium"}`}>
               {tip}
               {at.below ? (
                 <span className="absolute bottom-full left-1/2 -translate-x-1/2 border-x-[6px] border-b-[6px] border-x-transparent border-b-ink" aria-hidden />

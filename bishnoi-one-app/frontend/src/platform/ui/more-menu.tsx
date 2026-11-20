@@ -36,7 +36,7 @@ export function MoreMenu({ label = "More actions", children }: { label?: string;
         aria-expanded={open}
         aria-label={label}
         title={label}
-        className={`grid size-10 place-items-center rounded-[9px] border border-[#dededa] bg-sheet text-ink shadow-[0_1px_2px_rgba(20,20,20,0.05)] transition-colors hover:border-[#c9c9c5] hover:bg-[#f4f4f2] ${open ? "border-[#c9c9c5] bg-[#f4f4f2]" : ""}`}
+        className={`grid size-10 place-items-center rounded-[9px] border border-input bg-sheet text-ink shadow-[0_1px_2px_rgba(20,20,20,0.05)] transition-colors hover:border-input hover:bg-muted ${open ? "border-input bg-muted" : ""}`}
       >
         <Ellipsis className="size-5" aria-hidden />
       </button>
@@ -44,7 +44,7 @@ export function MoreMenu({ label = "More actions", children }: { label?: string;
         role="menu"
         hidden={!open}
         onClick={() => setOpen(false)}
-        className="absolute top-11 right-0 z-50 w-60 rounded-xl border border-rule bg-white p-1.5 shadow-[0_12px_32px_rgba(20,20,20,0.12)]"
+        className="absolute top-11 right-0 z-50 w-60 rounded-xl border border-rule bg-card p-1.5 shadow-[0_12px_32px_rgba(20,20,20,0.12)]"
       >
         {children}
       </div>

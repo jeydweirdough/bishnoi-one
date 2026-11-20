@@ -200,7 +200,7 @@ export async function PurchaseOrdersPage({ searchParams }: { searchParams: Searc
                               <td className="py-1.5 pr-3 font-mono text-ink-2">{l.sku}</td>
                               <td className="px-3 py-1.5 text-ink">{l.product}</td>
                               <td className="px-3 py-1.5 text-right tabular-nums">{fmt.count(l.quantity)}</td>
-                              <td className={`px-3 py-1.5 text-right tabular-nums ${l.received < l.quantity && po.status !== "draft" ? "text-[#8a5a00]" : ""}`}>{fmt.count(l.received)}</td>
+                              <td className={`px-3 py-1.5 text-right tabular-nums ${l.received < l.quantity && po.status !== "draft" ? "text-amber-700 dark:text-amber-400" : ""}`}>{fmt.count(l.received)}</td>
                               <td className="px-3 py-1.5 text-right tabular-nums text-ink-2">{fmt.peso(l.unitCost)}</td>
                               <td className="py-1.5 pl-3 text-right font-medium tabular-nums">{fmt.peso(l.quantity * l.unitCost)}</td>
                             </tr>

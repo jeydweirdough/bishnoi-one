@@ -242,7 +242,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pa
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               <StatusTag status={company.status} types={types} />
               {company.leadSource && (
-                <span className="inline-flex h-6 items-center rounded-md bg-[#f0f0ee] px-2.5 text-meta font-medium text-ink-2">From {lower(company.leadSource)}</span>
+                <span className="inline-flex h-6 items-center rounded-md bg-muted px-2.5 text-meta font-medium text-ink-2">From {lower(company.leadSource)}</span>
               )}
             </div>
           </div>

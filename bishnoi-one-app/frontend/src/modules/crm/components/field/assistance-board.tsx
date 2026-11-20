@@ -18,9 +18,9 @@ import type { Assistance, AssistanceList, AssistanceProgram } from "@/src/module
 // approval is the month's point). Pending ones come first, oldest first.
 
 const STATUS = {
-  pending: { label: "Pending", pill: "bg-[#eda100]/15 text-[#8a5a00]" },
-  approved: { label: "Approved", pill: "bg-[#1a8a52]/12 text-[#1a6b40]" },
-  denied: { label: "Denied", pill: "bg-[#e34948]/12 text-[#b42318]" },
+  pending: { label: "Pending", pill: "bg-[#eda100]/15 text-amber-700 dark:text-amber-400" },
+  approved: { label: "Approved", pill: "bg-[#1a8a52]/12 text-emerald-700 dark:text-emerald-400" },
+  denied: { label: "Denied", pill: "bg-[#e34948]/12 text-destructive" },
 } as const;
 
 /** Files go one to a request: a request takes at most 4.5 MB. PDF or a photo. */
@@ -95,7 +95,7 @@ export function AssistanceBoard({ data, doctors, today, dateLabel }: { data: Ass
                     <p className="text-meta text-ink-3">
                       Submitted {dateLabel[a.submittedOn] ?? a.submittedOn}
                       {a.status === "pending" && (
-                        <span className={waited >= 7 ? "font-semibold text-[#8a5a00]" : ""}>
+                        <span className={waited >= 7 ? "font-semibold text-amber-700 dark:text-amber-400" : ""}>
                           {" "}
                           · {waited === 0 ? "today" : `${waited} ${waited === 1 ? "day" : "days"} waiting`}
                           {waited >= 7 && ": follow up this week"}

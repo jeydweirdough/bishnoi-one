@@ -247,6 +247,22 @@ These serve as the fallback; there is no separate default.css file. */
   }
 }
 
+
+/* Dark mode (2026-11-20, as Studio Admin's theme switch): our own named colours in their dark versions.
+   shadcn's own variables switch in the .dark block above. */
+.dark {
+  color-scheme: dark;
+  --color-eosin-tint: color-mix(in oklch, var(--destructive) 18%, transparent);
+  --color-danger-tint: color-mix(in oklch, var(--destructive) 18%, transparent);
+  --color-filed: oklch(0.77 0.15 150);
+  --color-due-today-ink: oklch(0.83 0.15 80);
+  --color-due-later: oklch(0.72 0.15 265);
+  --color-promo-tint: color-mix(in oklch, #f7c21a 18%, transparent);
+  --color-promo-ink: oklch(0.88 0.13 90);
+  --color-rule-strong: oklch(1 0 0 / 18%);
+  --color-ink-2: oklch(0.85 0 0);
+}
+
 @layer base {
   /* shadcn/ui: every line takes the theme border colour unless told otherwise. */
   * {

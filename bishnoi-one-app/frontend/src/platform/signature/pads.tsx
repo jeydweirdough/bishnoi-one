@@ -10,7 +10,7 @@ import { cleanSignature, loadImage, type Cleaned } from "./clean";
 // Used for a person's own signature (their profile, Finance) and a customer signing for a delivery.
 
 /** A light checkerboard, so a transparent signature reads as transparent. */
-export const CHECKER = "bg-[length:16px_16px] bg-[linear-gradient(45deg,#f1f1f4_25%,transparent_25%),linear-gradient(-45deg,#f1f1f4_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f1f1f4_75%),linear-gradient(-45deg,transparent_75%,#f1f1f4_75%)] bg-white";
+export const CHECKER = "bg-[length:16px_16px] bg-[linear-gradient(45deg,#f1f1f4_25%,transparent_25%),linear-gradient(-45deg,#f1f1f4_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f1f1f4_75%),linear-gradient(-45deg,transparent_75%,#f1f1f4_75%)] bg-card";
 
 /** Sign with a mouse, finger or pen. Kept black; trimmed when saved. */
 export function DrawPad({ onChange }: { onChange: (c: Cleaned | null) => void }) {
@@ -51,7 +51,7 @@ export function DrawPad({ onChange }: { onChange: (c: Cleaned | null) => void })
         width={900}
         height={300}
         aria-label="Signing pad: sign here"
-        className="h-48 w-full touch-none rounded-lg border border-rule-strong bg-white"
+        className="h-48 w-full touch-none rounded-lg border border-rule-strong bg-card"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           drawing.current = at(e);

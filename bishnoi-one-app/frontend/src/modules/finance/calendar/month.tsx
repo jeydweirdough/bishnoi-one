@@ -95,7 +95,7 @@ export function CalendarMonth({ data, month, picked }: { data: CalendarData; mon
             const list = byDay.get(day) ?? [];
             return (
               <div key={day} className={`min-h-28 border-r border-b border-rule px-1.5 py-1 ${shaded ? "bg-bench/40" : "bg-sheet"}`}>
-                <p className={`mb-1 text-meta ${day === data.today ? "inline-flex size-6 items-center justify-center rounded-full bg-hema font-semibold text-white" : inMonth ? "text-ink-2" : "text-ink-3"}`}>
+                <p className={`mb-1 text-meta ${day === data.today ? "inline-flex size-6 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground" : inMonth ? "text-ink-2" : "text-ink-3"}`}>
                   {Number(day.slice(8))}
                 </p>
                 {off && <p className="mb-1 truncate text-[0.6875rem] text-ink-3 italic" title={off}>{off}</p>}

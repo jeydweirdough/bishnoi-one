@@ -90,10 +90,10 @@ export function ListToolbar({ q, placeholder, keep = {}, children }: { q: string
 export type PillTone = "good" | "warn" | "bad" | "info" | "plain";
 
 const PILL: Record<PillTone, string> = {
-  good: "border-emerald-600/20 bg-emerald-500/10 text-emerald-700",
-  warn: "border-amber-600/20 bg-amber-500/10 text-amber-800",
+  good: "border-emerald-600/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  warn: "border-amber-600/20 bg-amber-500/10 text-amber-800 dark:text-amber-400",
   bad: "border-destructive/20 bg-destructive/10 text-destructive",
-  info: "border-blue-600/20 bg-blue-500/10 text-blue-700",
+  info: "border-blue-600/20 bg-blue-500/10 text-blue-700 dark:text-blue-400",
   plain: "border-border bg-secondary text-secondary-foreground",
 };
 

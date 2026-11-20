@@ -42,7 +42,7 @@ export default async function ModuleNotHereYet({ params }: { params: Promise<{ m
   return (
     <PlainFrame>
     <main className="mx-auto max-w-[90rem] px-4 py-16 sm:px-6">
-      <div className="mx-auto max-w-lg rounded-2xl border border-rule bg-white px-6 py-12 text-center">
+      <div className="mx-auto max-w-lg rounded-2xl border border-rule bg-card px-6 py-12 text-center">
         <span className="mx-auto grid size-14 place-items-center rounded-2xl" style={{ background: m.tint, color: m.ink }}>
           <m.icon className="size-7" aria-hidden />
         </span>

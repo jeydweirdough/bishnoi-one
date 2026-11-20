@@ -29,14 +29,14 @@ export default async function ApprovalSlipPrint({ params }: { params: Promise<{ 
   const fmt = fmtOf(slip);
   const s = slip.summary;
   return (
-    <div className="min-h-screen bg-bench print:bg-white">
+    <div className="min-h-screen bg-bench print:bg-card">
       <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-rule bg-sheet px-6 py-3 print:hidden">
         <LinkButton href={`/approvals/${slip.id}`} variant="quiet">
           Back to the slip
         </LinkButton>
         <PrintButton />
       </div>
-      <article className="mx-auto my-8 max-w-[210mm] bg-white px-[16mm] py-[14mm] text-[10.5pt] leading-snug text-black shadow-sm print:my-0 print:max-w-none print:p-0 print:shadow-none">
+      <article className="mx-auto my-8 max-w-[210mm] bg-card px-[16mm] py-[14mm] text-[10.5pt] leading-snug text-black shadow-sm print:my-0 print:max-w-none print:p-0 print:shadow-none">
         <header className="flex items-start justify-between gap-8 border-b-2 border-black pb-4">
           <LetterheadBlock head={head} fallbackName={me.company?.name ?? ""} />
           <div className="text-right">

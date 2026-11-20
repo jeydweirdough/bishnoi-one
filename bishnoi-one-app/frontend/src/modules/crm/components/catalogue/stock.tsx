@@ -12,9 +12,9 @@ import { syncProducts } from "@/src/modules/crm/actions/catalogue";
 
 const STATE: Record<NonNullable<StockLevel["state"]>, { label: string; className: string }> = {
   out: { label: "Out of stock", className: "bg-danger-tint text-danger" },
-  low: { label: "Low", className: "bg-[#fdf3e1] text-due-today" },
-  ok: { label: "In stock", className: "bg-[#e6f2eb] text-filed" },
-  over: { label: "In stock", className: "bg-[#e6f2eb] text-filed" },
+  low: { label: "Low", className: "bg-amber-500/10 text-due-today" },
+  ok: { label: "In stock", className: "bg-emerald-500/10 text-filed" },
+  over: { label: "In stock", className: "bg-emerald-500/10 text-filed" },
 };
 
 /** "In stock · 130", "Low · 4", "Out of stock". */

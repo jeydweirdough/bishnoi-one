@@ -36,7 +36,7 @@ type Quotation = {
 };
 type Params = Promise<{ company: string; token: string }>;
 
-const paper = "mx-auto max-w-[210mm] bg-white px-[14mm] py-[12mm] text-[10.5pt] leading-snug text-black shadow-sm print:my-0 print:max-w-none print:p-0 print:shadow-none";
+const paper = "mx-auto max-w-[210mm] bg-card px-[14mm] py-[12mm] text-[10.5pt] leading-snug text-black shadow-sm print:my-0 print:max-w-none print:p-0 print:shadow-none";
 
 /**
  * The customer's quotation, opened from their order link after they order (decided 2026-10-26):
@@ -66,7 +66,7 @@ export default async function OrderQuotationPage({ params }: { params: Params })
 
   const first = q.rep.split(" ")[0];
   return (
-    <main className="min-h-dvh bg-bench px-4 py-8 sm:px-8 print:bg-white print:p-0">
+    <main className="min-h-dvh bg-bench px-4 py-8 sm:px-8 print:bg-card print:p-0">
       <div className="mx-auto max-w-[210mm]">
         <header className="mb-5 flex flex-wrap items-end justify-between gap-3 print:hidden">
           <div>

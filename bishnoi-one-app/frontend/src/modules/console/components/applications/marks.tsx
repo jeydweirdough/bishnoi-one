@@ -7,7 +7,7 @@ export function EnvironmentMark({ environment }: { environment: Deployment["envi
   return (
     <span
       className={`inline-flex h-5 items-center rounded-full px-1.5 text-stamp whitespace-nowrap uppercase ${
-        environment === "production" ? "border border-ink bg-ink text-white" : "border border-rule-strong text-ink-3"
+        environment === "production" ? "border border-ink bg-primary text-primary-foreground" : "border border-rule-strong text-ink-3"
       }`}
     >
       {ENVIRONMENT[environment]}

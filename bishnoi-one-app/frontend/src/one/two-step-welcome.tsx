@@ -82,7 +82,7 @@ export function TwoStepWelcome({ skip, onDone }: { skip: string | null; onDone: 
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={started.qr} alt="QR code to add Bishnoi One to your authenticator app" className="mx-auto size-52 rounded-lg border border-rule bg-white p-1" />
+              <img src={started.qr} alt="QR code to add Bishnoi One to your authenticator app" className="mx-auto size-52 rounded-lg border border-rule bg-card p-1" />
               <p className="text-center text-meta font-medium text-ink-2">Scan this QR code</p>
               <details className="text-meta text-ink-3">
                 <summary className="cursor-pointer text-center">Can&apos;t scan it?</summary>
