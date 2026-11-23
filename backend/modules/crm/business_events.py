@@ -170,7 +170,8 @@ def _flush_quietly(bind) -> None:
 def flush(db: Session, settings) -> int:
     """Sends what this database still holds, oldest first. Returns how many the Platform took."""
     url, key = getattr(settings, "platform_api_url", None), platform_connect.connect_key(settings)
-    if not url or not key:
+    # In the one backend the Platform knows the module by its in-process call: no connect key needed (stage M2).
+    if not url or not (key or inprocess.serves(url)):
         return 0
     waiting = db.scalars(select(OutboxEvent).where(OutboxEvent.sent_at.is_(None)).order_by(OutboxEvent.occurred_at).limit(BATCH)).all()
     taken = 0
@@ -182,7 +183,7 @@ def flush(db: Session, settings) -> int:
     for slug, items in by_company.items():
         body = {"company": slug, "events": [{"id": e.id, "kind": e.kind, "data": e.data, "occurredAt": e.occurred_at.isoformat()} for e in items]}
         try:
-            r = inprocess.post("crm", f"{url.rstrip('/')}/connect/events", json=body, headers={"X-Bishnoi-App-Key": key}, timeout=10)
+            r = inprocess.post("crm", f"{url.rstrip('/')}/connect/events", json=body, headers={"X-Bishnoi-App-Key": key} if key else {}, timeout=10)
             answer = r.json() if r.status_code == 200 else None
             problem = None if answer else f"answered {r.status_code}"
         except (httpx.HTTPError, ValueError) as e:
