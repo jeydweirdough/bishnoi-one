@@ -663,7 +663,7 @@ class PromoIn(Api):
     # None: every product.
     product_ids: list[str] | None = Field(None, max_length=500)
     # The divisions it's for: at least one.
-    team_ids: list[str] = Field(min_length=1, max_length=50)
+    team_ids: list[str] = Field(min_length=1, max_length=500)  # every division at once (Select all): 58 at Getmeds
     starts_on: date | None = None
     ends_on: date | None = None
     is_active: bool = True
@@ -768,7 +768,7 @@ class BundleIn(Api):
     as_one_line: bool = True
     items: list[BundleItem] = Field(min_length=1, max_length=30)
     # The divisions it's for: at least one.
-    team_ids: list[str] = Field(min_length=1, max_length=50)
+    team_ids: list[str] = Field(min_length=1, max_length=500)  # every division at once (Select all): 58 at Getmeds
     starts_on: date | None = None
     ends_on: date | None = None
     is_active: bool = True
