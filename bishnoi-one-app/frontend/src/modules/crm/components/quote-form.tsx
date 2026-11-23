@@ -10,6 +10,7 @@ import { CellInput, Field, FormError, Input, Select, Textarea } from "@/src/plat
 import { QuantityStepper } from "@/src/platform/ui/quantity-stepper";
 import { FileDrop } from "@/src/platform/ui/file-drop";
 import { createQuote, previewQuote, type QuoteFor, type QuoteInput } from "@/src/modules/crm/actions/customers";
+import { createDirectOrder, previewForOrder } from "@/src/modules/sales/actions";
 import { makeFormat, percent, toBasisPoints, type Format } from "@/src/platform/lib/format";
 import type { CustomField, Org, PriceList, QuotePreview, StockAnswer, StockLevel } from "@/src/platform/lib/types";
 import { Flag } from "@/src/platform/ui/marks";
@@ -106,8 +107,11 @@ export function QuoteForm({
   fields: custom = [],
   stock = null,
   deal = null,
+  order = null,
 }: {
   to: QuoteFor;
+  /** A sales order made directly with this form (2026-11-23): the same fields and pricing, then where it ships from. */
+  order?: { warehouses: { id: string; code: string; name: string }[] } | null;
   /** The deal it's made for, when started from one: its products, at its price, under its promos, start the quote. */
   deal?: { id: string; name: string; priceType?: string | null; lines?: { productId: string; quantity: number; promoId?: string | null }[] } | null;
   priceList: PriceList;
@@ -119,8 +123,10 @@ export function QuoteForm({
   const fmt = makeFormat(org);
   const router = useRouter();
   const can = useCan();
-  const always = priceList.priceTypes.filter((t) => t.rule === "always");
-  const withRx = priceList.priceTypes.filter((t) => t.rule === "with_rx");
+  // A sales order takes the price list's prices only: a typed price goes through a quote, for Finance to approve.
+  const usable = priceList.priceTypes.filter((t) => !order || t.entry !== "entered");
+  const always = usable.filter((t) => t.rule === "always");
+  const withRx = usable.filter((t) => t.rule === "with_rx");
   const [draft, setDraft] = useState<Draft>(() => {
     // From a deal: its lines, keeping each promo that still applies to its product.
     const known = (deal?.lines ?? []).filter((l) => priceList.products.some((p) => p.id === l.productId));
@@ -178,7 +184,7 @@ export function QuoteForm({
     }
     timer.current = setTimeout(async () => {
       const ask = ++asked.current;
-      const result = await previewQuote(to, input);
+      const result = await (order ? previewForOrder : previewQuote)(to, input);
       if (ask !== asked.current) return; // a newer change is on its way
       if (result.ok) {
         setPreview(result.data);
@@ -245,6 +251,21 @@ export function QuoteForm({
     }
 
     const form = new FormData();
+    if (order) {
+      form.set("order", JSON.stringify({ ...toInput(fmt, draft, entered, letter), warehouseId: text("warehouseId") || null, scheduledOn: text("scheduledOn") || null }));
+      if (withLetter && file) form.set("letterFile", file);
+      execute({
+        anticipate: () => ({ ...draft }),
+        rollback: (prev) => setDraft(prev),
+        request: () => createDirectOrder(to, form),
+        successMessage: (data) => ({ title: `Sales order ${data.number} saved`, description: "It's waiting for approval now." }),
+        onSuccess: (data) => {
+          router.push(`/crm/sales/orders/${data.id}`);
+          router.refresh();
+        },
+      });
+      return;
+    }
     form.set("quote", JSON.stringify({ ...toInput(fmt, draft, entered, letter), extra: extraChanges(custom, extra), dealId: deal?.id ?? null }));
     if (withLetter && file) form.set("letterFile", file);
 
@@ -609,7 +630,7 @@ export function QuoteForm({
       </div>
       {preview && preview.approvalReasons.length > 0 && (
         <p className="animate-reshape rounded-lg bg-hema-tint px-3 py-2 text-meta text-ink-2">
-          Your team lead approves this quote before it goes out:{" "}
+          {order ? "Its approvers see why it needs approval:" : "Your team lead approves this quote before it goes out:"}{" "}
           {preview.approvalReasons
             .map((r) => {
               if (r === "price") return `${priceType?.name} needs approval`;
@@ -667,13 +688,32 @@ export function QuoteForm({
         </fieldset>
       )}
 
+      {order && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Ships from" error={errorFor("warehouseId")}>
+            {(p) => (
+              <Select {...p} name="warehouseId" defaultValue={order.warehouses[0]?.id ?? ""}>
+                {order.warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Wanted on" optional error={errorFor("scheduledOn")}>
+            {(p) => <Input {...p} name="scheduledOn" type="date" min={today} />}
+          </Field>
+        </div>
+      )}
+
       <Field label="Notes" optional={!priceType?.requiresNotes} error={errorFor("notes")} hint={priceType?.requiresNotes ? `Say why this ${priceType.name} applies.` : undefined}>
         {(p) => (
           <Textarea {...p} value={draft.notes} onChange={(e) => update({ ...draft, notes: e.target.value })} rows={3} maxLength={2000} />
         )}
       </Field>
 
-      {custom.length > 0 && (
+      {!order && custom.length > 0 && (
         <fieldset>
           <legend className="mb-2 text-meta font-medium text-ink-2">More about this quote</legend>
           <FormEntityProvider entity="quote">
@@ -689,10 +729,14 @@ export function QuoteForm({
           <p className="text-meta text-ink-3">Total</p>
           <p className="text-figure tabular-nums">{preview ? fmt.peso(preview.tax?.totalDueCentavos ?? preview.totalCentavos) : "—"}</p>
           {preview?.tax && <p className="text-meta text-ink-3">Amount due, with tax from Finance</p>}
-          {preview && preview.approvalReasons.length > 0 && <p className="text-meta text-ink-2">Goes to your team lead for approval</p>}
+          {order ? (
+            <p className="text-meta text-ink-2">Goes for approval when saved</p>
+          ) : (
+            preview && preview.approvalReasons.length > 0 && <p className="text-meta text-ink-2">Goes to your team lead for approval</p>
+          )}
         </div>
         <Button type="submit" variant="primary" loading={saving} className="!h-10 !px-6">
-          Save quote
+          {order ? "Save sales order" : "Save quote"}
         </Button>
       </div>
     </form>

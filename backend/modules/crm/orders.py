@@ -75,32 +75,53 @@ def division_of(db: Session, team: Team | None) -> dict | None:
     return {"id": top.id, "name": top.name} if top else None
 
 
+def line_out(db: Session, line: dict) -> dict:
+    """One priced line as the sales order takes it: the promo and the extra discount apart, and their sum as before."""
+    product = db.get(Product, line.get("productId")) if line.get("productId") else None
+    promo, extra = line.get("promoDiscountCentavos") or 0, line.get("discountCentavos") or 0
+    return {
+        "productId": line.get("productId"),
+        "inventoryId": product.inventory_id if product else None,
+        "code": line.get("productCode"),
+        "name": line.get("productName"),
+        "unit": line.get("unit"),
+        "quantity": line.get("quantity", 0),
+        "freeQuantity": line.get("freeQuantity", 0),
+        "unitPriceCentavos": line.get("unitPriceCentavos", 0),
+        "discountCentavos": promo + extra,
+        "promoName": line.get("promoName"),
+        "promoDiscountCentavos": promo,
+        "extraDiscountCentavos": extra,
+        "discountKind": line.get("discountKind"),
+        "discountValue": line.get("discountValue"),
+        "totalCentavos": line.get("totalCentavos", 0),
+        "bundle": line.get("bundleName"),
+        # Its VAT category, for the invoice made from its delivery (step 13).
+        "vatCategory": product.vat_category if product else "standard",
+    }
+
+
+def customer_out(company: Company | None, contact: Contact | None, name: str) -> dict:
+    customer = contact or company
+    tin = (company.extra or {}).get("tin") if company is not None else None
+    return {
+        "kind": "contact" if contact else "company",
+        "id": customer.id if customer else None,
+        "name": name,
+        "address": address_of(company),
+        "email": text(customer, "email"),
+        "phone": text(customer, "phone", "mobile"),
+        "tin": tin.strip() if isinstance(tin, str) and tin.strip() else None,
+    }
+
+
 def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
     """What Bishnoi One Order receives for a quote. See the module's docstring."""
     contact = db.get(Contact, quote.contact_id) if quote.contact_id else None
     company = db.get(Company, quote.company_id) if quote.company_id else (contact.company if contact else None)
-    customer = contact or company
     team = db.get(Team, quote.team_id) if quote.team_id else None
     owner = db.get(User, quote.owner_id) if quote.owner_id else None
     letter = quote.letter or {}
-    lines = []
-    for line in quote.lines:
-        product = db.get(Product, line.get("productId")) if line.get("productId") else None
-        lines.append({
-            "productId": line.get("productId"),
-            "inventoryId": product.inventory_id if product else None,
-            "code": line.get("productCode"),
-            "name": line.get("productName"),
-            "unit": line.get("unit"),
-            "quantity": line.get("quantity", 0),
-            "freeQuantity": line.get("freeQuantity", 0),
-            "unitPriceCentavos": line.get("unitPriceCentavos", 0),
-            "discountCentavos": (line.get("promoDiscountCentavos") or 0) + (line.get("discountCentavos") or 0),
-            "totalCentavos": line.get("totalCentavos", 0),
-            "bundle": line.get("bundleName"),
-            # Its VAT category, for the invoice made from its delivery (step 13).
-            "vatCategory": product.vat_category if product else "standard",
-        })
     return {
         "source": "bishnoi-crm",
         "quote": {
@@ -113,14 +134,10 @@ def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
             "priceType": quote.price_type_name,
             "rx": quote.rx,
         },
-        "customer": {
-            "kind": "contact" if contact else "company",
-            "id": customer.id if customer else None,
-            "name": quote.customer_name,
-            "address": address_of(company),
-            "email": text(customer, "email"),
-            "phone": text(customer, "phone", "mobile"),
-        },
+        # What it was priced with (2026-11-23): the sales order keeps and shows it.
+        "pricing": {"priceType": quote.price_type, "priceTypeName": quote.price_type_name, "rx": quote.rx, "terms": quote.terms,
+                    "approvalReasons": list(quote.approval_reasons or []), "warnings": []},
+        "customer": customer_out(company, contact, quote.customer_name),
         "team": {"id": team.id, "name": team.name} if team else None,
         # The division the team sits under (the org chart: step 4), for revenue by division.
         "division": division_of(db, team),
@@ -131,7 +148,9 @@ def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
             if quote.payer != "self"
             else {"kind": "customer"}
         ),
-        "lines": lines,
+        "letter": ({"number": letter.get("number"), "issuedOn": letter.get("issuedOn"), "amountCentavos": letter.get("amountCentavos"),
+                    "fileName": (letter.get("file") or {}).get("name")} if quote.payer != "self" else None),
+        "lines": [line_out(db, line) for line in quote.lines],
         "totals": {
             "grossCentavos": quote.gross_centavos,
             "promoDiscountCentavos": quote.promo_discount_centavos,
@@ -141,6 +160,49 @@ def payload(db: Session, quote: Quote, me: User, settings: Settings) -> dict:
         "tax": quote.tax,
         "currency": settings.org_currency,
     }
+
+
+def direct_payload(db: Session, me: User, settings: Settings, *, company: Company | None, contact: Contact | None, customer_name: str,
+                   priced: dict, kind, rx: bool, notes: str | None, terms: str | None, issuer, letter: dict | None, warnings: list[str]) -> dict:
+    """A sales order made directly with the quote form (2026-11-23): the same payload as a quote's, without a quote.
+    The person making it is its salesperson, as they own a quote they make."""
+    team = me.team
+    return {
+        "source": "bishnoi-crm",
+        "quote": None,
+        "pricing": {"priceType": kind.code, "priceTypeName": kind.name, "rx": rx, "notes": notes, "terms": terms,
+                    "approvalReasons": list(priced.get("approvalReasons") or []), "warnings": warnings},
+        "customer": customer_out(company, contact, customer_name),
+        "team": {"id": team.id, "name": team.name} if team else None,
+        "division": division_of(db, team),
+        "salesperson": person(me),
+        "raisedBy": person(me),
+        "payer": ({"kind": "guarantee_letter", "issuer": issuer.name, "letterNumber": letter["number"], "amountCentavos": letter["amountCentavos"]}
+                  if issuer is not None and letter else {"kind": "customer"}),
+        "letter": letter if issuer is not None else None,
+        "lines": [line_out(db, line) for line in priced["lines"]],
+        "totals": {"grossCentavos": priced["grossCentavos"], "promoDiscountCentavos": priced["promoDiscountCentavos"],
+                   "discountCentavos": priced["discountCentavos"], "totalCentavos": priced["totalCentavos"]},
+        "tax": priced.get("tax"),
+        "currency": settings.org_currency,
+    }
+
+
+def place_direct(settings: Settings, body: dict) -> dict:
+    """Makes the direct order in Inventory (its /integration/sales-orders) and returns {id, number, status}."""
+    if not settings.inventory_api_url:
+        raise OrdersUnavailable("Inventory isn't linked, so a sales order can't be made here.")
+    try:
+        answer = inprocess.post("crm", f"{settings.inventory_api_url.rstrip('/')}/integration/sales-orders", json=body, timeout=TIMEOUT,
+                                headers={**inprocess.key_header(settings.inventory_api_key), **company_header(settings)})
+    except Exception as e:  # noqa: BLE001 (any failure to reach it reads the same to people)
+        raise OrdersUnavailable("Inventory can't be reached right now. Try again in a moment.") from e
+    if answer.status_code in (409, 422):
+        detail = answer.json().get("detail")
+        raise OrdersUnavailable(detail if isinstance(detail, str) else "Inventory refused the order: check the warehouse.")
+    if answer.status_code >= 300:
+        raise OrdersUnavailable(f"Inventory answered with an error ({answer.status_code}).")
+    return answer.json()
 
 
 def send(settings: Settings, quote_id: str, body: dict) -> dict:

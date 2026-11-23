@@ -698,6 +698,22 @@ class SalesOrder(Stamped, Base):
     invoice_tax: Mapped[int | None] = mapped_column(Integer, default=None)
     invoice_lines: Mapped[list | None] = mapped_column(JSON, default=None)
     invoice_note: Mapped[str | None] = mapped_column(String(300), default=None)
+    # As quoted (2026-11-23, migration 0032): what the CRM priced it with, from a quote or made directly with the
+    # quote form. source: quote / direct / typed (None on older orders: quote when quote_id is set, else typed).
+    source: Mapped[str | None] = mapped_column(String(10), default=None)
+    price_type: Mapped[str | None] = mapped_column(String(40), default=None)
+    price_type_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    rx: Mapped[bool] = mapped_column(default=False, server_default=sa_false())
+    promo_discount_centavos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    customer_email: Mapped[str | None] = mapped_column(String(254), default=None)
+    customer_phone: Mapped[str | None] = mapped_column(String(60), default=None)
+    # The guarantee letter {number, issuedOn, amountCentavos, fileName}; a direct order keeps the file itself.
+    letter: Mapped[dict | None] = mapped_column(JSON, default=None)
+    letter_file: Mapped[bytes | None] = mapped_column(LargeBinary, default=None, deferred=True)
+    letter_file_type: Mapped[str | None] = mapped_column(String(60), default=None)
+    approval_reasons: Mapped[list | None] = mapped_column(JSON, default=None)
+    warnings: Mapped[list | None] = mapped_column(JSON, default=None)
+    terms: Mapped[str | None] = mapped_column(Text, default=None)
 
     warehouse: Mapped["Warehouse"] = relationship(lazy="joined")
     decided_by: Mapped["User | None"] = relationship(foreign_keys=[decided_by_id], lazy="joined")
@@ -727,6 +743,13 @@ class SalesOrderLine(Base):
     packaging_id: Mapped[str | None] = mapped_column(String(36), default=None)
     unit_name: Mapped[str | None] = mapped_column(String(40), default=None)
     per: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # As quoted (migration 0032): `discount` stays the whole line discount (what Finance invoices); these split it.
+    promo_name: Mapped[str | None] = mapped_column(String(160), default=None)
+    promo_discount: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    extra_discount: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    discount_kind: Mapped[str | None] = mapped_column(String(10), default=None)
+    discount_value: Mapped[int | None] = mapped_column(Integer, default=None)
+    bundle_name: Mapped[str | None] = mapped_column(String(160), default=None)
 
     order: Mapped[SalesOrder] = relationship(back_populates="lines")
     product: Mapped["Product"] = relationship(lazy="joined")

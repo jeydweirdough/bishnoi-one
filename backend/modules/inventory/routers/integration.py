@@ -9,7 +9,7 @@ listed: its variants are.
 import hmac
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Header, Query, Request, status
 from sqlalchemy import func, select
 
 from modules import inprocess
@@ -172,3 +172,32 @@ def supplier_receipts(db: DB, supplier_id: str) -> dict:
             for r in rows
         ]
     }
+
+
+@router.post("/sales-orders", status_code=status.HTTP_201_CREATED)
+def direct_sales_order(db: DB, request: Request, body: dict = Body(...)) -> dict:
+    """A sales order made directly in the CRM with the quote form (2026-11-23): priced there exactly as a quote is,
+    made here at once and sent for approval. The body is the CRM's order payload (modules/crm/orders.py) with the
+    warehouse, the date it's wanted and, when a guarantee letter pays, the letter itself (base64)."""
+    import base64
+    from datetime import date
+
+    from modules.inventory import sales
+    from modules.inventory.models import Warehouse
+
+    warehouse = db.get(Warehouse, str(body.get("warehouseId"))) if body.get("warehouseId") else sales.default_warehouse(db)
+    if warehouse is None or not warehouse.is_active:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, [{"loc": ["body", "warehouseId"], "msg": "Pick a warehouse that's switched on.", "type": "value_error"}])
+    try:
+        scheduled = date.fromisoformat(body["scheduledOn"]) if body.get("scheduledOn") else None
+    except ValueError:
+        scheduled = None
+    letter = body.get("letter") if isinstance(body.get("letter"), dict) else {}
+    data = base64.b64decode(letter["fileBase64"]) if letter.get("fileBase64") else None
+    try:
+        order = sales.from_crm(db, body, getattr(request.state, "company", None), warehouse=warehouse, scheduled_on=scheduled,
+                               letter_file=data, letter_file_type=str(letter.get("fileType") or "")[:60] or None)
+    except ValueError as problem:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(problem)) from None
+    db.commit()
+    return {"id": order.id, "number": order.number, "status": order.status}

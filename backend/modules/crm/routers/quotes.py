@@ -37,7 +37,7 @@ from modules.crm.inventory import sync_if_stale
 from modules.crm.models import Company, Contact, Deal, Quote, StoredFile, Team, User
 from modules.crm.finance import TaxUnavailable, add_tax
 from modules.crm import business_events, mail, pharmacy, trade
-from modules.crm.orders import payload as order_payload
+from modules.crm.orders import OrdersUnavailable, direct_payload, payload as order_payload, place_direct
 from modules.crm.pricing import Problems, letterhead as letterhead_of, price_book, price_lines, price_list_out, sales_settings, today
 from modules.crm.scope import reaches, within
 
@@ -460,27 +460,22 @@ def save_quote(
     return record
 
 
-@router.post("/{kind}/{record_id}/quotes", status_code=status.HTTP_201_CREATED)
-async def create_quote(
-    access: Create,
-    me: CurrentUser,
-    db: DB,
-    settings: SettingsDep,
-    kind: Kind,
-    record_id: str,
-    quote: Annotated[str, Form(max_length=200_000)],
-    letter_file: Annotated[UploadFile | None, File(alias="letterFile")] = None,
-) -> dict:
+def parsed(model, raw: str, what: str):
+    """The form's JSON part, read as `model`, with its field errors as the API gives them."""
     try:
-        body = QuoteIn.model_validate(json.loads(quote))
+        return model.model_validate(json.loads(raw))
     except json.JSONDecodeError:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The quote wasn't readable. Reload and try again.") from None
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"The {what} wasn't readable. Reload and try again.") from None
     except ValidationError as e:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             [{"type": x["type"], "loc": ["body", *x["loc"]], "msg": x["msg"]} for x in e.errors(include_url=False, include_context=False)],
         ) from None
 
+
+def checked(db: Session, settings, access: Access, kind: str, record_id: str, body: QuoteIn, letter_file: UploadFile | None, what: str):
+    """Priced, taxed and checked as a quote is, for a quote or a sales order made directly (2026-11-23): the customer,
+    the price list, the notes its price type needs, who pays and their letter. Returns the problems still open."""
     company, contact = customer_of(db, access, kind, record_id)
     on = today(settings.org_timezone)
     book = book_for(db, company, contact, on)
@@ -488,7 +483,7 @@ async def create_quote(
     try:
         priced = with_tax(settings, book, priced)
     except TaxUnavailable as problem:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"{problem} The quote wasn't saved; try again in a moment.") from None
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"{problem} The {what} wasn't saved; try again in a moment.") from None
     kind_ = book.price_type(body.price_type)
 
     problems = Problems()
@@ -506,6 +501,31 @@ async def create_quote(
                 problems.add(["letter", "issuedOn"], "The letter can't be dated after today.")
         if issuer is not None and (letter_file is None or not letter_file.filename):
             problems.add(["letterFile"], "Attach the letter: a PDF, or a photo (JPG or PNG).")
+    return company, contact, book, priced, kind_, issuer, problems, on
+
+
+async def letter_of(issuer, letter_file: UploadFile | None) -> tuple[dict | None, bytes | None]:
+    """The guarantee letter's file, checked, and how it's kept: {ref, ext, name, contentType, size} and its bytes."""
+    if issuer is None:
+        return None, None
+    data, content_type, ext = await read_letter(letter_file)
+    name = Path(letter_file.filename).name[:120] or f"letter{ext}"
+    return {"ref": secrets.token_hex(16), "ext": ext, "name": name, "contentType": content_type, "size": len(data)}, data
+
+
+@router.post("/{kind}/{record_id}/quotes", status_code=status.HTTP_201_CREATED)
+async def create_quote(
+    access: Create,
+    me: CurrentUser,
+    db: DB,
+    settings: SettingsDep,
+    kind: Kind,
+    record_id: str,
+    quote: Annotated[str, Form(max_length=200_000)],
+    letter_file: Annotated[UploadFile | None, File(alias="letterFile")] = None,
+) -> dict:
+    body = parsed(QuoteIn, quote, "quote")
+    company, contact, book, priced, kind_, issuer, problems, on = checked(db, settings, access, kind, record_id, body, letter_file, "quote")
     deal = None
     if body.deal_id:
         deal = db.get(Deal, body.deal_id)
@@ -515,15 +535,9 @@ async def create_quote(
     problems.raise_if_any()
     extra = check_extra(db, "quote", body.extra)
     rules = book.settings
+    stored, data = await letter_of(issuer, letter_file)
 
-    stored = None
-    if issuer is not None:
-        data, content_type, ext = await read_letter(letter_file)
-        ref = secrets.token_hex(16)
-        name = Path(letter_file.filename).name[:120] or f"letter{ext}"
-        stored = {"ref": ref, "ext": ext, "name": name, "contentType": content_type, "size": len(data)}
-
-    record = save_quote(db, settings, me, company, contact, body, priced, kind_, issuer, deal, extra, rules, stored, data if stored is not None else None)
+    record = save_quote(db, settings, me, company, contact, body, priced, kind_, issuer, deal, extra, rules, stored, data)
     return quote_out(db, record, access)
 
 
@@ -723,6 +737,64 @@ def raise_order(access: Order, me: CurrentUser, db: DB, settings: SettingsDep, q
     audit(db, me, "quote.ordered", target=quote.number, target_type="quote", target_id=quote.id)
     db.commit()
     return quote_out(db, quote, access)
+
+
+class DirectOrderIn(QuoteIn):
+    """A sales order made directly with the quote form (2026-11-23): the quote's fields, then where it ships from."""
+
+    warehouse_id: str | None = Field(None, max_length=36)
+    scheduled_on: date | None = None
+
+
+@router.post("/{kind}/{record_id}/sales-orders", status_code=status.HTTP_201_CREATED)
+async def direct_order(
+    access: Order,
+    me: CurrentUser,
+    db: DB,
+    settings: SettingsDep,
+    kind: Kind,
+    record_id: str,
+    order: Annotated[str, Form(max_length=200_000)],
+    letter_file: Annotated[UploadFile | None, File(alias="letterFile")] = None,
+) -> dict:
+    """A sales order without a quote (owner, 2026-11-23: the quotation is the basis, but a direct sale needn't make
+    one): priced, taxed and checked exactly as a quote, then made in Inventory at once, waiting for approval on its
+    slip. What a quote would have waited for (the team lead's approval reasons, a prescription, the customer's credit,
+    the letter) goes on the slip for the approvers. A typed price goes through a quote: Finance approves it first."""
+    if not settings.inventory_linked:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Inventory isn't linked, so a sales order can't be made here.")
+    body = parsed(DirectOrderIn, order, "order")
+    company, contact, book, priced, kind_, issuer, problems, on = checked(db, settings, access, kind, record_id, body, letter_file, "order")
+    if kind_.entry == "entered":
+        problems.add(["priceType"], f"{kind_.name} is a typed price: make a quote, so Finance approves the price first.")
+    problems.raise_if_any()
+    customer = company or (contact.company if contact else None)
+    warnings = check_s2_compliance(book, priced, customer, on) + clidp.warnings(db, [l.get("productCode") for l in priced["lines"]], customer, on)
+    if trade.is_trade(db, customer):
+        credit = trade.credit_check(db, settings, customer)
+        if credit.get("status") in ("overdue", "suspended"):
+            priced["approvalReasons"].append("credit")
+            warnings.append(f"Credit: {credit['label']}. {credit.get('detail') or ''}".strip())
+    if body.rx:
+        priced["approvalReasons"].append("rx")
+    stored, data = await letter_of(issuer, letter_file)
+    letter = None
+    if issuer is not None and body.letter is not None:
+        import base64
+
+        letter = {"number": body.letter.number, "issuedOn": body.letter.issued_on.isoformat(), "amountCentavos": body.letter.amount_centavos,
+                  "fileName": stored["name"], "fileType": stored["contentType"], "fileBase64": base64.b64encode(data).decode()}
+    who = (contact.full_name + (f", {company.name}" if company else "")) if contact else company.name
+    payload = direct_payload(db, me, settings, company=company, contact=contact, customer_name=who[:200], priced=priced, kind=kind_,
+                             rx=body.rx, notes=body.notes, terms=book.settings.quote_terms, issuer=issuer, letter=letter, warnings=warnings)
+    payload |= {"warehouseId": body.warehouse_id, "scheduledOn": body.scheduled_on.isoformat() if body.scheduled_on else None}
+    try:
+        made = place_direct(settings, payload)
+    except OrdersUnavailable as problem:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(problem)) from None
+    audit(db, me, "sales_order.direct", target=made.get("number"), target_type="sales_order", target_id=made.get("id"))
+    db.commit()
+    return made
 
 
 @router.get("/quote-letterhead")

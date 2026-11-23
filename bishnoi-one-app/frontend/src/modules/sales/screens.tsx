@@ -2,13 +2,17 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { load, loadQuery } from "@/src/modules/inventory/platform/lib/api";
+import { apiFor } from "@/src/platform/lib/api";
+import { QuoteForm } from "@/src/modules/crm/components/quote-form";
+import type { CompanyDetail, PriceList, StockAnswer } from "@/src/platform/lib/types";
 import { NoAccess, Table, Td } from "@/src/modules/inventory/components/ui";
 import { referenceOf } from "@/src/modules/inventory/lib/reference";
 import { context, type Params, type Search } from "@/src/modules/inventory/lib/page";
 import type { Reference } from "@/src/modules/inventory/lib/types";
 import { Empty, PageHeader, Sheet } from "@/src/platform/ui/sheet";
 import { ToggleLinks } from "@/src/platform/ui/toggle-links";
-import { SalesOrderForm, SalesOrderSteps } from "./components";
+import { SalesOrderSteps } from "./components";
+import { TaxSummary } from "@/src/modules/crm/components/tax-summary";
 import { SaleDocuments } from "@/src/modules/inventory/components/supply";
 import type { ProductDocument } from "@/src/modules/inventory/lib/types";
 import type { SalesOrder, SalesOrderBrief, SalesStatus } from "./types";
@@ -117,6 +121,17 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
           actions={slip.status === "pending" ? <SlipActions id={slip.id} number={slip.number} canSign={slip.canSign} actingAs={slip.actingAs} canAddFiles={slip.canAddFiles} /> : null}
         />
       )}
+      {/* Why it needs approval, as the CRM priced it (2026-11-23): what the approvers check. */}
+      {o.status === "pending" && ((o.approvalReasons ?? []).length > 0 || (o.warnings ?? []).length > 0) && (
+        <div className="mb-4 rounded-lg bg-hema-tint px-4 py-2 text-sm text-ink">
+          {(o.approvalReasons ?? []).length > 0 && (
+            <p>Needs approval because: {(o.approvalReasons ?? []).map((r) => REASONS[r]?.(o) ?? r).join("; ")}.</p>
+          )}
+          {(o.warnings ?? []).map((w) => (
+            <p key={w} className="text-meta text-ink-2">{w}</p>
+          ))}
+        </div>
+      )}
       {o.status === "rejected" && o.decisionNote && (
         <p className="mb-4 rounded-lg bg-danger-tint px-4 py-2 text-sm text-ink">
           Rejected by {o.decidedBy?.name ?? "an approver"}: {o.decisionNote}
@@ -133,13 +148,42 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
           <p className="font-semibold text-ink">{o.customer.name}</p>
           {o.customer.address && <p className="text-sm text-ink-2">{o.customer.address}</p>}
           {o.customer.tin && <p className="text-sm text-ink-2">TIN {o.customer.tin}</p>}
-          {o.payer?.kind === "guarantee_letter" && <p className="mt-1 text-meta text-ink-3">Paid by guarantee letter: {o.payer.issuer} {o.payer.letterNumber}</p>}
+          {(o.customer.email || o.customer.phone) && <p className="text-meta text-ink-3">{[o.customer.email, o.customer.phone].filter(Boolean).join(" · ")}</p>}
+          <p className="mt-2 text-caps text-ink-3 uppercase">Payer</p>
+          {o.payer?.kind === "guarantee_letter" ? (
+            <p className="text-sm text-ink">
+              {o.payer.issuer}, guarantee letter {o.payer.letterNumber}
+              <span className="block text-meta text-ink-3">
+                {o.letter?.issuedOn && <>Dated {day(o.letter.issuedOn)} · </>}
+                {o.payer.amountCentavos != null && <>covers {fmt.peso(o.payer.amountCentavos)} · </>}
+                {o.letter?.hasFile ? (
+                  <a href={`/crm/sales/orders/${o.id}/letter`} target="_blank" rel="noreferrer" className="text-hema hover:underline">Open the letter</a>
+                ) : o.quote ? (
+                  <Link href={`/crm/quotes/${o.quote.id}`} className="text-hema hover:underline">The letter is on the quote</Link>
+                ) : null}
+              </span>
+            </p>
+          ) : (
+            <p className="text-sm text-ink">The customer</p>
+          )}
         </Sheet>
         <Sheet className="px-5 py-4">
           <p className="text-caps text-ink-3 uppercase">Sale</p>
           <p className="text-sm text-ink">{o.salesperson?.name ?? "No salesperson"}</p>
           {(o.division || o.team) && <p className="text-meta text-ink-3">{[o.division, o.team].filter(Boolean).join(" › ")}</p>}
-          {o.quote && <p className="mt-1 text-meta text-ink-3">From quote {o.quote.number}</p>}
+          {o.priceType && (
+            <p className="mt-1 text-sm text-ink">
+              Price: {o.priceType.name}
+              {o.rx && <span className="ml-2 inline-flex h-5 items-center rounded-full border border-hema px-2 text-stamp text-hema uppercase">Rx</span>}
+            </p>
+          )}
+          {o.quote ? (
+            <p className="mt-1 text-meta text-ink-3">
+              From quote <Link href={`/crm/quotes/${o.quote.id}`} className="text-hema hover:underline">{o.quote.number}</Link>
+            </p>
+          ) : (
+            <p className="mt-1 text-meta text-ink-3">{o.source === "direct" ? "Made directly, priced as a quote" : "Typed at Inventory's selling prices"}</p>
+          )}
           <p className="text-meta text-ink-3">Made {at(o.createdAt)}{o.createdBy ? ` by ${o.createdBy}` : ""}</p>
         </Sheet>
         <Sheet className="px-5 py-4">
@@ -199,13 +243,22 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
             <tr key={l.id}>
               <Td>
                 <span className="font-medium">{l.product.name}</span>
-                <span className="block text-meta text-ink-3">{l.product.sku} · {l.product.unit}</span>
+                <span className="block text-meta text-ink-3">{l.product.sku} · {l.product.unit}{l.bundle ? ` · in ${l.bundle}` : ""}</span>
               </Td>
               {/* In the base unit, with the unit sold (step 4A): "2 Boxes of 10". */}
               <Td num>{fmt.count(l.quantity)}{l.unit?.soldAs && <span className="block text-meta text-ink-3">{l.unit.soldAs}</span>}</Td>
               <Td num>{l.freeQuantity ? fmt.count(l.freeQuantity) : "—"}</Td>
               <Td num>{fmt.peso(l.unitPrice)}</Td>
-              <Td num>{l.discount ? fmt.peso(l.discount) : "—"}</Td>
+              <Td num>
+                {l.discount ? fmt.peso(l.discount) : "—"}
+                {/* As quoted: the promo and the extra discount apart. */}
+                {l.promoName && <span className="block text-meta text-ink-3">{l.promoName}{l.promoDiscount ? ` ${fmt.peso(l.promoDiscount)}` : ""}</span>}
+                {l.extraDiscount ? (
+                  <span className="block text-meta text-ink-3">
+                    Extra {l.discountKind === "percent" && l.discountValue ? `${(l.discountValue / 100).toLocaleString()}% off` : fmt.peso(l.extraDiscount)}
+                  </span>
+                ) : null}
+              </Td>
               <Td num>{fmt.peso(l.total)}</Td>
               <Td num>{fmt.count(l.delivered)}</Td>
             </tr>
@@ -216,21 +269,112 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
           </tr>
         </Table>
       </Sheet>
+      {/* The amounts as quoted: the promos and extra discounts apart, and the VAT the CRM had Finance work out. */}
+      {o.amountsFrom !== "invoice" && (o.priceType || o.tax) && (
+        <Sheet className="mt-5 ml-auto max-w-sm px-5 py-4">
+          <dl className="space-y-1 text-sm">
+            <div className="flex justify-between"><dt className="text-ink-3">Gross</dt><dd className="tabular-nums">{fmt.peso(o.ordered?.grossCentavos ?? o.grossCentavos)}</dd></div>
+            {(o.promoDiscountCentavos ?? 0) > 0 && <div className="flex justify-between"><dt className="text-ink-3">Promos</dt><dd className="tabular-nums">− {fmt.peso(o.promoDiscountCentavos!)}</dd></div>}
+            {own.discountCentavos - (o.promoDiscountCentavos ?? 0) > 0 && (
+              <div className="flex justify-between"><dt className="text-ink-3">Extra discounts</dt><dd className="tabular-nums">− {fmt.peso(own.discountCentavos - (o.promoDiscountCentavos ?? 0))}</dd></div>
+            )}
+            <div className="flex justify-between font-semibold"><dt>Total</dt><dd className="tabular-nums">{fmt.peso(own.totalCentavos)}</dd></div>
+          </dl>
+          {o.tax && <TaxSummary tax={o.tax} fmt={fmt} />}
+        </Sheet>
+      )}
       {o.notes && <p className="mt-4 text-sm whitespace-pre-line text-ink-2">{o.notes}</p>}
+      {o.terms && <p className="mt-2 text-meta whitespace-pre-line text-ink-3">Terms: {o.terms}</p>}
     </>
   );
 }
 
-export async function NewSalesOrderPage() {
+/** Why an order needs approval, as the CRM priced it, in words. */
+const REASONS: Record<string, (o: SalesOrder) => string> = {
+  price: (o) => `${o.priceType?.name ?? "its price type"} needs approval`,
+  discount: () => "extra discounts are over the limit",
+  margin: () => "gross margin is under the target floor",
+  s2_license: () => "it has an S-2 controlled substance and the customer's PDEA licence is missing or expired",
+  rx: () => "it's at a prescription price and no pharmacist checked it",
+  credit: () => "the customer's credit is overdue or suspended",
+};
+
+/** A sales order made directly (2026-11-23, owner: the quotation is the basis, and a direct sale needn't make one):
+ *  first the customer, then the quote form itself, priced by the CRM the same way, with where it ships from. */
+export async function NewSalesOrderPage({ searchParams }: { searchParams: Search }) {
   const { me, may } = await context();
   if (!may("sales.create")) return <NoAccess what="creating sales orders" />;
-  const { reference: ref } = await loadQuery<{ reference: Pick<Reference, "products" | "warehouses"> }>(`query NewSalesOrder { ${referenceOf("products", "warehouses")} }`, {}, ["reference"]);
+  const params = await searchParams;
+  const id = one(params.customer);
+  const crumbs = [{ href: "/crm/sales", label: "Sales orders" }];
+  if (!id) return <PickCustomer q={one(params.q)} crumbs={crumbs} />;
+  const crm = apiFor("crm");
+  const base = `/companies/${encodeURIComponent(id)}`;
+  let customer: CompanyDetail, priceList: PriceList;
+  try {
+    [customer, priceList] = await Promise.all([crm.get<CompanyDetail>(base), crm.get<PriceList>(`${base}/price-list`)]);
+  } catch (error) {
+    return (
+      <>
+        <PageHeader crumbs={crumbs} title="New sales order" />
+        <Empty icon="company" title="This customer can't be priced" actions={<LinkButton href="/crm/sales/orders/new">Pick another customer</LinkButton>}>
+          {error instanceof Error ? error.message : "The CRM didn't answer."}
+        </Empty>
+      </>
+    );
+  }
+  const codes = priceList.products.map((p) => p.code);
+  const stock = codes.length ? await crm.get<StockAnswer>(`/stock?codes=${encodeURIComponent(codes.join(","))}`).catch(() => null) : null;
+  const { reference: ref } = await loadQuery<{ reference: Pick<Reference, "warehouses"> }>(`query NewSalesOrder { ${referenceOf("warehouses")} }`, {}, ["reference"]);
   return (
     <>
-      <PageHeader crumbs={[{ href: "/crm/sales", label: "Sales orders" }]} title="New sales order">
-        For an order taken by phone or in person. Prices are the price list&apos;s; anything else goes through a quote in the CRM. It waits for approval.
+      <PageHeader crumbs={crumbs} title={`New sales order for ${customer.name}`}>
+        {customer.team ? `Priced with ${customer.team.name}'s prices, as a quote is. ` : "Priced as a quote is. "}Promos and extra discounts are per product line. It waits for approval.
+        {stock?.linked && <span className="mt-1 block text-ink-3">{stock.error ? `Stock can't be shown: ${stock.error}` : "Stock is from Inventory, as of when this page opened."}</span>}
       </PageHeader>
-      <SalesOrderForm org={me.org} reference={ref} />
+      <Sheet className="max-w-[70rem] px-5 py-6 sm:px-8">
+        <QuoteForm to={{ kind: "companies", id }} priceList={priceList} org={me.org} stock={stock} order={{ warehouses: ref.warehouses.filter((w) => w.isActive !== false) }} />
+      </Sheet>
+    </>
+  );
+}
+
+/** The first step: whose order it is, from the CRM's customers this person reaches. */
+async function PickCustomer({ q, crumbs }: { q: string; crumbs: { href: string; label: string }[] }) {
+  const found = await apiFor("crm")
+    .get<{ items: { id: string; name: string; code?: string | null; city?: string | null; industry?: string | null }[]; total: number }>(`/companies?limit=20${q ? `&q=${encodeURIComponent(q)}` : "&sort=updated"}`)
+    .catch(() => null);
+  return (
+    <>
+      <PageHeader crumbs={crumbs} title="New sales order">
+        Pick the customer. The order is priced as a quote is: their team&apos;s prices, promos and discounts.
+      </PageHeader>
+      <Sheet className="max-w-[44rem] px-5 py-5">
+        <form className="mb-4 flex gap-2" action="/crm/sales/orders/new">
+          <input name="q" defaultValue={q} placeholder="Search customers by name, code or city" autoFocus className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" />
+          <button type="submit" className="h-9 shrink-0 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">Search</button>
+        </form>
+        {found === null ? (
+          <p className="text-sm text-danger">The CRM's customers can't be read right now.</p>
+        ) : found.items.length === 0 ? (
+          <p className="text-sm text-ink-3">{q ? "No customers match." : "No customers yet."} Customers are added in the CRM.</p>
+        ) : (
+          <ul className="divide-y rounded-lg border">
+            {found.items.map((c) => (
+              <li key={c.id}>
+                <Link href={`/crm/sales/orders/new?customer=${encodeURIComponent(c.id)}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/50">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{c.name}</span>
+                    <span className="block truncate text-meta text-ink-3">{[c.code, c.city, c.industry].filter(Boolean).join(" · ") || " "}</span>
+                  </span>
+                  <span className="text-meta text-ink-3">Choose</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {found && found.total > found.items.length && <p className="mt-3 text-meta text-ink-3">Showing {found.items.length} of {found.total}: search to narrow it.</p>}
+      </Sheet>
     </>
   );
 }
