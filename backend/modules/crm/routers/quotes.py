@@ -117,9 +117,11 @@ def customer_of(db: Session, access: Access, kind: str, record_id: str) -> tuple
     return contact.company, contact
 
 
-def pricing_team(company: Company | None, contact: Contact | None) -> str | None:
-    """Whose prices apply: the team of whoever looks after the customer."""
-    return (contact or company).team_id
+def pricing_team(company: Company | None, contact: Contact | None, fallback: str | None = None) -> str | None:
+    """Whose prices apply: the team of whoever looks after the customer; for a customer no team looks after, the
+    team of whoever makes the quote or order (2026-11-23: it's their team's quote, so their division's promos and
+    bundles apply)."""
+    return (contact or company).team_id or fallback
 
 
 def pricing_group(company: Company | None, contact: Contact | None) -> str | None:
@@ -128,8 +130,8 @@ def pricing_group(company: Company | None, contact: Contact | None) -> str | Non
     return owner.price_group_code if owner else None
 
 
-def book_for(db: Session, company: Company | None, contact: Contact | None, on: str):
-    return price_book(db, pricing_team(company, contact), on, pricing_group(company, contact))
+def book_for(db: Session, company: Company | None, contact: Contact | None, on: str, fallback_team: str | None = None):
+    return price_book(db, pricing_team(company, contact, fallback_team), on, pricing_group(company, contact))
 
 
 def with_tax(settings, book, priced: dict) -> dict:
@@ -286,7 +288,7 @@ Kind = Literal["companies", "contacts"]
 def read_price_list(access: View, db: DB, settings: SettingsDep, kind: Kind, record_id: str) -> dict:
     company, contact = customer_of(db, access, kind, record_id)
     sync_if_stale(db, settings)
-    return price_list_out(book_for(db, company, contact, today(settings.org_timezone)))
+    return price_list_out(book_for(db, company, contact, today(settings.org_timezone), access.team_id))
 
 
 S2_CONTROLLED_SUBSTANCES = {
@@ -339,7 +341,7 @@ def check_s2_compliance(book, priced: dict, customer: Company | None, on: str) -
 def preview_quote(access: Create, db: DB, settings: SettingsDep, kind: Kind, record_id: str, body: QuoteIn) -> dict:
     company, contact = customer_of(db, access, kind, record_id)
     on = today(settings.org_timezone)
-    book = book_for(db, company, contact, on)
+    book = book_for(db, company, contact, on, access.team_id)
     priced = price_lines(book, body.price_type, body.rx, lines_in(body))
     # A contact's quote goes to its company's division.
     customer = company or (db.get(Company, contact.company_id) if contact and contact.company_id else None)
@@ -393,7 +395,7 @@ def save_quote(
     on = today(settings.org_timezone)
     who = (contact.full_name + (f", {company.name}" if company else "")) if contact else company.name
     customer = company or (contact.company if contact else None)
-    book = book_for(db, company, contact, on)
+    book = book_for(db, company, contact, on, me.team_id)
     check_s2_compliance(book, priced, customer, on)
     reasons = priced["approvalReasons"]
     record = Quote(
@@ -478,7 +480,7 @@ def checked(db: Session, settings, access: Access, kind: str, record_id: str, bo
     the price list, the notes its price type needs, who pays and their letter. Returns the problems still open."""
     company, contact = customer_of(db, access, kind, record_id)
     on = today(settings.org_timezone)
-    book = book_for(db, company, contact, on)
+    book = book_for(db, company, contact, on, access.team_id)
     priced = price_lines(book, body.price_type, body.rx, lines_in(body))
     try:
         priced = with_tax(settings, book, priced)

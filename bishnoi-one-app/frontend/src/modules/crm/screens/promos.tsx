@@ -3,7 +3,7 @@ import { can } from "@/src/modules/crm/lib/access";
 import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { CatalogueProduct, DivisionOption, Paged, PromoRow } from "@/src/platform/lib/types";
 import { NoAccess } from "@/src/modules/crm/components/admin/words";
-import { DivisionFilter, inDivision } from "@/src/modules/crm/components/catalogue/division-filter";
+import { DivisionFilter, NoDivisionNotice, inDivision } from "@/src/modules/crm/components/catalogue/division-filter";
 import { PromosEditor } from "@/src/modules/crm/components/catalogue/promos-editor";
 
 export const metadata = { title: "Promos" };
@@ -23,6 +23,7 @@ export default async function PromosPage({ searchParams }: { searchParams: Promi
         Promos a rep can pick on a quote line, while they run. Each is for its own divisions: nobody else sees or quotes it.
       </PageHeader>
       <DivisionFilter base="/crm/promos" teams={promos.teams} current={current} />
+      {promos.can.edit && <NoDivisionNotice rows={promos.items} what="promo" />}
       <PromosEditor
         promos={inDivision(promos.items, current)}
         products={products.items.map((p) => ({ id: p.id, name: p.name, code: p.code }))}

@@ -156,3 +156,18 @@ def test_a_quote_order_carries_its_pricing(app, client, crew, ids):
     payload = client.get(f"/quotes/{q['id']}/order-payload", headers=crew["ria"]).json()
     assert payload["pricing"]["priceType"] == "PATIENT" and payload["pricing"]["rx"] is False
     assert {"promoDiscountCentavos", "extraDiscountCentavos", "discountKind", "promoName"} <= set(payload["lines"][0])
+
+
+def test_a_customer_no_team_looks_after_is_priced_with_the_makers_team(app, client, crew, ids):
+    """2026-11-23: promos and bundles are per division; a customer with no team takes the division of whoever quotes."""
+    from modules.crm.models import Company
+
+    acme = company(client, crew["ria"])
+    mine = client.get(f"/companies/{acme['id']}/price-list", headers=crew["ria"]).json()
+    with app.state.sessions() as db:
+        db.get(Company, acme["id"]).team_id = None
+        db.commit()
+    unowned = client.get(f"/companies/{acme['id']}/price-list", headers=crew["ria"]).json()
+    assert [p["id"] for p in unowned["promos"]] == [p["id"] for p in mine["promos"]]
+    assert [b["id"] for b in unowned["bundles"]] == [b["id"] for b in mine["bundles"]]
+    assert mine["promos"] or mine["bundles"]  # the demo catalogue gives the rep's team some
