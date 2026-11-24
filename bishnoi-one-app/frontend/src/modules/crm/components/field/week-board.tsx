@@ -132,7 +132,7 @@ export function WeekBoard({ plan, doctors, dayLabel, fullDay }: { plan: WeekPlan
               <ul className="mt-1 flex flex-wrap gap-1.5">
                 {plan.added!.map((a) => (
                   <li key={a.id}>
-                    <a href={`/crm/customers/${a.id}`} className="inline-flex items-center rounded-full border border-rule bg-white px-2.5 py-0.5 text-meta text-ink hover:border-ink">
+                    <a href={`/crm/customers/${a.id}`} className="inline-flex items-center rounded-full border border-rule bg-card px-2.5 py-0.5 text-meta text-ink hover:border-ink">
                       {a.name}{a.city ? ` · ${a.city}` : ""}
                     </a>
                   </li>

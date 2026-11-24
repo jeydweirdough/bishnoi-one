@@ -18,8 +18,8 @@ export function CopyButton({ text, what }: { text: string; what: string }) {
     }
   }
   return (
-    <button suppressHydrationWarning type="button" onClick={copy} aria-label={`Copy ${what.toLowerCase()}`} title={`Copy ${what.toLowerCase()}`} className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-[#f4f4f2] hover:text-ink">
-      {done ? <Check className="size-3.5 text-[#3f6f35]" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+    <button suppressHydrationWarning type="button" onClick={copy} aria-label={`Copy ${what.toLowerCase()}`} title={`Copy ${what.toLowerCase()}`} className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-muted hover:text-ink">
+      {done ? <Check className="size-3.5 text-emerald-700 dark:text-emerald-400" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
     </button>
   );
 }

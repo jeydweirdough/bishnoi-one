@@ -69,7 +69,7 @@ export function WeekBars({ days, today, week, base }: { days: Record<string, num
   );
 }
 
-const SHADES = ["bg-mint-2", "bg-sage/45", "bg-sage", "bg-[#7fae6f]", "bg-sage-deep"];
+const SHADES = ["bg-mint-2", "bg-sage/45", "bg-sage", "bg-emerald-500", "bg-sage-deep"];
 
 /** About three months, a square a day (a column a week, Monday at the top): the darker, the more got done. */
 export function Heatmap({ days, today }: { days: Record<string, number>; today: string }) {
@@ -99,9 +99,9 @@ export function Heatmap({ days, today }: { days: Record<string, number>; today: 
         <div className="grid flex-1 grid-flow-col grid-rows-7 gap-1" aria-hidden>
           {weeks.flat().map((k) =>
             k > today ? (
-              <span key={k} className="aspect-square rounded-[3px]" />
+              <span key={k} className="aspect-square rounded-lg" />
             ) : (
-              <span key={k} title={`${k}: ${done(days[k] ?? 0)}`} className={`aspect-square rounded-[3px] ${shade(days[k] ?? 0)} ${k === today ? "ring-1 ring-ink/40" : ""}`} />
+              <span key={k} title={`${k}: ${done(days[k] ?? 0)}`} className={`aspect-square rounded-lg ${shade(days[k] ?? 0)} ${k === today ? "ring-1 ring-ink/40" : ""}`} />
             ),
           )}
         </div>

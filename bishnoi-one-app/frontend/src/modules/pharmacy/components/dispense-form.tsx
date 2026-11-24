@@ -80,7 +80,7 @@ export function DispenseForm({ rx, org }: { rx: Prepared; org: Org }) {
       className="space-y-6"
     >
       {perItem.map(({ item, total }) => (
-        <section key={item.id} className="rounded-[3px] border border-rule">
+        <section key={item.id} className="rounded-lg border border-rule">
           <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule px-4 py-3">
             <div className="min-w-0">
               <h3 className="font-semibold text-ink">{item.medicine.label}</h3>

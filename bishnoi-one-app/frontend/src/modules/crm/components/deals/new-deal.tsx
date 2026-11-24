@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Combobox } from "@/src/platform/ui/pickers";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";

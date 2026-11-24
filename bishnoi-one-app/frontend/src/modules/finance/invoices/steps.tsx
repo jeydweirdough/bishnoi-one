@@ -90,7 +90,7 @@ export function VoidInvoice({ id, number }: { id: string; number: string }) {
   const [pending, start] = useTransition();
   if (!open) return <Button onClick={() => setOpen(true)}>Void</Button>;
   return (
-    <div className="w-full space-y-3 rounded-[3px] border border-danger/40 bg-danger-tint/40 p-4">
+    <div className="w-full space-y-3 rounded-lg border border-danger/40 bg-danger-tint/40 p-4">
       <p className="text-sm">
         Void <span className="font-mono font-semibold">{number}</span>? The number stays used and the sale is reversed in the books. Keep the voided
         copies, as the BIR expects every number accounted for.
@@ -149,7 +149,7 @@ export function ReissueInvoice({ id, number, cancelled = false }: { id: string; 
   }
   if (!open) return <Button onClick={() => setOpen(true)}>Cancel and reissue</Button>;
   return (
-    <div className="w-full space-y-3 rounded-[3px] border border-danger/40 bg-danger-tint/40 p-4">
+    <div className="w-full space-y-3 rounded-lg border border-danger/40 bg-danger-tint/40 p-4">
       <p className="text-sm">
         Cancel <span className="font-mono font-semibold">{number}</span> and reissue it? It&apos;s voided (the number stays used, the sale reversed), and a copy opens as a
         draft for you to correct and issue with the next number, dated today. Both will show they&apos;re linked; the printed invoice stays as standard.

@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Eye, EyeOff, Search } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -57,7 +57,7 @@ export function ViewAsButton({ roles }: { roles: ViewAsRole[] }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Find a person or role"
-            className="h-10 w-full rounded-lg border border-rule bg-bench pr-3 pl-9 text-sm outline-none focus:border-ink focus:bg-white"
+            className="h-10 w-full rounded-lg border border-rule bg-bench pr-3 pl-9 text-sm outline-none focus:border-ring focus:bg-card"
           />
         </label>
         <div className="mt-3 max-h-[55dvh] space-y-4 overflow-y-auto pr-1">
@@ -99,7 +99,7 @@ export function ViewAsButton({ roles }: { roles: ViewAsRole[] }) {
 export function ViewingBar({ name, role }: { name: string; role: string }) {
   const [busy, start] = useTransition();
   return (
-    <div role="status" className="fixed top-0 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-3 rounded-b-xl bg-ink py-1.5 pr-1.5 pl-4 text-sm text-white shadow-lg">
+    <div role="status" className="fixed top-0 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-3 rounded-b-xl bg-primary py-1.5 pr-1.5 pl-4 text-sm text-primary-foreground shadow-lg">
       <Eye className="size-4 text-sage" aria-hidden />
       <span>
         Viewing as <b>{name}</b>
@@ -116,7 +116,7 @@ export function ViewingBar({ name, role }: { name: string; role: string }) {
             reload(r.data.home);
           })
         }
-        className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1 font-medium hover:bg-white/25 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-card/15 px-3 py-1 font-medium hover:bg-card/25 disabled:opacity-50"
       >
         <EyeOff className="size-4" aria-hidden />
         Stop viewing

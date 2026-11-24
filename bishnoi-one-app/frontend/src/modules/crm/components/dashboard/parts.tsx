@@ -60,7 +60,7 @@ export type Stat = { icon: IconName; label: string; value: string; note: ReactNo
  */
 function standing(pill: NonNullable<Figure["pill"]>): { Icon: LucideIcon; tone: string } {
   if (pill.tone === "bad") return { Icon: TrendingDown, tone: "text-danger" };
-  if (pill.tone === "warn") return { Icon: TriangleAlert, tone: "text-[#b7791f]" };
+  if (pill.tone === "warn") return { Icon: TriangleAlert, tone: "text-amber-700 dark:text-amber-400" };
   if (/pace/i.test(pill.text)) return { Icon: TrendingUp, tone: "text-filed" };
   return { Icon: CircleCheck, tone: "text-filed" };
 }

@@ -38,7 +38,7 @@ export function Modal({ open, title, children, onCancel, onOk, okText = "OK", ca
         onCancel();
       }}
       style={{ width: `min(${width}px, calc(100vw - 2rem))` }}
-      className="m-auto max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[3px] bg-sheet p-0 text-ink shadow-overlay"
+      className="m-auto max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg bg-sheet p-0 text-ink shadow-overlay"
     >
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">

@@ -149,7 +149,7 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
       <section className="space-y-4 border-t border-rule pt-5">
         <p className="text-sm font-semibold">Tax, terms and books</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="TIN" optional error={fields.tin} hint="Zoho's Company ID. Digits only: the dashes go in by themselves; 9 digits, then the branch code if any.">
+          <Field label="TIN" optional error={fields.tin} hint="Digits only: the dashes go in by themselves; 9 digits, then the branch code if any.">
             {(p) => <Input {...p} inputMode="numeric" value={v.tin} onChange={(e) => set({ tin: formatTin(e.target.value) })} placeholder="123-456-789-00000" maxLength={17} />}
           </Field>
           <Field label="Address" optional error={fields.address}>
@@ -230,14 +230,14 @@ export function SupplierForm({ supplier, withholding, accounts }: { supplier: Su
                 {contacts.map((c, i) => (
                   <tr key={i}>
                     <td className="py-1.5 pr-2">
-                      <select suppressHydrationWarning aria-label={`Contact ${i + 1}: salutation`} value={c.salutation ?? ""} onChange={(e) => setContact(i, { salutation: e.target.value || null })} className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+                      <Select aria-label={`Contact ${i + 1}: salutation`} value={c.salutation ?? ""} onChange={(e) => setContact(i, { salutation: e.target.value || null })} className="w-full">
                         <option value="" />
                         {SALUTATIONS.map((s) => (
                           <option key={s} value={s}>
                             {s}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </td>
                     {(["firstName", "lastName", "email", "phone", "designation"] as const).map((k) => (
                       <td key={k} className="px-2 py-1.5">

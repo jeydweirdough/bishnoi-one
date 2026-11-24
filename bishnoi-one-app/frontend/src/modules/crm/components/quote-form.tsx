@@ -64,7 +64,7 @@ const mobileLabel = "mb-0.5 block text-meta text-ink-3 sm:sr-only";
 function stockFirst(level: StockLevel | null | undefined): string {
   return level?.state ? `${level.available.toLocaleString()} · ` : "";
 }
-const cell = "h-9 w-full min-w-0 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-hema focus:outline-none aria-[invalid=true]:border-danger";
+const cell = "h-9 w-full min-w-0 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-ring focus:outline-none aria-[invalid=true]:border-danger";
 
 /** The quote as the API takes it. `null` in place of a number the rep hasn't typed properly yet. */
 function toInput(fmt: Format, d: Draft, entered: boolean, letter: QuoteInput["letter"]): QuoteInput {

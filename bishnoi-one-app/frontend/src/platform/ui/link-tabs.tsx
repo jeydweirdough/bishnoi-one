@@ -27,7 +27,7 @@ export function LinkTabs({ tabs, label, sub = false }: { tabs: LinkTab[]; label:
                 <Link
                   href={t.href}
                   aria-current={on ? "page" : undefined}
-                  className={`inline-flex h-9 items-center rounded-full px-3.5 text-sm whitespace-nowrap transition-colors ${on ? "bg-ink font-medium text-white" : "text-ink-2 hover:bg-rule hover:text-ink"}`}
+                  className={`inline-flex h-9 items-center rounded-full px-3.5 text-sm whitespace-nowrap transition-colors ${on ? "bg-primary font-medium text-primary-foreground" : "text-ink-2 hover:bg-rule hover:text-ink"}`}
                 >
                   {t.label}
                 </Link>

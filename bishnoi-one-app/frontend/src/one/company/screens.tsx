@@ -95,9 +95,8 @@ export async function IntegrationsPage() {
     getAccount(),
   ]);
   if (!data || !company) return <Page title="Integrations" intro={null}><NotYours /></Page>;
-  const finance = account.apps.some((a) => a.key === "finance");
   return (
-    <Page title="Integrations" intro="The outside services your apps use: email sending, Zoho Books, lead channels. Secrets are kept encrypted and never shown again once saved.">
+    <Page title="Integrations" intro="The outside services your apps use: email sending, lead channels. Secrets are kept encrypted and never shown again once saved.">
       <div className="max-w-3xl space-y-4">
         {data.services.map((s) => (
           <ServiceCard
@@ -110,16 +109,6 @@ export async function IntegrationsPage() {
             updatedWhen={s.updatedAt ? ago(s.updatedAt) : null}
           />
         ))}
-        {/* Finance signs in to Zoho Books itself (its own sign-in, kept by Finance); set up here (2026-10-31). */}
-        {finance && (
-          <Sheet className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-            <span className="min-w-0">
-              <span className="block font-semibold text-ink">Zoho Books for Finance</span>
-              <span className="block text-sm text-ink-2">Finance&apos;s sign-in to Zoho Books: the organisation it reads from, what it sends, and the queue of records to send.</span>
-            </span>
-            <LinkButton href="/platform/company/integrations/zoho">Open</LinkButton>
-          </Sheet>
-        )}
       </div>
     </Page>
   );

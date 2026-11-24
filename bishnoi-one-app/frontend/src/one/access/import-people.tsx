@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -103,7 +103,7 @@ export function ImportPeople() {
 
   return (
     <>
-      <Button icon={<Upload className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+      <Button size="sm" icon={<Upload className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
         Import
       </Button>
       <Modal

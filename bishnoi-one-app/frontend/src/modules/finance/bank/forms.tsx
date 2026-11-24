@@ -104,7 +104,7 @@ export function Reconcile({ rec, org, canReconcile }: { rec: Reconciliation; org
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
-      <div className="overflow-x-auto rounded-[3px] border border-rule bg-sheet">
+      <div className="overflow-x-auto rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10">
         {rec.lines.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-ink-3">Nothing on this account up to the statement&apos;s date that isn&apos;t cleared already.</p>
         ) : (
@@ -149,7 +149,7 @@ export function Reconcile({ rec, org, canReconcile }: { rec: Reconciliation; org
         )}
       </div>
       <div className="space-y-3 lg:sticky lg:top-4">
-        <dl className="space-y-1.5 rounded-[3px] border border-rule bg-sheet p-4 text-sm tabular-nums">
+        <dl className="space-y-1.5 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-4 text-sm tabular-nums">
           <div className="flex justify-between"><dt className="text-ink-2">Last statement&apos;s balance</dt><dd>{fmt.peso(rec.openingBalanceCentavos)}</dd></div>
           <div className="flex justify-between"><dt className="text-ink-2">Cleared in</dt><dd>{fmt.peso(totals.inn)}</dd></div>
           <div className="flex justify-between"><dt className="text-ink-2">Cleared out</dt><dd>− {fmt.peso(totals.out)}</dd></div>

@@ -65,7 +65,7 @@ export function AttachedFiles({
     <div className="space-y-3">
       <PrintAttachmentSources files={files} openBase={openBase} />
       {files.length ? (
-        <ul className="divide-y divide-rule rounded-[3px] border border-rule">
+        <ul className="divide-y divide-rule rounded-lg border border-rule">
           {files.map((f) => (
             <li key={f.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <FileText className="size-4 shrink-0 text-ink-3" aria-hidden />

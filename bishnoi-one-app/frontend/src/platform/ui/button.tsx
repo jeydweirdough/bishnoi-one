@@ -1,30 +1,14 @@
-// Buttons are Ant Design's (ant-button.tsx). What's left here is for a plain
-// <a> or <label> that has to look like one: an Ant button's shape, in classes
-// a server-rendered page can use.
+// Buttons are shadcn/ui's (ant-button.tsx keeps the props). What's left here is for a plain
+// <a> or <label> that has to look like one, in classes a server-rendered page can use.
 export { Button, LinkButton } from "./ant-button";
 import Link from "next/link";
 import type * as React from "react";
-import type { Size, Variant } from "./ant-button";
+import { buttonVariants } from "@/src/components/ui/button";
+import { SHAD_SIZE, SHAD_VARIANT, type Size, type Variant } from "./button-look";
 
-const base =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-55";
-
-const variants: Record<Variant, string> = {
-  primary: "bg-hema text-white hover:bg-hema-hover",
-  default: "border border-[#dededa] bg-sheet text-ink shadow-[0_1px_2px_rgba(20,20,20,0.05)] hover:border-[#c9c9c5] hover:bg-[#f4f4f2]",
-  quiet: "text-ink-2 hover:bg-[#f4f4f2] hover:text-ink",
-  danger: "border border-danger/45 bg-sheet text-danger hover:bg-danger-tint",
-};
-
-// The UI kit's sizes (decided 2026-10-22): 40 px, small 34, large 48.
-const sizes: Record<Size, string> = {
-  md: "h-10 px-[18px] text-sm",
-  sm: "h-[34px] gap-1.5 px-3.5 text-[13px]",
-  lg: "h-12 gap-2.5 px-6 text-[15px]",
-};
-
+// shadcn/ui's button classes (Studio Admin, 2026-11-19), for an <a> or <label> that has to look like a button.
 export function buttonClass(variant: Variant = "default", size: Size = "md", extra = "") {
-  return `${base} ${variants[variant]} ${sizes[size]} ${extra}`;
+  return buttonVariants({ variant: SHAD_VARIANT[variant], size: SHAD_SIZE[size], className: extra });
 }
 
 export function Spinner({ className = "" }: { className?: string }) {
@@ -37,12 +21,12 @@ export function Spinner({ className = "" }: { className?: string }) {
 }
 
 const ICON_TONES = {
-  default: "text-ink-3 hover:bg-bench hover:text-ink",
+  default: "text-muted-foreground hover:bg-muted hover:text-foreground",
   /** On a mint or grey surface. */
-  soft: "text-ink-2 hover:bg-sheet hover:text-ink",
-  danger: "text-ink-3 hover:bg-danger-tint hover:text-danger",
+  soft: "text-muted-foreground hover:bg-background hover:text-foreground",
+  danger: "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
   /** On a picture or a dark surface. */
-  solid: "bg-ink text-white hover:bg-hema-hover",
+  solid: "bg-primary text-primary-foreground hover:bg-primary/90",
 } as const;
 
 /** A button that is only an icon (⋯, ✕, ↑ ↓, ‹ ›): round, and named for screen readers by `label`. */
@@ -61,7 +45,7 @@ export function IconButton({
       aria-label={label}
       aria-pressed={pressed}
       title={label}
-      className={`grid shrink-0 place-items-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${size === "sm" ? "size-7" : "size-8"} ${pressed ? "bg-hema-tint text-ink" : ICON_TONES[tone]} ${className}`}
+      className={`grid shrink-0 place-items-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${size === "sm" ? "size-7" : "size-8"} ${pressed ? "bg-muted text-foreground" : ICON_TONES[tone]} ${className}`}
       {...rest}
     >
       {children}
@@ -79,7 +63,7 @@ export function TextButton({ tone = "ink", size = "meta", className = "", childr
   );
 }
 
-const QUICK = "inline-flex h-9 items-center gap-2 rounded-lg border border-rule-strong bg-sheet px-3.5 text-sm text-ink-2 transition-colors hover:border-ink hover:bg-mint hover:text-ink";
+const QUICK = buttonVariants({ variant: "outline", size: "lg" });
 
 /** A quick action on a record (Call, Email, Note…): a small pill with its icon. A link with `href`, else a button. */
 export function QuickAction({ href, icon, children, ...rest }: React.ComponentProps<"button"> & { href?: string; icon?: React.ReactNode }) {

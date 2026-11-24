@@ -352,7 +352,7 @@ export function DealForm({
               aria-checked={on}
               onClick={() => setPriority((x.value ?? "") as DealPriority | "")}
               className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors ${
-                on ? "border-ink bg-ink text-white" : "border-rule-strong bg-sheet text-ink-2 hover:border-ink hover:text-ink"
+                on ? "border-ink bg-primary text-primary-foreground" : "border-rule-strong bg-sheet text-ink-2 hover:border-ink hover:text-ink"
               }`}
             >
               <span aria-hidden className="size-2 rounded-full" style={{ background: x.color }} />

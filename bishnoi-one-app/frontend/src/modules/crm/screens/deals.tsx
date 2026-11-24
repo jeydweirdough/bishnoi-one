@@ -517,7 +517,7 @@ async function Table({
                         <Tip
                           tip={late ? `Overdue by ${fmt.plural(-left, "day")}` : left === 0 ? "Closes today" : `Closes in ${fmt.plural(left, "day")}`}
                           className={`mt-1 inline-flex items-center gap-1 rounded-md text-meta tabular-nums ${
-                            late ? "bg-danger-tint px-1.5 font-medium text-danger" : left <= 7 ? "bg-[#fdf3e1] px-1.5 font-medium text-due-today" : "text-ink-3"
+                            late ? "bg-danger-tint px-1.5 font-medium text-danger" : left <= 7 ? "bg-amber-500/10 px-1.5 font-medium text-due-today" : "text-ink-3"
                           }`}
                         >
                           <Hourglass className="size-3" aria-hidden />
@@ -548,7 +548,7 @@ async function Table({
                             aria-label={next ? `Next step: ${next.subject}, ${fmt.dateLabel(next.at.slice(0, 10))}` : `Plan the next step on ${d.name}`}
                             className={`relative z-[1] grid size-8 place-items-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sage ${
                               !next
-                                ? "bg-[#fdf3e1] text-due-today hover:bg-[#fae6c2]"
+                                ? "bg-amber-500/10 text-due-today hover:bg-[#fae6c2]"
                                 : nextLate
                                   ? "bg-danger-tint text-danger hover:bg-danger/15"
                                   : "bg-bench text-ink-2 hover:bg-mint-2 hover:text-ink"

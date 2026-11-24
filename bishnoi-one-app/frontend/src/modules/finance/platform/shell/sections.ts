@@ -69,7 +69,6 @@ export const SECTIONS: Section[] = [
   // "Imported expenses" on 2026-11-04, which read as the costs of importing goods.
   { key: "petty-cash", label: "Petty cash", icon: "money", tabs: [
     { href: "/finance/petty-cash", label: "Petty cash" },
-    { href: "/finance/petty-cash/imported", label: "Zoho expense history" },
   ] },
   { key: "sales", label: "Sales", icon: "letters", tabs: [
     { href: "/finance/sales-orders", label: "Sales orders" },
@@ -106,10 +105,6 @@ export const SECTIONS: Section[] = [
   { key: "calendar", label: "Calendar", icon: "calendar", tabs: [{ href: "/finance/calendar", label: "Calendar" }] },
   // The financial statements and the books of accounts are in the Reports Center (2026-10-28).
   { key: "reports", label: "Reports", icon: "reports", also: ["/finance/bir/statements"], tabs: [{ href: "/finance/reports", label: "Reports" }] },
-  { key: "imports", label: "Imports", icon: "lists", foot: true, tabs: [
-    { href: "/finance/import-matching", label: "Import matching" },
-    { href: "/finance/import-review", label: "Import review" },
-  ] },
 ];
 
 /** The areas this person sees, each with only the tabs they may open; an area with none is left out. */

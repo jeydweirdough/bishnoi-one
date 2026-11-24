@@ -16,7 +16,7 @@ import type { Order, Packing, PO, Receipt, SupplierRow, Transfer, WarehouseRow }
 
 const caption = "text-[8.5pt] font-semibold tracking-wide text-neutral-600 uppercase";
 const paper =
-  "mx-auto my-8 max-w-[210mm] bg-white px-[16mm] py-[14mm] text-[10.5pt] leading-snug text-black shadow-sm print:my-0 print:max-w-none print:p-0 print:shadow-none";
+  "mx-auto my-8 max-w-[210mm] bg-card px-[16mm] py-[14mm] text-[10.5pt] leading-snug text-black shadow-sm print:my-0 print:max-w-none print:p-0 print:shadow-none";
 const th = "py-1.5 px-2 font-semibold first:pl-0 last:pr-0";
 const td = "py-1.5 px-2 first:pl-0 last:pr-0";
 
@@ -25,7 +25,7 @@ type Ctx = Awaited<ReturnType<typeof context>>;
 /** The page around a document: back to the record and Print above, the sheet below. */
 function Frame({ back, backLabel, auto, children }: { back: string; backLabel: string; auto: boolean; children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-bench print:bg-white">
+    <div className="min-h-screen bg-bench print:bg-card">
       <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-rule bg-sheet px-6 py-3 print:hidden">
         <LinkButton href={back} variant="quiet">
           {backLabel}

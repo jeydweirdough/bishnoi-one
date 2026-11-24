@@ -2,5 +2,5 @@
 import { DotsPanel } from "@/src/platform/ui/dots";
 
 export default function Loading() {
-  return <DotsPanel label="Getting your account ready…" className="min-h-dvh bg-white" />;
+  return <DotsPanel label="Getting your account ready…" className="min-h-dvh bg-card" />;
 }

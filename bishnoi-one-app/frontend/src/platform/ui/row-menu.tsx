@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Ellipsis } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,7 +37,7 @@ export type RowMenuItem =
 const GAP = 6;
 const EDGE = 14;
 
-const ROW = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-bench focus-visible:bg-bench focus-visible:outline-none";
+const ROW = "flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none";
 
 /** `always`: the ⋯ shows at all times, not only when its row is hovered (where it's the only way to the row's actions: People). */
 export function RowMenu({ label, items, always = false }: { label: string; items: RowMenuItem[]; always?: boolean }) {
@@ -116,15 +116,15 @@ export function RowMenu({ label, items, always = false }: { label: string; items
         aria-expanded={Boolean(at)}
         aria-label={label}
         title="Actions"
-        className={`relative z-[1] grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition-all hover:bg-bench hover:text-ink focus-visible:ring-2 focus-visible:ring-sage focus-visible:outline-none disabled:opacity-40 ${
+        className={`relative z-[1] grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-all hover:bg-muted/50 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-40 ${
           at
-            ? "bg-bench text-ink opacity-100"
+            ? "bg-muted text-foreground opacity-100"
             : always
-              ? "border border-rule bg-sheet opacity-100"
+              ? "opacity-100"
               : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
         }`}
       >
-        <Ellipsis className="size-[1.125rem]" aria-hidden />
+        <Ellipsis className="size-4" aria-hidden />
       </button>
       {at &&
         createPortal(
@@ -138,13 +138,13 @@ export function RowMenu({ label, items, always = false }: { label: string; items
               maxHeight: fit?.room,
               visibility: fit ? "visible" : "hidden",
             }}
-            className="fixed z-[60] w-56 overflow-y-auto rounded-xl border border-rule bg-white p-1.5 shadow-[0_12px_32px_rgba(20,20,20,0.12)]"
+            className="fixed z-[60] w-56 overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
           >
             {shown.map((item, i) => {
-              if (item === "divider") return <div key={`d${i}`} role="separator" className="my-1 border-t border-rule" />;
+              if (item === "divider") return <div key={`d${i}`} role="separator" className="-mx-1 my-1 h-px bg-border" />;
               const body = (
                 <>
-                  <span className={`inline-flex shrink-0 [&>svg]:size-4 ${"danger" in item && item.danger ? "text-danger" : "text-ink-3"}`} aria-hidden>
+                  <span className={`inline-flex shrink-0 [&>svg]:size-4 ${"danger" in item && item.danger ? "text-destructive" : "text-muted-foreground"}`} aria-hidden>
                     {item.icon}
                   </span>
                   {item.label}
@@ -167,7 +167,7 @@ export function RowMenu({ label, items, always = false }: { label: string; items
                   </Link>
                 );
               return (
-                <button key={item.label} suppressHydrationWarning type="button" role="menuitem" onClick={() => act(item)} className={`${ROW} ${item.danger ? "text-danger hover:bg-danger-tint" : "text-ink"}`}>
+                <button key={item.label} suppressHydrationWarning type="button" role="menuitem" onClick={() => act(item)} className={`${ROW} ${item.danger ? "text-destructive hover:bg-destructive/10" : "text-ink"}`}>
                   {body}
                 </button>
               );

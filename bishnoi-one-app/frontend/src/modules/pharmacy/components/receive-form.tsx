@@ -87,7 +87,7 @@ export function ReceiveForm({ medicines, suppliers, org }: { medicines: { id: st
       <fieldset className="space-y-3">
         <legend className="mb-2 text-heading text-ink">Lots</legend>
         {lines.map((l, n) => (
-          <div key={n} className="grid gap-3 rounded-[3px] border border-rule p-3 sm:grid-cols-6">
+          <div key={n} className="grid gap-3 rounded-lg border border-rule p-3 sm:grid-cols-6">
             <Field label="Medicine" className="sm:col-span-3" error={fields[`lines.${n}.medicineId`]}>
               {(p) => (
                 <Select {...p} value={l.medicineId} onChange={(e) => setLine(n, { medicineId: e.target.value })}>

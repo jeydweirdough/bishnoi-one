@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Combobox } from "@/src/platform/ui/pickers";
 import { DateTimeField } from "@/src/platform/ui/pickers";
 import dayjs, { type Dayjs } from "dayjs";
@@ -182,7 +182,7 @@ export function CallOutcome({
       onOk={() => onSave(outcome.trim(), discussed)}
       okText="Mark done"
       confirmLoading={saving}
-      afterOpenChange={(shown) => shown && start(async () => {
+      afterOpenChange={(shown: boolean) => shown && start(async () => {
         const all = (await callChoices()).products;
         setOptions([...options, ...all.filter((o) => !options.some((p) => p.value === o.value))]);
       })}

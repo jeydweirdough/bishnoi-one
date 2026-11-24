@@ -1,5 +1,10 @@
 "use client";
 
+import { Avatar, AvatarFallback } from "@/src/components/ui/avatar";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { Checkbox } from "@/src/platform/ui/compat";
 import { Pager } from "@/src/platform/ui/pager";
 import { PAGE_SIZE, slicePage } from "@/src/platform/ui/paging";
 import { SelectAllBox, SelectBox, SelectableRow, SelectionProvider } from "@/src/platform/bulk/selection";
@@ -86,74 +91,82 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
 
       {/* Yourself can't be switched off or deleted, so you aren't ticked; nor with an employee open beside the list. */}
       <SelectionProvider items={panel ? [] : onPage.filter((p) => p.id !== data.meId).map((p) => ({ id: p.id, name: p.fullName }))}>
-      <Sheet className="px-5 pt-4 pb-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-full max-w-xs">
-            <SearchInput placeholder="Find an employee" allowClear value={query} onChange={(e) => (setQuery(e.target.value), setPicked(1))} />
-          </div>
-          {toChoose.size > 0 && (
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink-2">
-              <input suppressHydrationWarning type="checkbox" checked={onlyToChoose} onChange={(e) => (setOnlyToChoose(e.target.checked), setPicked(1))} />
-              Only those still to choose ({toChoose.size})
-            </label>
-          )}
-          {/* Quiet where it's a place to go; buttons with an icon and a word for what's done here; the main one solid. */}
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Link href="/platform/roles/people/bin" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm text-ink-2 hover:bg-bench hover:text-ink">
-              <Trash2 className="size-4 shrink-0" aria-hidden />
-              Recycle bin
-              {data.inBin > 0 && <span className="rounded-full bg-rule px-1.5 text-meta font-semibold text-ink-2">{data.inBin}</span>}
-            </Link>
-            <span className="mx-1 hidden h-5 w-px bg-rule sm:block" aria-hidden />
-            <LinkButton href="/platform/roles/people/export" download icon={<Download className="size-4" aria-hidden />}>
-              Export
-            </LinkButton>
+      {/* Studio Admin's Users (2026-11-19): a card, its header with the title, what it is and the actions. */}
+      <Card>
+        <CardHeader className="border-b has-data-[slot=card-action]:grid-cols-1 md:has-data-[slot=card-action]:grid-cols-[1fr_auto]">
+          <CardTitle className="text-xl leading-none">Employees</CardTitle>
+          <CardDescription className="max-w-sm leading-snug">Your company&apos;s employees, the apps they open and their roles.</CardDescription>
+          <CardAction className="col-start-1 row-start-auto flex w-full flex-wrap justify-start gap-2 justify-self-stretch md:col-start-2 md:row-span-2 md:row-start-1 md:w-auto md:justify-end md:justify-self-end">
+            <div className="w-full md:w-64">
+              <SearchInput placeholder="Search employees…" allowClear value={query} onChange={(e) => (setQuery(e.target.value), setPicked(1))} />
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/platform/roles/people/bin">
+                <Trash2 aria-hidden />
+                Recycle bin
+                {data.inBin > 0 && <Badge variant="secondary">{data.inBin}</Badge>}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href="/platform/roles/people/export" download>
+                <Download aria-hidden />
+                Export
+              </a>
+            </Button>
             <ImportPeople />
             <AddPerson data={data} />
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 px-0">
+        {toChoose.size > 0 && (
+          <div className="flex flex-wrap items-center gap-3 px-4">
+            <Checkbox checked={onlyToChoose} onChange={(e) => (setOnlyToChoose(e.target.checked), setPicked(1))}>
+              Only those still to choose ({toChoose.size})
+            </Checkbox>
           </div>
-        </div>
+        )}
 
         {shown.length === 0 ? (
           <Empty icon="people" title="Nobody matches">
             Try another name or email.
           </Empty>
         ) : (
-          <div className={panel ? "mt-3 grid gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)] lg:items-stretch" : "mt-3"}>
+          <div className={panel ? "grid gap-4 px-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)] lg:items-stretch" : ""}>
             <div className="flex flex-col overflow-x-auto">
               <table className={`w-full text-sm ${panel ? "" : "min-w-[48rem]"}`}>
                 <thead>
-                  <tr className="border-b border-rule text-left text-meta text-ink-3">
+                  <tr className="border-t border-b text-left text-sm text-muted-foreground">
                     {!panel && (
-                      <th scope="col" className="w-10 py-2">
+                      <th scope="col" className="w-12 py-3 pl-4">
                         <SelectAllBox />
                       </th>
                     )}
-                    <th scope="col" className="py-2 pr-4 font-medium">{panel ? "Name / email" : "Name"}</th>
+                    <th scope="col" className="py-3 pr-4 font-normal">Employee</th>
                     {!panel && (
                       <>
-                        <th scope="col" className="py-2 pr-4 font-medium">Email</th>
-                        <th scope="col" className="py-2 pr-4 font-medium">Date added</th>
-                        <th scope="col" className="py-2 pr-4 font-medium">Added by</th>
-                        <th scope="col" className="py-2 pr-4 font-medium">Status</th>
-                        <th scope="col" className="w-12 py-2 font-medium"><span className="sr-only">Actions</span></th>
+                        <th scope="col" className="py-3 pr-4 font-normal">Date added</th>
+                        <th scope="col" className="py-3 pr-4 font-normal">Added by</th>
+                        <th scope="col" className="py-3 pr-4 font-normal">Status</th>
+                        <th scope="col" className="w-12 py-3 pr-4 text-right font-normal">Actions</th>
                       </>
                     )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-rule">
+                <tbody className="divide-y">
                   {onPage.map((p) => (
                     <PersonRow key={p.id} person={p} data={data} compact={Boolean(panel)} current={p.id === selected} />
                   ))}
                 </tbody>
               </table>
-              <div className="mt-auto">
+              <div className="mt-auto px-4">
                 <Pager total={shown.length} page={page} size={size} onPage={setPicked} noun={shown.length === 1 ? "employee" : "employees"} />
               </div>
             </div>
             {panel && <div className="flex flex-col [&>*]:flex-1">{panel}</div>}
           </div>
         )}
-      </Sheet>
+        </CardContent>
+      </Card>
       {!panel && <EmployeesBulk data={data} />}
       </SelectionProvider>
     </div>
@@ -162,45 +175,62 @@ export function PeopleList({ data, selected = null, panel = null }: { data: Acce
 
 const addedOn = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" }) : "—");
 
+/** The avatar's colour, from the name (as Studio Admin's users list). */
+const TONES = [
+  "[&_[data-slot=avatar-fallback]]:bg-amber-100 [&_[data-slot=avatar-fallback]]:text-amber-700",
+  "[&_[data-slot=avatar-fallback]]:bg-rose-100 [&_[data-slot=avatar-fallback]]:text-rose-700",
+  "[&_[data-slot=avatar-fallback]]:bg-violet-100 [&_[data-slot=avatar-fallback]]:text-violet-700",
+  "[&_[data-slot=avatar-fallback]]:bg-sky-100 [&_[data-slot=avatar-fallback]]:text-sky-700",
+  "[&_[data-slot=avatar-fallback]]:bg-emerald-100 [&_[data-slot=avatar-fallback]]:text-emerald-700",
+  "[&_[data-slot=avatar-fallback]]:bg-indigo-100 [&_[data-slot=avatar-fallback]]:text-indigo-700",
+  "[&_[data-slot=avatar-fallback]]:bg-orange-100 [&_[data-slot=avatar-fallback]]:text-orange-700",
+];
+const toneOf = (name: string) => TONES[name.length % TONES.length];
+
+/** Active or switched off, as Studio Admin's status badge: a dot and the word. */
+function StatusBadge({ active }: { active: boolean }) {
+  return (
+    <Badge variant="outline" className={`gap-1.5 border px-2 py-1 font-medium ${active ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600" : "border-border bg-muted/50 text-muted-foreground"}`}>
+      <span className={`size-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-muted-foreground"}`} />
+      {active ? "Active" : "Switched off"}
+    </Badge>
+  );
+}
+
 /** A person in the table: their name opens them in the panel beside it (Zoho Directory's Users). */
 function PersonRow({ person, data, compact, current }: { person: AccessPerson; data: AccessData; compact: boolean; current: boolean }) {
   const initials = person.fullName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
   const name = (
     <Link href={`/platform/roles/people?person=${person.id}`} className="flex min-w-0 items-center gap-3" aria-current={current ? "page" : undefined}>
-      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-bench text-meta font-semibold text-ink-2" aria-hidden>
-        {initials}
-      </span>
+      <Avatar size="lg" className={`font-medium ${toneOf(person.fullName)}`}>
+        <AvatarFallback>{initials}</AvatarFallback>
+      </Avatar>
       <span className="min-w-0">
-        <span className="block truncate font-semibold text-ink hover:underline">
-          {person.fullName}
-          {person.isCompanyAdmin && <span className="ml-2 rounded border border-sage-deep px-1 text-[0.625rem] font-semibold tracking-wide text-sage-deep uppercase align-middle">Admin</span>}
+        <span className="flex items-center gap-2 truncate text-sm font-medium text-foreground hover:underline">
+          <span className="truncate">{person.fullName}</span>
+          {person.isCompanyAdmin && <Badge variant="outline">Admin</Badge>}
         </span>
-        {compact && <span className="block truncate text-meta text-ink-3">{person.email}</span>}
+        <span className="block truncate text-sm text-muted-foreground">{person.email}</span>
       </span>
     </Link>
   );
   if (compact) {
     return (
-      <tr className={current ? "bg-hema-tint/60" : "hover:bg-bench/50"}>
+      <tr className={current ? "bg-muted" : "hover:bg-muted/50"}>
         <td className="max-w-[22rem] px-2 py-2.5">{name}</td>
       </tr>
     );
   }
   return (
-    <SelectableRow id={person.id} className="hover:bg-bench/40">
-      <td className="w-10 py-2.5">{person.id !== data.meId && <SelectBox id={person.id} label={person.fullName} />}</td>
-      <td className="max-w-[16rem] py-2.5 pr-4">{name}</td>
-      <td className="max-w-[16rem] truncate py-2.5 pr-4 text-ink-2">{person.email}</td>
-      <td className="py-2.5 pr-4 whitespace-nowrap text-ink-2">{addedOn(person.addedAt)}</td>
-      <td className="max-w-[12rem] truncate py-2.5 pr-4 text-ink-2">{person.addedBy ?? "—"}</td>
-      <td className="py-2.5 pr-4">
-        {person.status === "active" ? (
-          <span className="rounded-full bg-[#e6f2e1] px-2 py-0.5 text-meta text-[#3f6f35]">Active</span>
-        ) : (
-          <span className="rounded-full bg-danger-tint px-2 py-0.5 text-meta text-danger">Switched off</span>
-        )}
+    <SelectableRow id={person.id} className="hover:bg-muted/50">
+      <td className="w-12 py-4 pl-4">{person.id !== data.meId && <SelectBox id={person.id} label={person.fullName} />}</td>
+      <td className="max-w-[22rem] py-4 pr-4">{name}</td>
+      <td className="py-4 pr-4 whitespace-nowrap">{addedOn(person.addedAt)}</td>
+      <td className="max-w-[12rem] truncate py-4 pr-4 text-muted-foreground">{person.addedBy ?? "—"}</td>
+      <td className="py-4 pr-4">
+        <StatusBadge active={person.status === "active"} />
       </td>
-      <td className="py-2.5 text-right">
+      <td className="py-4 pr-4 text-right">
         <PersonMenu person={person} isMe={person.id === data.meId} modules={data.modules.map((m) => m.key)} colleagues={data.people.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.fullName }))} />
       </td>
     </SelectableRow>

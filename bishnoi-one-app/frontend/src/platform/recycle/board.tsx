@@ -77,7 +77,7 @@ export function CleanupBoard({ module, path, kinds, bin, days }: { module: Modul
             role="tab"
             aria-selected={tab === t}
             onClick={() => setTab(t)}
-            className={`rounded-md px-4 py-1.5 text-sm ${tab === t ? "bg-hema text-white" : "text-ink-2 hover:bg-bench"}`}
+            className={`rounded-md px-4 py-1.5 text-sm ${tab === t ? "bg-primary text-primary-foreground" : "text-ink-2 hover:bg-bench"}`}
           >
             {t === "clean" ? "Clean up" : `Recycle bin${bin.length ? ` (${bin.length})` : ""}`}
           </button>

@@ -58,7 +58,7 @@ function Crumb({ label, title, items, footer }: { label: ReactNode; title: strin
       {at && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setAt(null)} aria-hidden />
-          <div role="menu" aria-label={title} style={{ top: at.top, left: at.left }} className="animate-reshape fixed z-50 max-h-[calc(100dvh-6rem)] w-64 overflow-y-auto rounded-xl border border-rule bg-white p-1.5 shadow-lg">
+          <div role="menu" aria-label={title} style={{ top: at.top, left: at.left }} className="animate-reshape fixed z-50 max-h-[calc(100dvh-6rem)] w-64 overflow-y-auto rounded-xl border border-rule bg-card p-1.5 shadow-lg">
             <p className="px-2.5 pt-1.5 pb-1 text-caps text-ink-3 uppercase">{title}</p>
             {items.map((i) => {
               const inner = (

@@ -1,7 +1,7 @@
 "use client";
 
 import { Combobox } from "@/src/platform/ui/pickers";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Copy, KeyRound, Mail, Pencil, Plus, Power, ShieldCheck, ShieldOff, Trash2, UserPlus, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -35,7 +35,7 @@ function showPassword(name: string, password: string) {
             suppressHydrationWarning
             type="button"
             aria-label="Copy password"
-            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-white hover:text-ink"
+            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-card hover:text-ink"
             onClick={() => navigator.clipboard.writeText(password).then(() => toast.success("Password copied"), () => toast.error("Couldn't copy: select it instead."))}
           >
             <Copy className="size-4" aria-hidden />
@@ -68,7 +68,7 @@ async function sendInvitation(person: { id: string; fullName: string }) {
             suppressHydrationWarning
             type="button"
             aria-label="Copy link"
-            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-white hover:text-ink"
+            className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-card hover:text-ink"
             onClick={() => navigator.clipboard.writeText(link).then(() => toast.success("Link copied"), () => toast.error("Couldn't copy: select it instead."))}
           >
             <Copy className="size-4" aria-hidden />
@@ -151,7 +151,7 @@ export function AddPerson({ data }: { data: AccessData }) {
 
   return (
     <>
-      <Button variant="primary" icon={<UserPlus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+      <Button variant="primary" size="sm" icon={<UserPlus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
         Add employee
       </Button>
       <Modal open={open} title="Add employee" onCancel={() => !busy && setOpen(false)} onOk={save} okText="Add employee" confirmLoading={busy} width={600} destroyOnHidden>

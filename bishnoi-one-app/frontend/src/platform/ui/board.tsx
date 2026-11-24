@@ -3,7 +3,8 @@
 import { ArrowRight, CalendarClock, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Dropdown, Modal } from "antd";
+import { Dropdown } from "@/src/platform/ui/compat";
+import { Modal } from "@/src/platform/ui/modal";
 import { useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Amount } from "./amount";
@@ -165,7 +166,7 @@ export function Board({ columns, cards, moves, run, newHref, more }: {
                 onDragLeave={() => setOver((o) => (o === col.key ? null : o))}
                 onDrop={(e) => drop(e, col.key)}
                 className={`flex min-h-[24rem] min-w-0 flex-col rounded-xl border p-2 transition-colors ${
-                  over === col.key && target ? "border-sage bg-hema-tint" : target ? "border-dashed border-sage bg-[#f4f4f1]" : "border-transparent bg-[#f4f4f1]"
+                  over === col.key && target ? "border-sage bg-hema-tint" : target ? "border-dashed border-sage bg-muted" : "border-transparent bg-muted"
                 }`}
               >
                 <header className="mb-2 px-1.5 pt-1">

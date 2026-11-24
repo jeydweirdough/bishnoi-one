@@ -22,7 +22,7 @@ export default async function Reports() {
         <ul className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {centres.map((c) => (
             <li key={c.href}>
-              <Link href={c.href} className="flex h-full items-start gap-3 rounded-2xl border border-rule bg-white p-5 transition-colors hover:border-ink">
+              <Link href={c.href} className="flex h-full items-start gap-3 rounded-2xl border border-rule bg-card p-5 transition-colors hover:border-ink">
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-mint-2 text-sage-deep">
                   <Icon name={c.icon} className="size-5" />
                 </span>

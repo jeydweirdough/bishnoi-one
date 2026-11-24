@@ -18,7 +18,6 @@ import { STATUS_LABELS, type Ageing, type IncomeAccountOption, type Invoice, typ
 import { Amount } from "@/src/modules/finance/platform/ui/amount";
 import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Figure, type PillTone } from "@/src/platform/ui/list-layout";
 import { ExpandableTable } from "@/src/platform/ui/expandable-table";
-import { ZohoImport } from "@/src/modules/finance/import-matching/zoho-import";
 
 // Sales invoices (app/routers/invoices.py): drafts, issued with the next
 // number of the BIR's series, and voided rather than changed once issued.
@@ -115,7 +114,6 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
         title="Sales invoices"
         actions={
           <>
-            {may(me, "imports.run") && me.dataEnvironment === "local_test" && <ZohoImport kind="oojeema-sales" />}
             {may(me, "invoices.create") && (
               <LinkButton href="/finance/invoices/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
                 New invoice
@@ -340,7 +338,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
           )}
         </PageHeader>
         {inv.imported && (
-          <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
+          <p className="mb-4 rounded-lg bg-hema-tint px-4 py-2 text-sm text-ink">
             Imported from {inv.imported.source === "oojeema" ? "Oojeema's Sales Journal" : inv.imported.source} ({inv.imported.file}), source number {inv.imported.sourceId}, by {inv.imported.by} on{" "}
             {fmt.dateLabel(inv.imported.at.slice(0, 10))}. No number came from Finance&apos;s BIR series, and it can&apos;t be reissued.{" "}
             {inv.entryId && (
@@ -352,7 +350,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
         )}
         {/* Made from a delivery (step 13): where it came from, and why it still waits when it does. */}
         {inv.delivery && (
-          <p className={`mb-4 rounded-[3px] px-4 py-2 text-sm text-ink ${inv.attention && inv.status === "draft" ? "bg-promo-tint" : "bg-hema-tint"}`}>
+          <p className={`mb-4 rounded-lg px-4 py-2 text-sm text-ink ${inv.attention && inv.status === "draft" ? "bg-promo-tint" : "bg-hema-tint"}`}>
             Made from delivery{" "}
             <Link href={`/inventory/orders/${inv.delivery.id}`} className="font-mono font-semibold text-hema hover:underline">{inv.delivery.number}</Link>
             {inv.salesOrder && (
@@ -366,7 +364,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
         )}
         {/* Cancel and reissue: on screen only; the printed invoice stays standard (decided 2026-10-22). */}
         {(inv.replaces || inv.replacedBy) && (
-          <p className="mb-4 rounded-[3px] bg-hema-tint px-4 py-2 text-sm text-ink">
+          <p className="mb-4 rounded-lg bg-hema-tint px-4 py-2 text-sm text-ink">
             {inv.replaces && (
               <>
                 Replaces{" "}

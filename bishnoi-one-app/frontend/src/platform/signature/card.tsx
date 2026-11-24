@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { PenLine, Trash2, Upload } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -37,7 +37,7 @@ export function SignatureCard({ data, intro, save, remove }: {
       <p className="mb-3 max-w-2xl text-sm text-ink-2">{intro}</p>
       {c ? (
         <div className="flex flex-wrap items-end gap-4">
-          <div className={`rounded-[3px] border border-rule px-4 py-3 ${CHECKER}`}>
+          <div className={`rounded-lg border border-rule px-4 py-3 ${CHECKER}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={c.image} alt="Your signature" className="h-16 max-w-72 object-contain" />
           </div>

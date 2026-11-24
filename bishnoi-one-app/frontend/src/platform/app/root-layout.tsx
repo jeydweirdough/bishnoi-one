@@ -1,24 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
 import type { ReactNode } from "react";
-import { Toaster } from "sonner";
-import { ToastIcon } from "../ui/toast-icon";
+import { Toaster } from "@/src/components/ui/sonner";
+import { TooltipProvider } from "@/src/components/ui/tooltip";
+import { ThemeProvider } from "next-themes";
 import { APP_NAME } from "../lib/labels";
-import { AntTheme } from "./ant-theme";
 
-// Poppins, kept with the app (src/platform/fonts, the Latin set of each weight
-// in use; SIL Open Font License): a build never has to reach Google Fonts, so
-// a server whose internet is down still builds (decided 2026-10-23).
-const poppins = localFont({
-  variable: "--font-poppins",
-  display: "swap",
-  src: [
-    { path: "../fonts/poppins-400.woff2", weight: "400", style: "normal" },
-    { path: "../fonts/poppins-500.woff2", weight: "500", style: "normal" },
-    { path: "../fonts/poppins-600.woff2", weight: "600", style: "normal" },
-    { path: "../fonts/poppins-700.woff2", weight: "700", style: "normal" },
-  ],
-});
+// Geist, as Studio Admin uses it (shadcn/ui, 2026-11-19), from the geist package: kept with the app, so a
+// server whose internet is down still builds.
+const fontVars = `${GeistSans.variable} ${GeistMono.variable}`;
 
 /** What every Bishnoi One app calls itself, unless it says otherwise. */
 export const metadata: Metadata = {
@@ -26,7 +17,7 @@ export const metadata: Metadata = {
   description: "Customers, quotes, activities and products for every team.",
 };
 
-export const viewport: Viewport = { themeColor: "#f5f5f5" };
+export const viewport: Viewport = { themeColor: "#ffffff" };
 
 /**
  * The frame round every Bishnoi One app — the shell and each module alike.
@@ -36,29 +27,13 @@ export const viewport: Viewport = { themeColor: "#f5f5f5" };
  */
 export function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${poppins.variable} antialiased`}>
+    <html lang="en" className={`${fontVars} antialiased`} suppressHydrationWarning>
       <body className="min-h-dvh font-sans">
-        <AntTheme>{children}</AntTheme>
-        <Toaster
-          position="top-center"
-          // The UI kit's light toasts (decided 2026-10-22): white, a thin line, its round icon, closing after 4 seconds.
-          duration={4000}
-          icons={{
-            success: <ToastIcon tone="ok" />,
-            info: <ToastIcon tone="info" />,
-            warning: <ToastIcon tone="warn" />,
-            error: <ToastIcon tone="bad" />,
-          }}
-          toastOptions={{
-            classNames: {
-              toast: "!rounded-[12px] !border !border-rule !bg-sheet !py-2.5 !pr-3 !pl-3.5 !shadow-[0_10px_30px_rgba(20,20,20,0.12)] !font-sans !text-[0.84375rem] !text-ink",
-              title: "!font-medium",
-              description: "!text-ink-2",
-              actionButton: "!bg-transparent !px-1 !font-semibold !text-ink !underline !underline-offset-[3px]",
-              cancelButton: "!bg-transparent !text-ink-2",
-            },
-          }}
-        />
+        {/* Light, dark or as the computer is set (Studio Admin's switch, src/platform/shell/theme-switch.tsx); light until chosen. */}
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+          <TooltipProvider>{children}</TooltipProvider>
+          <Toaster position="top-center" duration={4000} />
+        </ThemeProvider>
       </body>
     </html>
   );

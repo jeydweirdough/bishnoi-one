@@ -34,7 +34,7 @@ export default async function JournalVoucherPage({ params }: { params: Promise<{
       </div>
       <Sheet className="relative px-8 py-7 print:border-0 print:shadow-none">
         {e.status !== "approved" && (
-          <p className="mb-4 rounded-[3px] bg-danger-tint px-3 py-2 text-sm font-semibold text-danger">
+          <p className="mb-4 rounded-lg bg-danger-tint px-3 py-2 text-sm font-semibold text-danger">
             {e.status === "waiting" ? "Waiting for approval: not in the books yet." : `Rejected by ${e.decidedBy}: ${e.rejectedReason}. Not in the books.`}
           </p>
         )}

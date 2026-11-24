@@ -304,7 +304,7 @@ export function ReportsIndex({
     <div className="grid gap-5 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
       <nav
         aria-label="Report categories"
-        className="rounded-2xl border border-rule bg-white p-2 lg:sticky lg:top-4"
+        className="rounded-2xl border border-rule bg-card p-2 lg:sticky lg:top-4"
       >
         {railItem("all", "All reports", allItems.length, <LayoutGrid />)}
         {railItem(
@@ -345,7 +345,7 @@ export function ReportsIndex({
         )}
       </nav>
 
-      <section className="overflow-hidden rounded-2xl border border-rule bg-white">
+      <section className="overflow-hidden rounded-2xl border border-rule bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-5 py-3">
           <h2 className="flex items-center gap-2 text-heading text-ink">
             {title}
@@ -357,7 +357,7 @@ export function ReportsIndex({
             <label className="relative w-full max-w-xs">
               <span className="sr-only">Search reports</span>
               <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3"
+                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                 aria-hidden
               />
               <input
@@ -367,16 +367,16 @@ export function ReportsIndex({
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search reports"
-                className="h-9 w-full rounded-lg border border-rule bg-bench pr-9 pl-9 text-sm outline-none focus:border-ink focus:bg-white"
+                className="block h-8 w-full rounded-lg border border-input bg-transparent pr-8 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
               />
-              <kbd className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded border border-rule bg-white px-1.5 text-[11px] text-ink-3">
+              <kbd className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded border border-rule bg-card px-1.5 text-[11px] text-ink-3">
                 /
               </kbd>
             </label>
             <button
               type="button"
               onClick={() => setIsCreating(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-ink px-3.5 text-sm font-semibold text-white shadow-xs hover:bg-ink/90 transition-colors shrink-0"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors shrink-0"
             >
               <Plus className="size-4" /> New Custom Report
             </button>
@@ -447,7 +447,7 @@ export function ReportsIndex({
                             : `Add ${r.title} to favourites`
                         }
                         title={fav ? "In favourites" : "Add to favourites"}
-                        className="relative z-[1] grid size-7 place-items-center rounded-md hover:bg-white"
+                        className="relative z-[1] grid size-7 place-items-center rounded-md hover:bg-card"
                       >
                         <Star
                           className={`size-4 ${fav ? "fill-[#f5b301] text-[#f5b301]" : "text-ink-3"}`}

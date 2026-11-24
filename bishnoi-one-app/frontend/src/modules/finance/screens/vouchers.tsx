@@ -15,7 +15,6 @@ import type { SignedStep } from "@/src/modules/finance/signature/types";
 import { attachVoucherFile, removeVoucherFile } from "@/src/modules/finance/vouchers/actions";
 import { VoucherEditor } from "@/src/modules/finance/vouchers/editor";
 import { VoucherSteps } from "@/src/modules/finance/vouchers/steps";
-import { ZohoImport } from "@/src/modules/finance/import-matching/zoho-import";
 import { VOUCHER_STATUS_LABELS, type Voucher, type VoucherChoices, type VoucherStatus, type VoucherSummary } from "@/src/modules/finance/vouchers/types";
 
 // Payment vouchers (app/routers/vouchers.py; Plans/Plan - Payment vouchers): prepared, then
@@ -56,16 +55,13 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
   const navigation = new URLSearchParams(query);
   navigation.set("size", String(size));
   const pager = <Pager total={list.items.length} page={page} size={size} base={"/finance/vouchers?" + navigation} noun="vouchers" />;
-  // Importing Zoho's supplier payments: its own tick, and the testing site only for now (app/routers/imports.py).
-  const canImport = (me.permissions?.includes("imports.run") ?? false) && me.dataEnvironment === "local_test";
   return (
     <>
       <PageHeader
         title="Payment vouchers"
         actions={
-          (canImport || list.canPrepare) && (
+          list.canPrepare && (
             <>
-              {canImport && <ZohoImport kind="supplier-payments" />}
               {list.canPrepare && (
                 <LinkButton href="/finance/vouchers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
                   New payment voucher
@@ -89,7 +85,7 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
                 key={t.key}
                 href={t.key ? `/finance/vouchers?show=${t.key}` : "/finance/vouchers"}
                 aria-current={show === t.key ? "page" : undefined}
-                className={`rounded-[3px] border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
+                className={`rounded-lg border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
               >
                 {t.label}
                 {n ? <span className={t.key === "returned" ? "font-semibold text-due-today" : "text-ink-3"}> {n}</span> : null}
@@ -100,7 +96,7 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
         <form action="/finance/vouchers" className="flex flex-wrap items-center gap-2" role="search">
           {query.has("queue") && <input suppressHydrationWarning type="hidden" name="queue" value={query.get("queue")!} />}
           {show && <input suppressHydrationWarning type="hidden" name="show" value={show} />}
-          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Number, supplier, Oojeema PV, check" aria-label="Find a voucher" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Number, supplier, Oojeema PV, check" aria-label="Find a voucher" className="h-8 w-64 rounded-lg border border-rule-strong bg-sheet px-2 text-sm" />
           <label className="flex items-center gap-2 text-meta text-ink-2">
             Rows per page
             <select suppressHydrationWarning name="size" defaultValue={size} className="h-8 rounded-lg border border-rule-strong bg-sheet px-2">
@@ -230,7 +226,6 @@ export async function VoucherPage({ params, searchParams }: { params: Promise<{ 
         }
       >
         <StatusMark status={v.status} />
-        {v.zohoSync && <p role="status" className="mt-2 text-sm text-ink-2">Zoho: {v.zohoSync.label}. {v.zohoSync.message}</p>}
         <span className="ml-2 text-meta text-ink-2">
           {v.methodLabel} · {fmt.peso(v.totalCentavos)}
           {v.paidFrom && ` from ${v.paidFrom.code} · ${v.paidFrom.name}`}
@@ -238,7 +233,7 @@ export async function VoucherPage({ params, searchParams }: { params: Promise<{ 
       </PageHeader>
 
       {v.status === "returned" && lastReturn && (
-        <p className="mb-4 rounded-[3px] bg-due-today/10 px-4 py-2 text-sm">
+        <p className="mb-4 rounded-lg bg-due-today/10 px-4 py-2 text-sm">
           <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
         </p>
       )}
@@ -255,7 +250,6 @@ export async function VoucherPage({ params, searchParams }: { params: Promise<{ 
               ["Pay to", <Link key="s" href={`/finance/suppliers/${v.supplier.id}`} className="text-hema hover:underline">{v.supplier.name}</Link>],
               ["Their bank", [v.supplier.bankName, v.supplier.bankAccountName, v.supplier.bankAccountNumber].filter(Boolean).join(" · ") || null],
               ["Oojeema PV", v.oojeemaRef],
-              ["Zoho", v.zohoRef],
             ]}
           />
           <Particulars
@@ -390,7 +384,7 @@ export async function PrintVoucherPage({ params }: { params: Promise<{ id: strin
       </div>
       <Sheet className="relative px-8 py-7 print:border-0 print:shadow-none">
         {v.status !== "released" && (
-          <p className="mb-4 rounded-[3px] bg-danger-tint px-3 py-2 text-sm font-semibold text-danger">
+          <p className="mb-4 rounded-lg bg-danger-tint px-3 py-2 text-sm font-semibold text-danger">
             {v.status === "void" || v.status === "cancelled" ? `${VOUCHER_STATUS_LABELS[v.status]}: not a payment.` : `${VOUCHER_STATUS_LABELS[v.status]}: not paid yet.`}
           </p>
         )}

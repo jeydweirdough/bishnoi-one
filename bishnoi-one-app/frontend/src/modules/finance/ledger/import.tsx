@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/src/platform/ui/pickers";
 import { Upload } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -92,7 +93,7 @@ export function ChartImport() {
   }
 
   return (
-    <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-4">
+    <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-4">
       <div>
         <p className="text-sm font-semibold">Import a chart of accounts</p>
         <p className="text-meta text-ink-2">
@@ -115,7 +116,7 @@ export function ChartImport() {
             <span className="font-semibold text-hema">{check.counts.new} new</span> · {check.counts.here} already here ·{" "}
             <span className={check.counts.problem ? "font-semibold text-danger" : ""}>{check.counts.problem} need a look</span>. {chosen.length} ticked to import.
           </p>
-          <div className="max-h-[32rem] overflow-auto rounded-[3px] border border-rule">
+          <div className="max-h-[32rem] overflow-auto rounded-lg border border-rule">
             <table className="w-full min-w-[56rem] text-sm">
               <thead className="sticky top-0 bg-sheet">
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
@@ -158,14 +159,14 @@ export function ChartImport() {
                       </td>
                       <td className="px-2 py-1.5">
                         {needsType ? (
-                          <select suppressHydrationWarning
+                          <Select
                             aria-label={`Line ${r.line}: type`}
                             value={picked[r.line] ?? ""}
                             onChange={(e) => {
                               setPicked({ ...picked, [r.line]: e.target.value as AccountType });
                               if (e.target.value) tick(r.line, true);
                             }}
-                            className="h-8 w-full rounded-[3px] border border-danger bg-sheet px-2 text-sm"
+                            className="w-full"
                           >
                             <option value="">Pick a type…</option>
                             {(Object.keys(TYPE_LABELS) as AccountType[]).map((t) => (
@@ -173,7 +174,7 @@ export function ChartImport() {
                                 {TYPE_LABELS[t]}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         ) : r.type ? (
                           TYPE_LABELS[r.type]
                         ) : (

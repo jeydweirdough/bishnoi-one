@@ -191,7 +191,7 @@ export function CodeTemplate({ templateId, html, onChange }: { templateId: strin
             title="Preview of the quotation"
             sandbox=""
             srcDoc={preview?.html ?? ""}
-            className="h-[36rem] w-full rounded-lg border border-rule bg-white"
+            className="h-[36rem] w-full rounded-lg border border-rule bg-card"
           />
           {problem && <p className="mt-1 text-meta text-danger">{problem}</p>}
         </div>

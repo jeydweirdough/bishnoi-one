@@ -1,6 +1,6 @@
 "use client";
 
-import { AutoComplete } from "antd";
+import { AutoComplete } from "@/src/platform/ui/compat";
 import { Combobox } from "@/src/platform/ui/pickers";
 import type { ReactNode } from "react";
 import { Field, Input, Select, Textarea } from "@/src/platform/ui/field";

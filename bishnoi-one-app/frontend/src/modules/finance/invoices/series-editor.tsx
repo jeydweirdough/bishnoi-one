@@ -74,7 +74,7 @@ export function AddSeries({ today }: { today: string }) {
   }
   const put = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value });
   return (
-    <form onSubmit={submit} noValidate className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+    <form onSubmit={submit} noValidate className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
       <p className="text-sm font-semibold">New series from the Authority to Print</p>
       <FormGrid>
         <Field label="Name" size="lg" error={fields.name}>

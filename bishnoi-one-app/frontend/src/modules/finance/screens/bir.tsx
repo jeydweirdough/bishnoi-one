@@ -1,4 +1,5 @@
 import { ContainedTable } from "@/src/modules/finance/bir/contained-table";
+import { Select } from "@/src/platform/ui/pickers";
 import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -30,8 +31,8 @@ const BOOKS = [
   { value: "general-ledger", label: "General ledger" },
 ] as const;
 
-const inputClass = "ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm";
-const buttonClass = "h-8 rounded-[3px] border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control";
+const inputClass = "ml-2 h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm";
+const buttonClass = "h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control";
 
 function ReportTabs({ current, options }: { current: string; options: { value: string; label: string; href: string }[] }) {
   return <nav aria-label="Report sections" className="flex max-w-full flex-wrap gap-1.5 print:hidden">{options.map(o =>
@@ -90,23 +91,23 @@ function QuarterForm({ action, year, quarter, keep }: { action: string; year: nu
       ))}
       <label className="text-meta text-ink-2">
         Year
-        <select suppressHydrationWarning name="year" defaultValue={year} className={inputClass}>
+        <Select name="year" defaultValue={year} className={inputClass}>
           {years.map((y) => (
             <option key={y} value={y}>
               {y}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <label className="text-meta text-ink-2">
         Quarter
-        <select suppressHydrationWarning name="quarter" defaultValue={quarter} className={inputClass}>
+        <Select name="quarter" defaultValue={quarter} className={inputClass}>
           {[1, 2, 3, 4].map((q) => (
             <option key={q} value={q}>
               {["1st", "2nd", "3rd", "4th"][q - 1]}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <button suppressHydrationWarning type="submit" className={buttonClass}>
         Show
@@ -843,15 +844,15 @@ function MonthForm({ year, month }: { year: number; month: number }) {
       <input suppressHydrationWarning type="hidden" name="form" value="0619e" />
       <label className="flex items-center gap-1.5 text-meta font-medium text-ink-2">
         Year
-        <select suppressHydrationWarning name="year" defaultValue={year} className={inputClass}>
+        <Select name="year" defaultValue={year} className={inputClass}>
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+        </Select>
       </label>
       <label className="flex items-center gap-1.5 text-meta font-medium text-ink-2">
         Month
-        <select suppressHydrationWarning name="month" defaultValue={month} className={inputClass}>
+        <Select name="month" defaultValue={month} className={inputClass}>
           {names.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-        </select>
+        </Select>
       </label>
       <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
     </form>
@@ -963,9 +964,9 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
             <input suppressHydrationWarning type="hidden" name="form" value="1604e" />
             <label className="flex items-center gap-1.5 text-meta font-medium text-ink-2">
               Year
-              <select suppressHydrationWarning name="year" defaultValue={d.year} className={inputClass}>
+              <Select name="year" defaultValue={d.year} className={inputClass}>
                 {years.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
+              </Select>
             </label>
             <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
           </form>

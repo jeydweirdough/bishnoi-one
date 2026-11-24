@@ -19,7 +19,7 @@ export type Tone = "neutral" | "active" | "done" | "attention" | "muted";
 const TONES: Record<Tone, string> = {
   neutral: "bg-[#f1f1ee] text-ink-2",
   active: "bg-hema-tint text-ink",
-  done: "bg-[#e6f2e1] text-[#3f6f35]",
+  done: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   attention: "bg-danger-tint text-danger",
   muted: "bg-bench text-ink-3",
 };
@@ -96,23 +96,23 @@ export function RowLink({ href, children, sub }: { href: string; children: React
 /** Search and filters, sent as the page's address (a plain GET form). */
 export function Filters({ children, q, placeholder = "Search", keep = {} }: { children?: ReactNode; q?: string; placeholder?: string; keep?: Record<string, string> }) {
   return (
-    <form role="search" className="mb-3 flex flex-wrap items-end gap-3">
+    <form role="search" className="mb-4 flex flex-wrap items-center gap-2">
       {Object.entries(keep).map(([k, v]) => v && <input suppressHydrationWarning key={k} type="hidden" name={k} value={v} />)}
       {q !== undefined && (
-        <label className="relative min-w-[14rem] flex-1">
+        <label className="relative w-full sm:w-64">
           <span className="sr-only">{placeholder}</span>
-          <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <input suppressHydrationWarning
             type="search"
             name="q"
             defaultValue={q}
             placeholder={placeholder}
-            className="block h-10 w-full rounded-lg border border-control bg-sheet pr-4 pl-11 text-sm text-ink placeholder:text-ink-3/80 transition-colors hover:border-ink-3 focus:border-ink focus:shadow-[0_0_0_3px_rgb(168_214_155_/_0.45)] focus:outline-none"
+            className="block h-7 w-full rounded-[min(var(--radius-md),10px)] border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           />
         </label>
       )}
       {children}
-      <Button type="submit" icon={<Search className="size-4" aria-hidden />}>
+      <Button type="submit" size="sm" icon={<Search className="size-4" aria-hidden />}>
         Show
       </Button>
     </form>
@@ -122,9 +122,9 @@ export function Filters({ children, q, placeholder = "Search", keep = {} }: { ch
 /** A plain select for a filter bar. */
 export function FilterSelect({ name, value, label, options }: { name: string; value: string; label: string; options: { value: string; label: string }[] }) {
   return (
-    <label className="block min-w-[10rem]">
-      <span className="mb-1 block text-meta font-medium text-ink-2">{label}</span>
-      <Select name={name} defaultValue={value}>
+    <label className="block">
+      <span className="sr-only">{label}</span>
+      <Select name={name} defaultValue={value} prefix={label} className="h-7 w-auto min-w-36">
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -149,9 +149,9 @@ export function Figures({ items }: { items: { label: string; value: ReactNode; f
   return (
     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {items.map((f) => (
-        <div key={f.label} className={`flex flex-col-reverse justify-end rounded-xl border bg-sheet px-5 py-4 ${f.flag ? "border-danger/40" : "border-rule"}`}>
-          <dt className="mt-1 text-sm font-medium text-ink">{f.flag ? <Flag letter="!">{f.label}</Flag> : f.label}</dt>
-          <dd className="text-[1.625rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">
+        <div key={f.label} className={`flex flex-col gap-1 rounded-xl bg-card px-4 py-4 ring-1 ${f.flag ? "ring-destructive/40" : "ring-foreground/10"}`}>
+          <dt className="text-sm text-muted-foreground">{f.flag ? <Flag letter="!">{f.label}</Flag> : f.label}</dt>
+          <dd className="text-2xl leading-tight font-semibold tabular-nums">
             {f.href ? (
               <Link href={f.href} className="hover:text-ink">
                 {typeof f.value === "string" ? <Amount text={f.value} /> : f.value}

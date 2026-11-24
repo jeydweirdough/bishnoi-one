@@ -30,7 +30,7 @@ export function POStatusIcon({ status, late }: { status: POStatus; late?: boolea
   const icon = {
     draft: { Of: FilePen, color: "text-ink-3" },
     ordered: { Of: Truck, color: "text-[#2a78d6]" },
-    partial: { Of: PackageOpen, color: "text-[#8a5a00]" },
+    partial: { Of: PackageOpen, color: "text-amber-700 dark:text-amber-400" },
     received: { Of: PackageCheck, color: "text-filed" },
     cancelled: { Of: PackageX, color: "text-danger" },
   }[status];

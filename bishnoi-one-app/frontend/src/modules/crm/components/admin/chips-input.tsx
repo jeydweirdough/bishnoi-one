@@ -81,7 +81,7 @@ export function ChipsInput({
               }
             }}
             placeholder={placeholder}
-            className="h-8 w-44 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-hema focus:outline-none"
+            className="h-8 w-44 border-0 border-b border-control bg-transparent px-0 text-sm focus:border-ring focus:outline-none"
           />
           <button suppressHydrationWarning
             type="button"

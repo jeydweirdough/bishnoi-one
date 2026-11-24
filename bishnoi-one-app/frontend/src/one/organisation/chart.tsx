@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { Building2, ChevronDown, MapPin, Network, Pencil, Plus, Power, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -212,7 +212,7 @@ function UnitTree({ data }: { data: OrgData }) {
   );
 }
 
-const KIND_TONE: Record<UnitKind, string> = { department: "bg-ink text-white", division: "bg-sage-deep text-white", team: "bg-bench text-ink-2" };
+const KIND_TONE: Record<UnitKind, string> = { department: "bg-primary text-primary-foreground", division: "bg-sage-deep text-white", team: "bg-bench text-ink-2" };
 
 /** "Prescription Business" -> "PB": the unit's badge. */
 function initials(name: string): string {

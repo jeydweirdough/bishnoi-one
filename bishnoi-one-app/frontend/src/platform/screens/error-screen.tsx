@@ -74,4 +74,4 @@ export function ErrorScreen({ kind, reference, actions, standalone = false }: { 
 
 /** A button-shaped link that needs no app frame around it (the crash page has none), in the kit's shape. */
 export const plainButton = (primary = false) =>
-  `inline-flex h-10 items-center justify-center rounded-[9px] px-[18px] text-sm font-medium transition-colors ${primary ? "bg-ink text-white hover:bg-[#2b2b2b]" : "border border-[#dededa] bg-sheet text-ink shadow-[0_1px_2px_rgba(20,20,20,0.05)] hover:border-[#c9c9c5] hover:bg-[#f4f4f2]"}`;
+  `inline-flex h-10 items-center justify-center rounded-[9px] px-[18px] text-sm font-medium transition-colors ${primary ? "bg-primary text-primary-foreground hover:bg-[#2b2b2b]" : "border border-input bg-sheet text-ink shadow-[0_1px_2px_rgba(20,20,20,0.05)] hover:border-input hover:bg-muted"}`;

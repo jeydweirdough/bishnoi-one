@@ -1,7 +1,7 @@
 "use client";
 
 import { IconButton } from "@/src/platform/ui/button";
-import { Dropdown } from "antd";
+import { Dropdown } from "@/src/platform/ui/compat";
 import { AlarmClock, Cake, ChevronLeft, ChevronRight, CircleAlert, FileClock, Gauge, MoreHorizontal, ShieldAlert, UserRoundPen, Moon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";

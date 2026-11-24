@@ -118,12 +118,12 @@ export async function SalesOrderPage({ params }: { params: Params<{ id: string }
         />
       )}
       {o.status === "rejected" && o.decisionNote && (
-        <p className="mb-4 rounded-[3px] bg-danger-tint px-4 py-2 text-sm text-ink">
+        <p className="mb-4 rounded-lg bg-danger-tint px-4 py-2 text-sm text-ink">
           Rejected by {o.decidedBy?.name ?? "an approver"}: {o.decisionNote}
         </p>
       )}
       {o.invoiceState === "voided" && o.invoice && (
-        <p className="mb-4 rounded-[3px] bg-promo-tint px-4 py-2 text-sm text-ink">
+        <p className="mb-4 rounded-lg bg-promo-tint px-4 py-2 text-sm text-ink">
           Invoice {o.invoice.number} was voided{o.invoice.voidReason ? `: ${o.invoice.voidReason}` : ""}. The order&apos;s own amounts show until Finance issues its replacement.
         </p>
       )}

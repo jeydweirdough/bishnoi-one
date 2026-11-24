@@ -102,18 +102,18 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
                     <CellInput className="w-24" inputMode="decimal" aria-label={`Line ${n + 1}: unit price`} value={r.price} onChange={(e) => setRow(n, { price: e.target.value })} />
                   </td>
                   <td className="px-2 py-2">
-                    <select suppressHydrationWarning
+                    <Select
                       aria-label={`Line ${n + 1}: VAT category`}
                       value={r.category}
                       onChange={(e) => setRow(n, { category: e.target.value })}
-                      className="h-8 rounded-[3px] border border-rule-strong bg-sheet px-1.5 text-meta"
+                      className=""
                     >
                       {setup.pack.categories.map((c) => (
                         <option key={c.key} value={c.key}>
                           {c.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td className="px-2 py-2 text-center">
                     <input suppressHydrationWarning type="checkbox" aria-label={`Line ${n + 1}: covered by the SC/PWD discount`} checked={r.relief} onChange={(e) => setRow(n, { relief: e.target.checked })} className="size-4 accent-hema" />
@@ -170,13 +170,13 @@ export function SaleTryout({ setup, org }: { setup: TaxSetup; org: Org }) {
 function InvoiceSummary({ result, fmt }: { result: ComputedSale | null; fmt: ReturnType<typeof makeFormat> }) {
   if (!result) {
     return (
-      <div className="grid min-h-48 place-content-center rounded-[3px] border-2 border-dashed border-rule p-6 text-center text-meta text-ink-3">
+      <div className="grid min-h-48 place-content-center rounded-lg border-2 border-dashed border-rule p-6 text-center text-meta text-ink-3">
         The sales invoice summary appears here.
       </div>
     );
   }
   return (
-    <section aria-label="Sales Invoice summary" className="h-fit rounded-[3px] border border-ink bg-sheet p-5 text-sm">
+    <section aria-label="Sales Invoice summary" className="h-fit rounded-lg border border-ink bg-sheet p-5 text-sm">
       <header className="border-b-[3px] border-double border-ink pb-3 text-center">
         <p className="font-semibold">{result.seller.registeredName ?? "(registered name)"}</p>
         {result.seller.tradeName && <p className="text-meta">{result.seller.tradeName}</p>}

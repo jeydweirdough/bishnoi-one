@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Params }) {
 
 const caption = "text-[8.5pt] font-semibold tracking-wide text-neutral-600 uppercase";
 const paper =
-  "mx-auto my-8 max-w-[210mm] bg-white px-[16mm] py-[14mm] text-[10.5pt] leading-snug text-black shadow-sm print:my-0 print:max-w-none print:p-0 print:shadow-none";
+  "mx-auto my-8 max-w-[210mm] bg-card px-[16mm] py-[14mm] text-[10.5pt] leading-snug text-black shadow-sm print:my-0 print:max-w-none print:p-0 print:shadow-none";
 
 /** A quote on paper. With a quotation template set up for it (Settings,
  *  Quotation templates), that template: designed ones print from here,
@@ -43,7 +43,7 @@ export default async function QuotePrintPage({ params, searchParams }: { params:
   const excelHref = template?.kind === "excel" ? `/crm/quotes/${id}/document?template=${template.id}` : null;
 
   return (
-    <div className="min-h-screen bg-bench print:bg-white">
+    <div className="min-h-screen bg-bench print:bg-card">
       <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-rule bg-sheet px-6 py-3 print:hidden">
         <LinkButton href={`/crm/quotes/${id}`} variant="quiet">
           Back to quote

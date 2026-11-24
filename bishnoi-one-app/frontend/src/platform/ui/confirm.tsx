@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { useState, useTransition, type ReactNode } from "react";
 import { Button } from "./button";
 
@@ -61,7 +61,7 @@ export function ConfirmButton({
       >
         {label}
       </Button>
-      {/* Ant Design's modal: it can't be closed while the action runs. */}
+      {/* The dialog can't be closed while the action runs. */}
       <Modal
         open={open}
         title={title}

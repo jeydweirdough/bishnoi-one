@@ -18,7 +18,6 @@ import { BillSteps, DeleteBillDraft, VoidBill } from "@/src/modules/finance/paya
 import { AttachedFiles } from "@/src/modules/finance/payables/files";
 import { SupplierImport } from "@/src/modules/finance/payables/import";
 import { ImportedDetails } from "../payables/import-details";
-import { ZohoImport } from "@/src/modules/finance/import-matching/zoho-import";
 import { SupplierForm, SwitchSupplier } from "@/src/modules/finance/payables/supplier-form";
 import { VOUCHER_STATUS_LABELS } from "@/src/modules/finance/vouchers/types";
 import { BILL_STATE_LABELS, type Bill, type BillChoices, type BillState, type BillSummary, type Supplier, type Withholding } from "@/src/modules/finance/payables/types";
@@ -101,16 +100,13 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
     return "/finance/bills?" + next;
   };
   const pager = <Pager total={list.items.length} page={page} size={size} base={"/finance/bills?" + navigation} noun="bills" />;
-  // Importing Zoho's bills: its own tick, and the testing site only for now (app/routers/imports.py).
-  const canImport = may(me, "imports.run") && me.dataEnvironment === "local_test";
   return (
     <>
       <PageHeader
         title="Bills"
         actions={
-          (canImport || list.canCreate) && (
+          list.canCreate && (
             <>
-              {canImport && <ZohoImport kind="bills" />}
               {list.canCreate && (
                 <>
                   <LinkButton href="/finance/scans">Scan receipt</LinkButton>
@@ -140,7 +136,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
                 key={t.key}
                 href={tabHref(t.key)}
                 aria-current={show === t.key ? "page" : undefined}
-                className={`rounded-[3px] border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
+                className={`rounded-lg border px-3 py-1 text-meta ${show === t.key ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
               >
                 {t.label}
                 {n ? <span className={t.key === "missing" || t.key === "returned" ? "font-semibold text-due-today" : "text-ink-3"}> {n}</span> : null}
@@ -151,7 +147,7 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
         <form action="/finance/bills" className="flex max-w-full flex-wrap items-end gap-2" role="search">
           {["queue", "supplierId", "bucket"].map((key) => query.has(key) ? <input suppressHydrationWarning key={key} type="hidden" name={key} value={query.get(key)!} /> : null)}
           {show && <input suppressHydrationWarning type="hidden" name="show" value={show} />}
-          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Supplier, invoice, PO or reference" aria-label="Find a bill" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Supplier, invoice, PO or reference" aria-label="Find a bill" className="h-8 w-64 rounded-lg border border-rule-strong bg-sheet px-2 text-sm" />
           <label className="flex items-center gap-2 text-meta text-ink-2">Rows per page<select suppressHydrationWarning name="size" defaultValue={size} className="h-8 rounded-lg border border-rule-strong bg-sheet px-2">{[10,25,50,100].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
           <button suppressHydrationWarning type="submit" className="h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold">Show</button>
         </form>
@@ -313,7 +309,6 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
         }
       >
         <StatusMark state={b.state} />
-        {b.zohoSync && <p role="status" className="mt-2 text-sm text-ink-2">Zoho: {b.zohoSync.label}. {b.zohoSync.message}</p>}
         {b.status === "void" && (
           <span className="ml-2 text-meta text-danger">
             Voided by {b.voidedBy}: {b.voidReason}
@@ -346,7 +341,7 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
       )}
 
       {b.state === "returned" && lastReturn && (
-        <p className="mb-4 rounded-[3px] bg-due-today/10 px-4 py-2 text-sm">
+        <p className="mb-4 rounded-lg bg-due-today/10 px-4 py-2 text-sm">
           <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
         </p>
       )}
@@ -385,7 +380,6 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
               ["Bill date", fmt.dateLabel(b.billDate)],
               ["Due date", fmt.dateLabel(b.dueDate)],
               ["Checked against", [b.checkedPo && "PO", b.checkedDr && "delivery receipt"].filter(Boolean).join(" and ") || <span key="c" className="text-due-today">Not marked</span>],
-              ["Zoho", b.zohoRef],
               ["Oojeema", b.oojeemaRef],
               ["Approved by", b.approvedBy],
               ["Tax withheld checked by", b.checkedBy],

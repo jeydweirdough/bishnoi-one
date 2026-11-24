@@ -29,7 +29,7 @@ export function HealthMark({ status, label }: { status: Health; label?: string }
 // Critical is the one that flags; the rest are words in rising ink.
 const SEVERITY_STYLE: Record<Severity, string> = {
   critical: "",
-  high: "border border-ink bg-ink text-white",
+  high: "border border-ink bg-primary text-primary-foreground",
   medium: "border border-ink-2 text-ink-2",
   low: "border border-rule-strong text-ink-3",
 };
@@ -42,7 +42,7 @@ export function SeverityMark({ severity }: { severity: Severity }) {
 export function IncidentSeverityMark({ severity }: { severity: IncidentSeverity }) {
   if (severity === "critical") return <Flag letter="!">{INCIDENT_SEVERITIES.critical}</Flag>;
   return (
-    <span className={`inline-flex h-5 items-center rounded-full px-1.5 text-stamp uppercase ${severity === "major" ? "border border-ink bg-ink text-white" : "border border-rule-strong text-ink-3"}`}>
+    <span className={`inline-flex h-5 items-center rounded-full px-1.5 text-stamp uppercase ${severity === "major" ? "border border-ink bg-primary text-primary-foreground" : "border border-rule-strong text-ink-3"}`}>
       {INCIDENT_SEVERITIES[severity]}
     </span>
   );
@@ -80,7 +80,7 @@ export function Lifecycle({ status }: { status: TicketStatus }) {
           {i > 0 && <span aria-hidden className={`h-px w-3 ${i <= at ? "bg-hema" : "bg-rule-strong"}`} />}
           <span
             aria-current={i === at ? "step" : undefined}
-            className={`rounded-full px-1.5 py-0.5 ${i === at ? "bg-hema font-semibold text-white" : i < at ? "text-hema" : "text-ink-3"}`}
+            className={`rounded-full px-1.5 py-0.5 ${i === at ? "bg-primary font-semibold text-primary-foreground" : i < at ? "text-hema" : "text-ink-3"}`}
           >
             {TICKET_STATUSES[s]}
           </span>

@@ -77,7 +77,7 @@ export function StageTrack({
               }}
               className={`relative flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 text-[0.78125rem] font-medium whitespace-nowrap transition-colors ${
                 first ? "pr-4 pl-3" : "pr-4 pl-6"
-              } ${!here && !past ? "text-ink-3" : ""} ${canMove && state === "open" && !here ? "cursor-pointer hover:bg-[#f4f4f2] hover:text-ink" : "cursor-default"}`}
+              } ${!here && !past ? "text-ink-3" : ""} ${canMove && state === "open" && !here ? "cursor-pointer hover:bg-muted hover:text-ink" : "cursor-default"}`}
             >
               {past && <Check className="size-3.5 shrink-0" aria-hidden />}
               <span className="truncate">{s.name}</span>
@@ -86,7 +86,7 @@ export function StageTrack({
         })}
         {state !== "open" && (
           <span
-            className={`flex h-11 shrink-0 items-center gap-1.5 px-4 text-[0.78125rem] font-semibold whitespace-nowrap ${state === "won" ? "bg-[#e6f2e1] text-[#3f6f35]" : "bg-[#f4f4f2] text-ink-2"}`}
+            className={`flex h-11 shrink-0 items-center gap-1.5 px-4 text-[0.78125rem] font-semibold whitespace-nowrap ${state === "won" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-ink-2"}`}
           >
             {state === "won" ? <Trophy className="size-3.5" aria-hidden /> : <XCircle className="size-3.5" aria-hidden />}
             {state === "won" ? "Won" : "Lost"}

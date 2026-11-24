@@ -308,8 +308,8 @@ export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null
   return (
     <form onSubmit={submit} noValidate className="space-y-5">
       {!!bill?.purchaseEvidence?.length&&<p className="text-sm">Received quantities and invoice identity stay linked. To correct that identity, cancel an unsubmitted draft and prepare it again.</p>}
-      {purchase&&<section className="space-y-3 rounded border border-rule bg-sheet p-4" aria-label="Received quantity allocations"><h2 className="font-semibold">Received evidence and invoice quantities</h2><p>Allocate only what this invoice covers. Amounts copied from receiving are a starting reference: verify invoice prices, currency and whether they include tax.</p>{purchase.rows.map((r,i)=><label key={r.intakeId+r.sourceLineId} className="grid gap-1 text-sm">{r.label} · available {r.maximum} {r.unit}<input aria-label={`Invoice quantity for ${r.label}`} type="number" min={1} max={r.maximum} step={1} value={sourceQuantities[i]} onChange={e=>{setSourceReviewed(false);setSourceQuantities(sourceQuantities.map((q,j)=>j===i?Number(e.target.value):q));}}/></label>)}<label className="flex gap-2"><input type="checkbox" checked={sourceReviewed} onChange={e=>setSourceReviewed(e.target.checked)}/>I checked received quantities against this invoice, units, currency and prices.</label>{fields.source&&<p role="alert">{fields.source}</p>}</section>}
-      <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+      {purchase&&<section className="space-y-3 rounded-xl border border-rule bg-card p-4 text-card-foreground" aria-label="Received quantity allocations"><h2 className="font-semibold">Received evidence and invoice quantities</h2><p>Allocate only what this invoice covers. Amounts copied from receiving are a starting reference: verify invoice prices, currency and whether they include tax.</p>{purchase.rows.map((r,i)=><label key={r.intakeId+r.sourceLineId} className="grid gap-1 text-sm">{r.label} · available {r.maximum} {r.unit}<input aria-label={`Invoice quantity for ${r.label}`} type="number" min={1} max={r.maximum} step={1} value={sourceQuantities[i]} onChange={e=>{setSourceReviewed(false);setSourceQuantities(sourceQuantities.map((q,j)=>j===i?Number(e.target.value):q));}}/></label>)}<label className="flex gap-2"><input type="checkbox" checked={sourceReviewed} onChange={e=>setSourceReviewed(e.target.checked)}/>I checked received quantities against this invoice, units, currency and prices.</label>{fields.source&&<p role="alert">{fields.source}</p>}</section>}
+      <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
           <Field
             label="Supplier"
@@ -377,7 +377,7 @@ export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null
         </div>
       </section>
 
-      <section className="space-y-3 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-3 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <Choice
           name="includeVat"
           legend="The amounts below"
@@ -419,24 +419,24 @@ export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null
                     <CellInput aria-label={`Line ${i + 1}: description`} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value })} maxLength={200} className="w-full !text-left" />
                   </td>
                   <td className="px-2 py-1.5">
-                    <select suppressHydrationWarning aria-label={`Line ${i + 1}: purchase type`} value={l.purchaseType} onChange={(e) => setLine(l.key, { purchaseType: e.target.value as PurchaseType })} className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+                    <Select aria-label={`Line ${i + 1}: purchase type`} value={l.purchaseType} onChange={(e) => setLine(l.key, { purchaseType: e.target.value as PurchaseType })} className="w-full">
                       {choices.purchaseTypes.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
-                    </select>
+                    </Select>
                   </td>
                   <td className="px-2 py-1.5">
-                    <select suppressHydrationWarning aria-label={`Line ${i + 1}: VAT`} value={l.vat} onChange={(e) => setLine(l.key, { vat: e.target.value as VatKind })} className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm">
+                    <Select aria-label={`Line ${i + 1}: VAT`} value={l.vat} onChange={(e) => setLine(l.key, { vat: e.target.value as VatKind })} className="w-full">
                       <option value="">Choose VAT</option>
                       {choices.vatKinds.map((k) => (
                         <option key={k.key} value={k.key}>
                           {k.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td className="px-2 py-1.5">
                     {supplier?.origin === "foreign" ? (
                       // Sir Mel (2026-11-04): nothing is withheld from a foreign supplier.
-                      <select suppressHydrationWarning aria-label={`Line ${i + 1}: tax withheld`} value={FOREIGN} disabled className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm text-ink-2">
+                      <select suppressHydrationWarning aria-label={`Line ${i + 1}: tax withheld`} value={FOREIGN} disabled className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm text-ink-2">
                         <option value={FOREIGN}>None · foreign supplier</option>
                       </select>
                     ) : (
@@ -446,7 +446,7 @@ export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null
                           aria-invalid={fields[`lines.${i}.vat`] && l.withholding === "unconfirmed" ? true : undefined}
                           value={l.withholding}
                           onChange={(e) => setLine(l.key, { withholding: e.target.value })}
-                          className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
+                          className="h-8 w-full rounded-lg border border-rule-strong bg-sheet px-2 text-sm"
                         >
                           <option value="unconfirmed">Choose withholding</option>
                           {choices.withholding.map((w) => (
@@ -516,11 +516,8 @@ export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null
         </div>
       </section>
 
-      <section className="space-y-4 rounded-[3px] border border-rule bg-sheet p-5">
+      <section className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Zoho reference" optional error={fields.zohoRef} hint="The same bill's number in Zoho, while both are used.">
-            {(p) => <Input {...p} value={v.zohoRef} onChange={(e) => set({ zohoRef: e.target.value })} maxLength={60} />}
-          </Field>
           <Field label="Oojeema reference" optional error={fields.oojeemaRef} hint="The expense or voucher number in Oojeema.">
             {(p) => <Input {...p} value={v.oojeemaRef} onChange={(e) => set({ oojeemaRef: e.target.value })} maxLength={60} />}
           </Field>

@@ -112,6 +112,10 @@ class Settings(BaseSettings):
             self.environment = "production"
         if "allowed_hosts" not in self.model_fields_set and self.environment == "production":
             self.allowed_hosts = ["*"]
+        # The books on a real database (PostgreSQL) are the company's own, unless DATA_ENVIRONMENT says
+        # otherwise (2026-11-19: the live server showed "Local test" and offered the test-only Zoho imports).
+        if "data_environment" not in self.model_fields_set and not self.database_url.startswith("sqlite"):
+            self.data_environment = "official"
         return self
 
     @model_validator(mode="after")

@@ -117,7 +117,7 @@ export function ActivityCalendar({
           {block && customer.name && <span className="block truncate font-normal opacity-80">{customer.name}</span>}
         </span>
         {a.meetingLink && !a.isDone && (
-          <a href={a.meetingLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label={`Join: ${a.subject}`} className="ml-auto shrink-0 rounded bg-ink px-1.5 py-px text-[0.625rem] font-medium text-white">
+          <a href={a.meetingLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label={`Join: ${a.subject}`} className="ml-auto shrink-0 rounded bg-primary px-1.5 py-px text-[0.625rem] font-medium text-primary-foreground">
             Join
           </a>
         )}
@@ -143,21 +143,21 @@ export function ActivityCalendar({
         <h2 className="mr-auto text-heading text-ink">{title}</h2>
         <div role="group" aria-label="View" className="inline-flex rounded-[9px] border border-rule bg-sheet p-0.5">
           {(["month", "week"] as const).map((m) => (
-            <Link key={m} href={links[m]} aria-current={mode === m ? "page" : undefined} className={`rounded-[7px] px-3 py-1 text-meta font-medium ${mode === m ? "bg-ink text-white" : "text-ink-2 hover:text-ink"}`}>
+            <Link key={m} href={links[m]} aria-current={mode === m ? "page" : undefined} className={`rounded-[7px] px-3 py-1 text-meta font-medium ${mode === m ? "bg-primary text-primary-foreground" : "text-ink-2 hover:text-ink"}`}>
               {m === "month" ? "Month" : "Week"}
             </Link>
           ))}
         </div>
         <div className="inline-flex items-center gap-1">
-          <Link href={links.previous} aria-label={mode === "month" ? "Previous month" : "Previous week"} className="grid size-[34px] place-items-center rounded-[8px] border border-[#dededa] bg-sheet text-ink-2 hover:bg-[#f4f4f2]">
+          <Link href={links.previous} aria-label={mode === "month" ? "Previous month" : "Previous week"} className="grid size-[34px] place-items-center rounded-[8px] border border-input bg-sheet text-ink-2 hover:bg-muted">
             <ChevronLeft className="size-4" aria-hidden />
           </Link>
           {links.today && (
-            <Link href={links.today} className="inline-flex h-[34px] items-center rounded-[8px] border border-[#dededa] bg-sheet px-3 text-meta font-medium text-ink hover:bg-[#f4f4f2]">
+            <Link href={links.today} className="inline-flex h-[34px] items-center rounded-[8px] border border-input bg-sheet px-3 text-meta font-medium text-ink hover:bg-muted">
               Today
             </Link>
           )}
-          <Link href={links.next} aria-label={mode === "month" ? "Next month" : "Next week"} className="grid size-[34px] place-items-center rounded-[8px] border border-[#dededa] bg-sheet text-ink-2 hover:bg-[#f4f4f2]">
+          <Link href={links.next} aria-label={mode === "month" ? "Next month" : "Next week"} className="grid size-[34px] place-items-center rounded-[8px] border border-input bg-sheet text-ink-2 hover:bg-muted">
             <ChevronRight className="size-4" aria-hidden />
           </Link>
         </div>
@@ -174,7 +174,7 @@ export function ActivityCalendar({
               type="button"
               aria-pressed={on}
               onClick={() => setHidden((h) => (on ? [...h, k.kind] : h.filter((x) => x !== k.kind)))}
-              className={`inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[0.78rem] font-medium transition-colors ${on ? "border-[#dededa] bg-sheet text-ink" : "border-dashed border-[#d6d6d4] bg-transparent text-ink-3"}`}
+              className={`inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[0.78rem] font-medium transition-colors ${on ? "border-input bg-sheet text-ink" : "border-dashed border-[#d6d6d4] bg-transparent text-ink-3"}`}
             >
               <i className="size-2 rounded-full" style={{ background: on ? KIND_COLOUR[k.kind] : "#d6d6d4" }} aria-hidden />
               {k.label}s
@@ -189,7 +189,7 @@ export function ActivityCalendar({
         <div className="overflow-x-auto rounded-[10px] border border-rule">
           <div className="grid min-w-[46rem] grid-cols-7">
             {WEEKDAYS.map((d) => (
-              <div key={d} className="border-b border-rule bg-[#fbfbfa] px-2 py-2 text-caps font-semibold text-ink-3 uppercase">
+              <div key={d} className="border-b border-rule bg-muted/50 px-2 py-2 text-caps font-semibold text-ink-3 uppercase">
                 {d}
               </div>
             ))}
@@ -201,9 +201,9 @@ export function ActivityCalendar({
                   key={day}
                   onClick={() => canPlan && planAt(day, 9)}
                   title={canPlan ? "Click to plan a call this day" : undefined}
-                  className={`group min-h-28 border-b border-rule px-1.5 py-1 ${i % 7 ? "border-l" : ""} ${inMonth ? "bg-sheet" : "bg-[#fbfbfa]"} ${canPlan ? "cursor-pointer hover:bg-[#f7faf5]" : ""}`}
+                  className={`group min-h-28 border-b border-rule px-1.5 py-1 ${i % 7 ? "border-l" : ""} ${inMonth ? "bg-sheet" : "bg-muted/50"} ${canPlan ? "cursor-pointer hover:bg-muted/50" : ""}`}
                 >
-                  <p className={`mb-1 text-meta ${day === today ? "inline-flex size-6 items-center justify-center rounded-full bg-ink font-semibold text-white" : inMonth ? "text-ink-2" : "text-ink-3"}`}>{Number(day.slice(8))}</p>
+                  <p className={`mb-1 text-meta ${day === today ? "inline-flex size-6 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground" : inMonth ? "text-ink-2" : "text-ink-3"}`}>{Number(day.slice(8))}</p>
                   <ul className="space-y-0.5">
                     {list.slice(0, PER_DAY).map((a) => (
                       <li key={a.id}>
@@ -296,9 +296,9 @@ function WeekGrid({
   return (
     <div className="overflow-x-auto rounded-[10px] border border-rule">
       <div className="grid min-w-[52rem]" style={{ gridTemplateColumns: "3.5rem repeat(7, minmax(0, 1fr))" }}>
-        <div className="border-b border-rule bg-[#fbfbfa]" />
+        <div className="border-b border-rule bg-muted/50" />
         {days.map((d) => (
-          <div key={d} className={`border-b border-l border-rule px-2 py-2 text-meta font-semibold ${d === today ? "bg-[#f1f7ee] text-ink" : "bg-[#fbfbfa] text-ink-2"}`}>
+          <div key={d} className={`border-b border-l border-rule px-2 py-2 text-meta font-semibold ${d === today ? "bg-emerald-500/10 text-ink" : "bg-muted/50 text-ink-2"}`}>
             {label.format(new Date(`${d}T00:00:00Z`))}
           </div>
         ))}
@@ -323,7 +323,7 @@ function WeekGrid({
                   key={h}
                   onClick={() => canPlan && planAt(d, h)}
                   title={canPlan ? `Plan a call at ${((h + 11) % 12) + 1} ${h < 12 ? "AM" : "PM"}` : undefined}
-                  className={`absolute inset-x-0 border-t border-rule ${i === 0 ? "border-t-0" : ""} ${canPlan ? "cursor-pointer hover:bg-[#f7faf5]" : ""}`}
+                  className={`absolute inset-x-0 border-t border-rule ${i === 0 ? "border-t-0" : ""} ${canPlan ? "cursor-pointer hover:bg-muted/50" : ""}`}
                   style={{ top: i * HOUR_PX, height: HOUR_PX }}
                 />
               ))}

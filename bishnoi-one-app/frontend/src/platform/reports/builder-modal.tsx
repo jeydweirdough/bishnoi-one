@@ -1,6 +1,8 @@
 "use client";
 
-import { Modal, Tabs } from "antd";
+import { Select } from "@/src/platform/ui/pickers";
+import { Tabs } from "@/src/platform/ui/compat";
+import { Modal } from "@/src/platform/ui/modal";
 import {
   ArrowDown,
   ArrowUp,
@@ -243,7 +245,7 @@ export function ReportBuilderModal({
                       type="button"
                       disabled={index === 0}
                       onClick={() => moveColumn(index, "up")}
-                      className="grid size-7 place-items-center rounded text-ink-3 hover:bg-white hover:text-ink disabled:opacity-30"
+                      className="grid size-7 place-items-center rounded text-ink-3 hover:bg-card hover:text-ink disabled:opacity-30"
                       title="Move up"
                     >
                       <ArrowUp className="size-4" />
@@ -252,7 +254,7 @@ export function ReportBuilderModal({
                       type="button"
                       disabled={index === selectedCols.length - 1}
                       onClick={() => moveColumn(index, "down")}
-                      className="grid size-7 place-items-center rounded text-ink-3 hover:bg-white hover:text-ink disabled:opacity-30"
+                      className="grid size-7 place-items-center rounded text-ink-3 hover:bg-card hover:text-ink disabled:opacity-30"
                       title="Move down"
                     >
                       <ArrowDown className="size-4" />
@@ -268,7 +270,7 @@ export function ReportBuilderModal({
               .map((col) => (
                 <div
                   key={col.key}
-                  className="flex items-center justify-between rounded-lg border border-rule/50 bg-white/50 px-3 py-2 text-sm opacity-60"
+                  className="flex items-center justify-between rounded-lg border border-rule/50 bg-card/50 px-3 py-2 text-sm opacity-60"
                 >
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -326,33 +328,33 @@ export function ReportBuilderModal({
                     key={idx}
                     className="flex flex-wrap items-center gap-2 rounded-xl border border-rule bg-bench/30 p-2.5"
                   >
-                    <select
+                    <Select
                       value={f.column}
                       onChange={(e) =>
                         updateFilter(idx, "column", e.target.value)
                       }
-                      className="h-9 rounded-lg border border-rule bg-white px-2 text-sm font-medium text-ink"
+                      className=""
                     >
                       {base.columns.map((c) => (
                         <option key={c.key} value={c.key}>
                           {c.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
 
-                    <select
+                    <Select
                       value={f.op}
                       onChange={(e) =>
                         updateFilter(idx, "op", e.target.value as FilterOp)
                       }
-                      className="h-9 rounded-lg border border-rule bg-white px-2 text-sm text-ink"
+                      className=""
                     >
                       {allowedOps.map((op) => (
                         <option key={op.value} value={op.value}>
                           {op.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
 
                     {needsVal && (
                       <input
@@ -369,7 +371,7 @@ export function ReportBuilderModal({
                           updateFilter(idx, "value", e.target.value)
                         }
                         placeholder="Value..."
-                        className="h-9 min-w-32 flex-1 rounded-lg border border-rule bg-white px-2.5 text-sm"
+                        className="h-9 min-w-32 flex-1 rounded-lg border border-rule bg-card px-2.5 text-sm"
                       />
                     )}
 
@@ -406,10 +408,10 @@ export function ReportBuilderModal({
             <label className="block mb-1.5 text-sm font-medium text-ink">
               Group by
             </label>
-            <select
+            <Select
               value={groupBy}
               onChange={(e) => setGroupBy(e.target.value)}
-              className="h-9 w-full rounded-lg border border-rule bg-white px-3 text-sm text-ink"
+              className="w-full"
             >
               <option value="">(None - show individual rows)</option>
               {base.columns
@@ -419,7 +421,7 @@ export function ReportBuilderModal({
                     {c.label}
                   </option>
                 ))}
-            </select>
+            </Select>
           </div>
 
           {groupBy && numericCols.length > 0 && (
@@ -434,7 +436,7 @@ export function ReportBuilderModal({
                     className="flex items-center justify-between gap-4"
                   >
                     <span className="text-sm text-ink-2">{c.label}</span>
-                    <select
+                    <Select
                       value={measures[c.key] ?? "sum"}
                       onChange={(e) =>
                         setMeasures({
@@ -442,14 +444,14 @@ export function ReportBuilderModal({
                           [c.key]: e.target.value as Measure,
                         })
                       }
-                      className="h-8 rounded-md border border-rule bg-white px-2 text-xs"
+                      className=""
                     >
                       {MEASURES.map((m) => (
                         <option key={m.value} value={m.value}>
                           {m.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 ))}
               </div>
@@ -471,10 +473,10 @@ export function ReportBuilderModal({
             Choose how rows are ordered in the table.
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <select
+            <Select
               value={sortCol}
               onChange={(e) => setSortCol(e.target.value)}
-              className="h-9 min-w-48 rounded-lg border border-rule bg-white px-3 text-sm text-ink"
+              className="min-w-48"
             >
               <option value="">(Default order)</option>
               {base.columns.map((c) => (
@@ -482,7 +484,7 @@ export function ReportBuilderModal({
                   {c.label}
                 </option>
               ))}
-            </select>
+            </Select>
 
             {sortCol && (
               <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
@@ -524,7 +526,7 @@ export function ReportBuilderModal({
                 className={`rounded-xl border p-4 text-center text-sm font-medium transition-colors ${
                   chart === opt.id
                     ? "border-ink bg-mint-2 font-semibold text-ink"
-                    : "border-rule bg-white text-ink-2 hover:border-ink hover:text-ink"
+                    : "border-rule bg-card text-ink-2 hover:border-ink hover:text-ink"
                 }`}
               >
                 {opt.label}
@@ -581,7 +583,7 @@ export function ReportBuilderModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. High Value Customers"
-                className="bg-white"
+                className="bg-card"
               />
             )}
           </Field>

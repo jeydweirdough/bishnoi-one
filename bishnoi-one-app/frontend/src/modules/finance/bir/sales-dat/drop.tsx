@@ -21,7 +21,7 @@ export function Drop({ title, hint, accept, multiple = true, onFiles }: { title:
         const files = Array.from(e.dataTransfer.files);
         if (files.length) onFiles(multiple ? files : files.slice(0, 1));
       }}
-      className={`rounded-[3px] border-2 border-dashed px-4 py-5 transition-colors ${over ? "border-hema bg-hema-tint" : "border-rule-strong"}`}
+      className={`rounded-lg border-2 border-dashed px-4 py-5 transition-colors ${over ? "border-hema bg-hema-tint" : "border-rule-strong"}`}
     >
       <p className="text-sm font-semibold text-ink">{title}</p>
       {hint && <p className="mt-0.5 text-meta text-ink-3">{hint}</p>}

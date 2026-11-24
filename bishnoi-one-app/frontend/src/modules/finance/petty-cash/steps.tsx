@@ -17,7 +17,7 @@ function ReasonBox({ intro, label, placeholder, confirm, pending, error, onConfi
   const [reason, setReason] = useState("");
   const [short, setShort] = useState<string | null>(null);
   return (
-    <div className="w-full space-y-3 rounded-[3px] border border-danger/40 bg-danger-tint/40 p-4">
+    <div className="w-full space-y-3 rounded-lg border border-danger/40 bg-danger-tint/40 p-4">
       <p className="text-sm">{intro}</p>
       <Field label={label} error={short ?? error ?? undefined}>
         {(p) => <Input {...p} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder={placeholder} autoFocus />}

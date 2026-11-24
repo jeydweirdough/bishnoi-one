@@ -69,7 +69,7 @@ function RoleCard({ role, catalogue, onDone }: { role?: RoleRow; catalogue: Perm
   }
 
   return (
-    <section className="rounded-[3px] bg-sheet shadow-sheet">
+    <section className="rounded-lg bg-sheet shadow-sheet">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-rule px-5 py-4">
         {naming ? (
           <FormGrid className="w-full">
@@ -83,7 +83,7 @@ function RoleCard({ role, catalogue, onDone }: { role?: RoleRow; catalogue: Perm
             <div className="flex items-center gap-1.5">
               <h2 className="text-heading text-ink">{role?.name}</h2>
               {!locked && (
-                <button suppressHydrationWarning type="button" onClick={() => setNaming(true)} title={`Rename ${role?.name}`} aria-label={`Rename ${role?.name}`} className="rounded-[3px] p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
+                <button suppressHydrationWarning type="button" onClick={() => setNaming(true)} title={`Rename ${role?.name}`} aria-label={`Rename ${role?.name}`} className="rounded-lg p-1 text-ink-3 hover:bg-hema-tint hover:text-hema">
                   <Pencil className="size-3.5" aria-hidden />
                 </button>
               )}

@@ -248,18 +248,17 @@ export function LinesEditor({
                         unit={p?.unit}
                       />
                       {p?.packagings?.length ? (
-                        <select
-                          suppressHydrationWarning
+                        <Select
                           aria-label={`Line ${i + 1} unit`}
                           value={unitsOf(p, selling).find((u) => (line.packagingId ? u.packagingId === line.packagingId : u.per === (line.per || 1)))?.key ?? ""}
                           onChange={(e) => {
                             const u = unitsOf(p, selling).find((x) => x.key === e.target.value);
                             if (u) set(i, { per: u.per, packagingId: u.packagingId });
                           }}
-                          className="h-10 rounded-md border border-rule-strong bg-white px-1.5 text-meta text-ink"
+                          className=""
                         >
                           {unitsOf(p, selling).map((u) => <option key={u.key} value={u.key}>{u.label}</option>)}
-                        </select>
+                        </Select>
                       ) : (
                         <span className="w-10 text-meta text-ink-3">{p?.unit ?? ""}</span>
                       )}

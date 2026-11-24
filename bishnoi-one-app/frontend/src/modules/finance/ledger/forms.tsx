@@ -101,7 +101,7 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
     );
   }
   return (
-    <form onSubmit={submit} noValidate className="space-y-4 rounded-[3px] border border-rule bg-sheet p-4">
+    <form onSubmit={submit} noValidate className="space-y-4 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 p-4">
       <p className="text-sm font-semibold">New manual journal</p>
       <div className="grid gap-4 sm:grid-cols-[10rem_minmax(0,1fr)_12rem]">
         <Field label="Date" error={fields.date}>
@@ -129,16 +129,16 @@ export function JournalForm({ accounts, org, today }: { accounts: Account[]; org
             {lines.map((l, i) => (
               <tr key={l.key} className="align-top">
                 <td className="py-1.5 pr-2">
-                  <select suppressHydrationWarning
+                  <Select
                     aria-label={`Line ${i + 1}: account`}
                     aria-invalid={fields[`lines.${i}.accountId`] ? true : undefined}
                     value={l.accountId}
                     onChange={(e) => set(l.key, { accountId: e.target.value })}
-                    className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm aria-[invalid=true]:border-danger"
+                    className="w-full"
                   >
                     <option value="">Select an account…</option>
                     {accountOptions(accounts)}
-                  </select>
+                  </Select>
                 </td>
                 <td className="px-2 py-1.5">
                   <CellInput aria-label={`Line ${i + 1}: description`} value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} className="w-full !text-left" />
@@ -468,7 +468,7 @@ function AccountForm({ account, accounts, onDone }: { account: Account | null; a
   }
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-4 rounded-[3px] border border-rule p-4">
+    <form onSubmit={submit} noValidate className="space-y-4 rounded-lg border border-rule p-4">
       <div className="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)_12rem]">
         <Field label="Account code" error={fields.code}>
           {(p) => <Input {...p} value={code} onChange={(e) => setCode(e.target.value)} placeholder="6150" autoFocus />}

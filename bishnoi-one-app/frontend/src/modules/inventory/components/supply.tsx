@@ -1,6 +1,6 @@
 "use client";
 
-import { Checkbox } from "antd";
+import { Checkbox } from "@/src/platform/ui/compat";
 import { FileText, Trash2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";

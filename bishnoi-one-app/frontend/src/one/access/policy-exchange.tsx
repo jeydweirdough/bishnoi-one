@@ -16,7 +16,7 @@ function download(name: string, data: unknown) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-const area = "w-full rounded-lg border border-rule bg-white p-3 text-sm";
+const area = "w-full rounded-lg border border-rule bg-card p-3 text-sm";
 export function PolicyExchange({ context, initialHistory }: { context: PolicyContext; initialHistory: PolicyVersion[] }) {
   const router = useRouter();
   const [requirements, setRequirements] = useState("");

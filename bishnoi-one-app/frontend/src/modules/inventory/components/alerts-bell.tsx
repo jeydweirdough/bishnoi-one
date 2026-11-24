@@ -3,7 +3,7 @@
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Popover } from "antd";
+import { Popover } from "@/src/platform/ui/compat";
 import { useState } from "react";
 import type { Alert } from "@/src/modules/inventory/lib/types";
 import { AlertList } from "@/src/modules/inventory/components/alerts";

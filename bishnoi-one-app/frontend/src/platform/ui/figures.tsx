@@ -11,8 +11,8 @@ import { Bone } from "./skeleton";
 export type Tone = "good" | "warn" | "bad" | "plain" | "ink";
 
 const TONES: Record<Tone, string> = {
-  good: "bg-[#e6f2e1] text-[#3f6f35]",
-  warn: "bg-[#fbf0d9] text-[#8a5a00]",
+  good: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  warn: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   bad: "bg-danger-tint text-danger",
   plain: "bg-bench text-ink-3",
   ink: "border border-ink bg-sheet text-ink",
@@ -55,7 +55,7 @@ export type Figure = {
 
 function Linked({ href, className, children }: { href?: string; className: string; children: ReactNode }) {
   return href ? (
-    <Link href={href} className={`${className} transition-colors hover:border-ink`}>
+    <Link href={href} className={`${className} transition-colors hover:bg-muted/40`}>
       {children}
     </Link>
   ) : (
@@ -66,11 +66,11 @@ function Linked({ href, className, children }: { href?: string; className: strin
 /** One figure in a card: the number large, then what it is, then how it compares. */
 export function FigureCard({ figure: f, first = false }: { figure: Figure; first?: boolean }) {
   return (
-    <Linked href={f.href} className={`block rounded-xl bg-sheet px-5 py-4 ${first ? "border-[1.5px] border-ink" : "border border-rule"}`}>
+    <Linked href={f.href} className="block rounded-xl bg-card px-5 py-4 ring-1 ring-foreground/10">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-[1.875rem] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums"><Amount text={f.value} /></p>
-          <p className="mt-1 text-sm font-medium text-ink">{f.label}</p>
+          <p className="text-sm text-muted-foreground">{f.label}</p>
+          <p className="mt-1 truncate text-2xl leading-tight font-semibold tabular-nums"><Amount text={f.value} /></p>
           {f.pill && (
             <Pill tone={f.pill.tone} className="mt-1.5">
               {f.pill.text}
@@ -79,7 +79,7 @@ export function FigureCard({ figure: f, first = false }: { figure: Figure; first
         </div>
         {f.ring !== undefined && f.ring !== null && <Ring pct={f.ring} />}
       </div>
-      <p className={`mt-1 text-meta ${f.alert ? "font-semibold text-due-today" : "text-ink-3"}`}><Amounts text={f.note} /></p>
+      <p className={`mt-1 text-meta ${f.alert ? "font-semibold text-due-today" : "text-muted-foreground"}`}><Amounts text={f.note} /></p>
     </Linked>
   );
 }
@@ -87,9 +87,9 @@ export function FigureCard({ figure: f, first = false }: { figure: Figure; first
 /** The same card while its number is on the way: what it counts now, the number when it lands. */
 export function FigureCardLoading({ label, first = false }: { label: string; first?: boolean }) {
   return (
-    <div className={`block rounded-xl bg-sheet px-5 py-4 ${first ? "border-[1.5px] border-ink" : "border border-rule"}`}>
+    <div className="block rounded-xl bg-card px-5 py-4 ring-1 ring-foreground/10">
+      <p className="text-sm text-muted-foreground">{label}</p>
       <Bone className="my-1.5 h-7 w-28" />
-      <p className="mt-1 text-sm font-medium text-ink">{label}</p>
       <Bone className="mt-2 h-3 w-36" />
     </div>
   );
@@ -98,7 +98,7 @@ export function FigureCardLoading({ label, first = false }: { label: string; fir
 /** A smaller figure, as a tile among others (under a lead figure, in a grid of counts). */
 export function Tile({ figure: f }: { figure: Figure }) {
   return (
-    <Linked href={f.href} className={`block min-w-0 rounded-lg border bg-sheet px-4 py-3 ${f.alert ? "border-[#f0c9c6]" : "border-rule"}`}>
+    <Linked href={f.href} className={`block min-w-0 rounded-xl bg-card px-4 py-3 ring-1 ${f.alert ? "ring-destructive/40" : "ring-foreground/10"}`}>
       <span className={`block truncate text-[1.375rem] leading-tight font-semibold tabular-nums ${f.alert ? "text-danger" : "text-ink"}`}><Amount text={f.value} /></span>
       <span className="mt-1 block text-sm font-medium text-ink">{f.label}</span>
       <span className="mt-0.5 block text-meta text-ink-3">
@@ -163,7 +163,7 @@ export function TrendCard({ icon, tint, label, value, now, before, since, upIsGo
         {loading ? <Bone className="h-8 w-20" /> : <span className="text-[1.875rem] leading-none font-semibold tracking-[-0.02em] text-ink tabular-nums">{value}</span>}
         {c && !loading && (
           <span className="shrink-0 text-right">
-            <span className={`block text-meta font-semibold ${good === null ? "text-ink-3" : good ? "text-[#3f6f35]" : "text-danger"}`}>
+            <span className={`block text-meta font-semibold ${good === null ? "text-ink-3" : good ? "text-emerald-700 dark:text-emerald-400" : "text-danger"}`}>
               {c.pct === null ? "New" : c.pct === 0 ? "No change" : `${c.up ? "▲" : "▼"} ${Math.abs(c.pct)}%`}
             </span>
             <span className="block text-meta text-ink-3">{since}</span>

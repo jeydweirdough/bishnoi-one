@@ -1,3 +1,4 @@
+import { Select } from "@/src/platform/ui/pickers";
 import { hasTotals, totalsOf } from "./totals";
 import Link from "next/link";
 import { ReportChartView } from "./chart";
@@ -144,7 +145,7 @@ export async function ReportView({
       </div>
 
       {(data.dated || filters.length > 0) && (
-        <section className="rounded-xl border border-rule bg-white px-5 py-4 print:hidden">
+        <section className="rounded-xl border border-rule bg-card px-5 py-4 print:hidden">
           {data.dated && (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-meta font-medium text-ink-2">Period</span>
@@ -155,7 +156,7 @@ export async function ReportView({
                     key={p.label}
                     href={withQuery(base, { ...kept, from: p.from, to: p.to })}
                     aria-current={on ? "true" : undefined}
-                    className={`rounded-full border px-3 py-1 text-meta ${on ? "border-ink bg-ink text-white" : "border-rule text-ink-2 hover:border-ink hover:text-ink"}`}
+                    className={`rounded-full border px-3 py-1 text-meta ${on ? "border-ink bg-primary text-primary-foreground" : "border-rule text-ink-2 hover:border-ink hover:text-ink"}`}
                   >
                     {p.label}
                   </Link>
@@ -173,7 +174,7 @@ export async function ReportView({
                     type="date"
                     name="from"
                     defaultValue={search.from || data.from}
-                    className="h-9 rounded-lg border border-rule bg-white px-2.5 text-sm"
+                    className="h-9 rounded-lg border border-rule bg-card px-2.5 text-sm"
                   />
                 </label>
                 <label className="block">
@@ -183,7 +184,7 @@ export async function ReportView({
                     type="date"
                     name="to"
                     defaultValue={search.to || data.to}
-                    className="h-9 rounded-lg border border-rule bg-white px-2.5 text-sm"
+                    className="h-9 rounded-lg border border-rule bg-card px-2.5 text-sm"
                   />
                 </label>
               </>
@@ -191,17 +192,17 @@ export async function ReportView({
             {filters.map((f) => (
               <label key={f.key} className="block">
                 <span className="mb-1 block text-meta font-medium text-ink-2">{f.label}</span>
-                <select suppressHydrationWarning name={f.key} defaultValue={search[f.key] ?? ""} className="h-9 min-w-40 rounded-lg border border-rule bg-white px-2.5 text-sm">
+                <Select name={f.key} defaultValue={search[f.key] ?? ""} className="min-w-40">
                   {f.options.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             ))}
             {savedReport && <input type="hidden" name="saved" value={savedReport.id} />}
-            <button suppressHydrationWarning type="submit" className="h-9 rounded-lg bg-ink px-4 text-sm font-medium text-white hover:bg-ink/90">
+            <button suppressHydrationWarning type="submit" className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
               Apply
             </button>
             {Object.values({ ...kept, from: search.from, to: search.to }).some(Boolean) && (
@@ -216,9 +217,9 @@ export async function ReportView({
       {effective.summary && effective.summary.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {effective.summary.map((f) => (
-            <div key={f.label} className="rounded-xl border border-rule bg-white px-4 py-3">
+            <div key={f.label} className="rounded-xl border border-rule bg-card px-4 py-3">
               <p className="text-meta text-ink-3">{f.label}</p>
-              <p className={`mt-1 text-xl font-semibold tabular-nums ${f.tone === "bad" ? "text-danger" : f.tone === "warn" ? "text-[#8a5a00]" : f.tone === "good" ? "text-sage-deep" : "text-ink"}`}>
+              <p className={`mt-1 text-xl font-semibold tabular-nums ${f.tone === "bad" ? "text-danger" : f.tone === "warn" ? "text-amber-700 dark:text-amber-400" : f.tone === "good" ? "text-sage-deep" : "text-ink"}`}>
                 {f.value === null ? "—" : show(f.kind, f.value)}
               </p>
             </div>
@@ -227,7 +228,7 @@ export async function ReportView({
       )}
 
       {chart && chartCols.length > 0 && (
-        <section className="rounded-xl border border-rule bg-white px-5 py-4">
+        <section className="rounded-xl border border-rule bg-card px-5 py-4">
           <ReportChartView
             kind={chart.kind}
             labels={chartCols.map((c) => c.label)}
@@ -241,9 +242,9 @@ export async function ReportView({
         </section>
       )}
 
-      <section className="overflow-hidden rounded-xl border border-rule bg-white shadow-sm">
+      <section className="overflow-hidden rounded-xl border border-rule bg-card shadow-sm">
         {/* Zoho-style formal Report Header */}
-        <div className="border-b border-rule bg-white px-6 py-4 text-center">
+        <div className="border-b border-rule bg-card px-6 py-4 text-center">
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">{companyName}</p>
           <h2 className="mt-0.5 text-lg font-bold text-ink">{effective.title}</h2>
           {data.dated && data.from && data.to && (

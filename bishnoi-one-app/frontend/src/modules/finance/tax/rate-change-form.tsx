@@ -59,7 +59,7 @@ export function RateChangeForm({ codes, today }: { codes: TaxCode[]; today: stri
         e.preventDefault();
         submit();
       }}
-      className="space-y-4 rounded-[3px] border border-rule p-4"
+      className="space-y-4 rounded-lg border border-rule p-4"
     >
       <p className="text-sm text-ink-2">
         For a change in the law. Sales before the day you give keep the old rate; sales from that day on get the new one.

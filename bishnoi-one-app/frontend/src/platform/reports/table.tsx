@@ -68,8 +68,8 @@ export function ReportTable({ title, columns, rows, totals, canExport, doc }: { 
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 print:hidden">
         <label className="relative block w-full max-w-xs">
           <span className="sr-only">Search the rows</span>
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
-          <input suppressHydrationWarning type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the rows" className="h-9 w-full rounded-lg border border-rule bg-white pr-3 pl-9 text-sm outline-none focus:border-ink" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <input suppressHydrationWarning type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the rows" className="block h-8 w-full rounded-lg border border-input bg-transparent pr-2.5 pl-8 text-sm placeholder:text-muted-foreground transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none" />
         </label>
         <div className="flex items-center gap-2">
           <span className="text-meta text-ink-3">
@@ -89,7 +89,7 @@ export function ReportTable({ title, columns, rows, totals, canExport, doc }: { 
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm" style={{ minWidth: `${Math.max(36, columns.length * 8)}rem` }}>
-          <thead className="sticky top-0 bg-white">
+          <thead className="sticky top-0 bg-card">
             <tr className="border-y border-rule text-left text-meta text-ink-3">
               {columns.map((c, i) => {
                 const on = sort?.i === i;
@@ -144,7 +144,7 @@ export function ReportTable({ title, columns, rows, totals, canExport, doc }: { 
         </table>
       </div>
       {/* Zoho-style Total Count & record summary footer */}
-      <div className="flex items-center justify-between border-t border-rule bg-white px-5 py-3 text-meta text-ink-3">
+      <div className="flex items-center justify-between border-t border-rule bg-card px-5 py-3 text-meta text-ink-3">
         <span>Total Count: <strong className="font-semibold text-ink tabular-nums">{shown.length}</strong></span>
         <span>{shown.length === rows.length ? `All ${rows.length} records shown` : `Showing ${shown.length} of ${rows.length} records`}</span>
       </div>

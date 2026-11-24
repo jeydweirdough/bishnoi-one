@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, FileText, LocateFixed, ShieldCheck, X } from "lucide-react";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { useCallback, useEffect, useState } from "react";
 import { Button, TextButton } from "@/src/platform/ui/button";
 import { Input } from "@/src/platform/ui/field";
@@ -85,7 +85,7 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
           ))}
         </ul>
         {/* Their quotation, with prices, at this link: ready now, or once it's reviewed (decided 2026-10-26). */}
-        <a href={`/crm/order/${company}/${token}/quotation`} className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[9px] bg-ink px-5 text-sm font-semibold text-white hover:bg-ink/85">
+        <a href={`/crm/order/${company}/${token}/quotation`} className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[9px] bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-ink/85">
           <FileText className="size-4" aria-hidden />
           {placed.waitsForApproval ? "Follow your quotation" : "View your quotation"}
         </a>
@@ -228,10 +228,10 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
               <span
                 aria-current={i === at ? "step" : undefined}
                 className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ${
-                  i === at ? "bg-ink font-semibold text-white" : i < at ? "bg-mint-2 font-medium text-sage-deep" : "bg-bench text-ink-3"
+                  i === at ? "bg-primary font-semibold text-primary-foreground" : i < at ? "bg-mint-2 font-medium text-sage-deep" : "bg-bench text-ink-3"
                 }`}
               >
-                <span className={`grid size-5 place-items-center rounded-full text-[11px] font-semibold ${i === at ? "bg-white text-ink" : i < at ? "bg-sage-deep text-white" : "bg-white text-ink-3"}`}>
+                <span className={`grid size-5 place-items-center rounded-full text-[11px] font-semibold ${i === at ? "bg-card text-ink" : i < at ? "bg-sage-deep text-white" : "bg-card text-ink-3"}`}>
                   {i < at ? <Check className="size-3" aria-hidden /> : i + 1}
                 </span>
                 {st.label}
@@ -251,7 +251,7 @@ export function OrderLinkForm({ company, orgName, token, medicines, rep, asksWho
             onPick={onPick}
             extra={
               rxNames.length > 0 && (
-                <p className="flex items-start gap-2 rounded-lg bg-[#fdf3e1] px-3 py-2 text-meta text-ink">
+                <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-meta text-ink">
                   <FileText className="mt-0.5 size-4 shrink-0 text-due-today" aria-hidden />
                   <span>
                     <b>{rxNames.join(", ")}</b> {rxNames.length === 1 ? "needs" : "need"} a prescription. You&apos;ll attach it in the next steps.

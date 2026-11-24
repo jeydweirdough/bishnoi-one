@@ -388,7 +388,7 @@ export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: s
       </PageHeader>
 
       {v.status === "returned" && lastReturn && (
-        <p className="mb-4 rounded-[3px] bg-due-today/10 px-4 py-2 text-sm">
+        <p className="mb-4 rounded-lg bg-due-today/10 px-4 py-2 text-sm">
           <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
         </p>
       )}
@@ -436,7 +436,7 @@ export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: s
         </p>
         <ol className="space-y-4">
           {v.lines.map((l) => (
-            <li key={l.id} className="grid gap-4 rounded-[3px] border border-rule p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <li key={l.id} className="grid gap-4 rounded-lg border border-rule p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <div className="min-w-0">
                 <p className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                   <span className="text-sm font-semibold">
@@ -459,7 +459,7 @@ export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: s
                 />
               </div>
               <div className="min-w-0 space-y-2">
-                {l.file ? <ReceiptPreview voucherId={v.id} lineId={l.id} file={l.file} /> : <p className="rounded-[3px] bg-due-today/10 px-3 py-4 text-sm text-due-today">Receipt missing: no photo or PDF attached yet.</p>}
+                {l.file ? <ReceiptPreview voucherId={v.id} lineId={l.id} file={l.file} /> : <p className="rounded-lg bg-due-today/10 px-3 py-4 text-sm text-due-today">Receipt missing: no photo or PDF attached yet.</p>}
                 {v.canEdit && <ReceiptSlot voucherId={v.id} lineId={l.id} position={l.position} file={l.file} />}
               </div>
             </li>
@@ -523,14 +523,14 @@ export async function PrintPettyCashPage({ params }: { params: Promise<{ id: str
           Print it, or choose &quot;Save as PDF&quot; in the print window. Every attached receipt prints after the voucher.
         </PageHeader>
         {v.missingReceipts > 0 && (
-          <p className="mb-4 rounded-[3px] bg-due-today/10 px-4 py-2 text-sm">
+          <p className="mb-4 rounded-lg bg-due-today/10 px-4 py-2 text-sm">
             {v.missingReceipts === 1 ? "1 receipt isn't" : `${v.missingReceipts} receipts aren't`} attached yet, so {v.missingReceipts === 1 ? "it won't" : "they won't"} print.
           </p>
         )}
       </div>
       <Sheet className="relative px-8 py-7 print:border-0 print:shadow-none">
         {v.status !== "posted" && (
-          <p className="mb-4 rounded-[3px] bg-danger-tint px-3 py-2 text-sm font-semibold text-danger">
+          <p className="mb-4 rounded-lg bg-danger-tint px-3 py-2 text-sm font-semibold text-danger">
             {v.status === "void" ? `Void${v.voidReason ? `: ${v.voidReason}` : ""}. Not in the books.` : `${v.statusLabel}: not posted yet.`}
           </p>
         )}

@@ -10,7 +10,7 @@ import { Icon, type IconName } from "@/src/modules/inventory/platform/ui/icons";
 /** The panel: the record's left column beside its facts. Without `side`, the facts take the width. */
 export function DetailPanel({ side, children }: { side?: ReactNode; children: ReactNode }) {
   return (
-    <div className={`mt-5 grid gap-4 rounded-xl border border-rule bg-[#f4f4f1] p-3 sm:p-4 ${side ? "lg:grid-cols-[19rem_minmax(0,1fr)]" : ""}`}>
+    <div className={`mt-5 grid gap-4 rounded-xl border border-rule bg-muted p-3 sm:p-4 ${side ? "lg:grid-cols-[19rem_minmax(0,1fr)]" : ""}`}>
       {side && <div className="min-w-0 space-y-4">{side}</div>}
       <div className="min-w-0 space-y-4">{children}</div>
     </div>

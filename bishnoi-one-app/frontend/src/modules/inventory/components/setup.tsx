@@ -46,7 +46,7 @@ export function NeedsFirst({
           {missing.map((m, i) => (
             <li key={m.need} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rule px-4 py-3">
               <span className="flex items-center gap-3">
-                <span className={`grid size-7 place-items-center rounded-full text-meta font-semibold ${i === 0 ? "bg-ink text-white" : "border border-rule-strong text-ink-3"}`}>{i + 1}</span>
+                <span className={`grid size-7 place-items-center rounded-full text-meta font-semibold ${i === 0 ? "bg-primary text-primary-foreground" : "border border-rule-strong text-ink-3"}`}>{i + 1}</span>
                 <span>
                   <span className="block text-sm font-semibold text-ink">{m.step.title}</span>
                   <span className="block text-meta text-ink-3">{m.step.why}</span>

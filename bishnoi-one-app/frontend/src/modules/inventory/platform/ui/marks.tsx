@@ -5,8 +5,8 @@ import type { CustomerStatus, Quote } from "@/src/modules/inventory/platform/lib
 // sage = active, grey = inactive.
 const statusStyle: Record<CustomerStatus, string> = {
   lead: "border border-dashed border-ink-2 text-ink-2",
-  active: "border border-transparent bg-[#e6f2e1] text-[#3f6f35]",
-  inactive: "border border-transparent bg-[#f0f0ee] text-ink-3",
+  active: "border border-transparent bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  inactive: "border border-transparent bg-muted text-ink-3",
 };
 
 export function StatusMark({ status }: { status: CustomerStatus }) {
@@ -25,7 +25,7 @@ export function StatusMark({ status }: { status: CustomerStatus }) {
 export function QuoteStateMark({ state }: { state: Quote["state"] }) {
   if (state === "rejected") return <Flag letter="!">{QUOTE_STATES.rejected}</Flag>;
   if (state === "ready") {
-    return <span className="inline-flex h-6 items-center rounded-md bg-[#e6f2e1] px-2.5 text-meta font-medium whitespace-nowrap text-[#3f6f35]">{QUOTE_STATES.ready}</span>;
+    return <span className="inline-flex h-6 items-center rounded-md bg-emerald-500/10 px-2.5 text-meta font-medium whitespace-nowrap text-emerald-700 dark:text-emerald-400">{QUOTE_STATES.ready}</span>;
   }
   return (
     <span className="inline-flex h-6 shrink-0 items-center rounded-md border border-dashed border-ink-2 px-2.5 text-meta font-medium whitespace-nowrap text-ink-2">

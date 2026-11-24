@@ -5,7 +5,7 @@ import type { CustomerStatus, Quote } from "@/src/modules/finance/platform/lib/t
 // solid = active, outlined = inactive.
 const statusStyle: Record<CustomerStatus, string> = {
   lead: "border border-dashed border-ink-2 text-ink-2",
-  active: "border border-ink bg-ink text-white",
+  active: "border border-ink bg-primary text-primary-foreground",
   inactive: "border border-rule-strong text-ink-3",
 };
 

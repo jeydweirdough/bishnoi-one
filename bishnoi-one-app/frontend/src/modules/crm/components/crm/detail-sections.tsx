@@ -1,6 +1,6 @@
 "use client";
 
-import { Collapse } from "antd";
+import { Collapse } from "@/src/platform/ui/compat";
 import { useState, type ReactNode } from "react";
 
 export type DetailSection = { title: string; items: [string, ReactNode][] };

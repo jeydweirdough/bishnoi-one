@@ -47,7 +47,7 @@ export function ApproveSeveral() {
   }
 
   return (
-    <form ref={form} id={BULK_FORM} onSubmit={(e) => (e.preventDefault(), send())} className="mb-3 flex flex-wrap items-center gap-2 rounded-[3px] border border-rule bg-sheet px-4 py-2.5">
+    <form ref={form} id={BULK_FORM} onSubmit={(e) => (e.preventDefault(), send())} className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 px-4 py-2.5">
       <span className="text-meta text-ink-2">Tick the entries to approve, or</span>
       <Button type="button" size="sm" variant="quiet" onClick={all}>
         Select all shown

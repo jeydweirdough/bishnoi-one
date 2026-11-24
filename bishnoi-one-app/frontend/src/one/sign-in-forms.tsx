@@ -19,7 +19,7 @@ export function ForgotForm({ email: first }: { email: string }) {
   const [busy, start] = useTransition();
   if (sent) {
     return (
-      <div className="mt-8 space-y-4 text-center text-sm text-ink-2">
+      <div className="space-y-4 text-center text-sm text-muted-foreground">
         <p>
           If <strong className="text-ink">{email}</strong> has a Bishnoi One account, a link to choose a new password is on its way. It works for an hour.
         </p>
@@ -32,7 +32,7 @@ export function ForgotForm({ email: first }: { email: string }) {
   }
   return (
     <form
-      className="mt-8 space-y-5"
+      className="flex flex-col gap-4"
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
@@ -66,7 +66,7 @@ function NewPassword({ save, label, done }: { save: (password: string) => Promis
   const [busy, start] = useTransition();
   return (
     <form
-      className="mt-8 space-y-5"
+      className="flex flex-col gap-4"
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
@@ -96,7 +96,7 @@ export function LinkPasswordForm({ token, email, invite }: { token: string; emai
   const [done, setDone] = useState(false);
   if (done) {
     return (
-      <div className="mt-8 space-y-4 text-center text-sm text-ink-2">
+      <div className="space-y-4 text-center text-sm text-muted-foreground">
         <p>Your password is set. Sign in with {email} and your new password.</p>
         <Button variant="primary" size="lg" className="w-full justify-center" onClick={() => window.location.assign(`/login?email=${encodeURIComponent(email)}`)}>
           Sign in
@@ -113,7 +113,7 @@ export function FirstPasswordForm({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState<string>();
   return (
     <>
-      <div className="mt-8">
+      <div>
         <Field label="The password you were given">
           {(p) => <PasswordInput {...p} value={given} onChange={(e) => (setGiven(e.target.value), setError(undefined))} autoComplete="current-password" autoFocus />}
         </Field>
@@ -207,7 +207,7 @@ export function TwoStepSetup({ onDone, compact = false }: { onDone: () => void; 
     >
       <p className="text-sm text-ink-2">1. In the app, add an account and scan this code.</p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={started.qr} alt="QR code to add Bishnoi One to your authenticator app" className="mx-auto size-48 rounded-lg border border-rule bg-white p-1" />
+      <img src={started.qr} alt="QR code to add Bishnoi One to your authenticator app" className="mx-auto size-48 rounded-lg border border-rule bg-card p-1" />
       <p className="text-meta text-ink-3">
         Can&apos;t scan? Enter this key in the app instead: <span className="font-mono break-all text-ink">{started.secret.replace(/(.{4})/g, "$1 ").trim()}</span>
       </p>

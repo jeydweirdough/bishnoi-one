@@ -1,6 +1,6 @@
 "use client";
 
-import { Dropdown } from "antd";
+import { Dropdown } from "@/src/platform/ui/compat";
 import { ChevronDown } from "lucide-react";
 import { useOptimistic, useTransition } from "react";
 import { toast } from "sonner";

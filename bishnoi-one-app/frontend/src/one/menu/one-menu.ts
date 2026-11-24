@@ -137,9 +137,6 @@ export function buildMenu(me: Account): OneMenu {
       { href: "/finance/bir/sales-dat", label: "BIR files (DAT)", icon: "letters", show: may("finance", "bir.prepare") },
       { href: "/finance/bir/readiness", label: "BIR readiness", icon: "lists", show: may("finance", "bir.view") },
       { href: "/finance/calendar", label: "Signing calendar", icon: "calendar", show: may("finance", "calendar.use") },
-      { href: "/finance/petty-cash/imported", label: "Imported expenses", icon: "lists", show: may("finance", "petty_cash.view") },
-      { href: "/finance/import-review", label: "Import review", icon: "lists", show: may("finance", "integrations.manage") },
-      { href: "/finance/import-matching", label: "Import matching", icon: "lists", show: may("finance", "imports.propose", "imports.confirm", "imports.confirm_tax", "imports.run") },
     ]),
     group("Pharmacy", "prescriptions", [
       { href: "/pharmacy", label: "Pharmacy overview", icon: "overview", exact: true, show: may("pharmacy", "dashboard.view") },

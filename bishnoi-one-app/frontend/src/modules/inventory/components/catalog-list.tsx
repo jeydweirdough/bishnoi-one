@@ -3,7 +3,8 @@
 import { Ellipsis, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Dropdown, Modal, type MenuProps } from "antd";
+import { Dropdown, type MenuProps } from "@/src/platform/ui/compat";
+import { Modal } from "@/src/platform/ui/modal";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/src/modules/inventory/platform/ui/button";

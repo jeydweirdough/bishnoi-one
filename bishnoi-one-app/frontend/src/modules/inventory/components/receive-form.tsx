@@ -14,7 +14,7 @@ import { QuickAdd, WithAdd, type Added, type CanAdd } from "@/src/modules/invent
 
 type Row = { productId: string; orderLineId: string | null; quantity: string; cost: string; batchNo: string; manufacturedOn: string; expiresOn: string; serials: string; outstanding: number | null };
 
-const cell = "h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-hema focus:outline-none";
+const cell = "h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm hover:border-control focus:border-ring focus:outline-none";
 
 /**
  * Taking a delivery in. Against a purchase order, its outstanding lines are

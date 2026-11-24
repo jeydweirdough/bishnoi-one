@@ -6,9 +6,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Optional second local Finance site uses a separate dev lock and build cache.
   ...(process.env.FINANCE_OFFICIAL_PREVIEW === "1" ? { distDir: ".next-finance-official" } : {}),
-  logging: {
-    incomingRequests: { ignore: [/\/finance\/integrations\/zoho\/callback/] },
-  },
   // Everything this app uses is inside this folder. Saying so keeps Next from
   // guessing a root further up the repo.
   turbopack: {
@@ -38,6 +35,8 @@ const nextConfig: NextConfig = {
     authInterrupts: true,
     // A receipt or a guarantee letter goes up through a server action; the default (1 MB) is less than a phone photo.
     serverActions: { bodySizeLimit: "4.5mb" },
+    // A build on a small machine (a laptop with little memory free): NEXT_BUILD_CPUS=2 npm run build. Unset, Next decides.
+    ...(process.env.NEXT_BUILD_CPUS ? { cpus: Number(process.env.NEXT_BUILD_CPUS) } : {}),
   },
 };
 

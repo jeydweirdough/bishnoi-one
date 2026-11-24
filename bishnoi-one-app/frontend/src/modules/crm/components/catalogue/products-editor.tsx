@@ -13,7 +13,7 @@ import type { CatalogueProduct, FormFieldDef, FormLayout, Org, SalesRules, Stock
 import { ChoiceSelect, LayoutForm, extraChanges, toDraft, type ExtraDraft } from "@/src/modules/crm/components/extra/extra-fields";
 import { extraText } from "@/src/modules/crm/components/extra/extra-values";
 import { deleteProduct, proposePrices, saveProduct, type ProductInput } from "@/src/modules/crm/actions/catalogue";
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { StockBadge, StockWhere } from "@/src/modules/crm/components/catalogue/stock";
 
 type PriceType = SalesRules["priceTypes"][number];
@@ -120,7 +120,7 @@ export function ProductsEditor({
                       {p.name}
                       {!p.isActive && <span className="ml-2 rounded-md bg-bench px-2 py-0.5 text-meta">Off</span>}
                       {p.cpr?.state === "expired" && <span className="ml-2 rounded-md bg-danger/10 px-2 py-0.5 text-meta font-normal text-danger" title={`Valid until ${p.cpr.validUntil}: it shouldn't be sold until renewed`}>CPR expired</span>}
-                      {p.cpr?.state === "expiring" && <span className="ml-2 rounded-md bg-[#fff4e0] px-2 py-0.5 text-meta font-normal text-[#8a5a00]" title={`Valid until ${p.cpr.validUntil}`}>CPR expiring</span>}
+                      {p.cpr?.state === "expiring" && <span className="ml-2 rounded-md bg-amber-500/10 px-2 py-0.5 text-meta font-normal text-amber-700 dark:text-amber-400" title={`Valid until ${p.cpr.validUntil}`}>CPR expiring</span>}
                     </p>
                     <p className="text-meta text-ink-3">{[p.code, p.genericName, p.strength, p.form, p.cpr ? `CPR ${p.cpr.number}` : null].filter(Boolean).join(" · ")}</p>
                   </td>
@@ -148,7 +148,7 @@ export function ProductsEditor({
                     <td key={t.code} className="px-3 py-2.5 text-right tabular-nums">
                       {p.prices[t.code] !== undefined ? fmt.peso(p.prices[t.code]) : <span className="text-danger">Not set</span>}
                       {p.priceApprovals?.[t.code]?.status === "pending" && (
-                        <span className="block text-meta font-normal text-[#8a5a00]" title="Waiting for Finance's approval; salespeople don't see it yet">
+                        <span className="block text-meta font-normal text-amber-700 dark:text-amber-400" title="Waiting for Finance's approval; salespeople don't see it yet">
                           For approval
                         </span>
                       )}

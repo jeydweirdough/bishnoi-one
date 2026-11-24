@@ -45,7 +45,7 @@ export default async function ProductsCprPage() {
         )}
       </PageHeader>
 
-      <section aria-labelledby="fda" className="rounded-2xl border border-rule bg-white">
+      <section aria-labelledby="fda" className="rounded-2xl border border-rule bg-card">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule px-5 py-3">
           <h2 id="fda" className="text-base font-semibold text-ink">FDA inspection</h2>
           <p className="text-meta text-ink-3">

@@ -23,7 +23,7 @@ const withQuery = (path: string, query: URLSearchParams) => (query.size ? `${pat
 
 const JOURNAL_SIZES = [10, 25, 50, 100];
 
-const inputClass = "ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm";
+const inputClass = "ml-2 h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm";
 
 /** Every entry, newest first, with its lines: manual journals and those the fund steps post. */
 export default async function JournalPage({ searchParams }: { searchParams: Search }) {
@@ -98,7 +98,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
             key={f.value}
             href={filterHref(f)}
             aria-current={current === f.value ? "page" : undefined}
-            className={`rounded-[3px] border px-3 py-1 text-meta ${current === f.value ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
+            className={`rounded-lg border px-3 py-1 text-meta ${current === f.value ? "border-hema bg-hema-tint font-semibold text-hema" : "border-rule-strong text-ink-2 hover:border-control"}`}
           >
             {f.label}
           </Link>
@@ -273,13 +273,13 @@ export async function AccountPage({ params, searchParams }: { params: Promise<{ 
       <form className="mb-4 flex flex-wrap items-end gap-3" action={`/finance/ledger/accounts/${a.id}`}>
         <label className="text-meta text-ink-2">
           From
-          <input suppressHydrationWarning type="date" name="from" defaultValue={from} className="ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning type="date" name="from" defaultValue={from} className="ml-2 h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm" />
         </label>
         <label className="text-meta text-ink-2">
           To
-          <input suppressHydrationWarning type="date" name="to" defaultValue={to} className="ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning type="date" name="to" defaultValue={to} className="ml-2 h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm" />
         </label>
-        <button suppressHydrationWarning type="submit" className="h-8 rounded-[3px] border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control">
+        <button suppressHydrationWarning type="submit" className="h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control">
           Show
         </button>
       </form>

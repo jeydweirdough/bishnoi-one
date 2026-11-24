@@ -95,7 +95,7 @@ export function Scanner({ onCode, busy = false, label = "Scan or type a code", a
         }}
         className="flex flex-wrap items-center gap-2"
       >
-        <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-rule-strong bg-white px-3 focus-within:border-hema">
+        <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-rule-strong bg-card px-3 focus-within:border-hema">
           <ScanLine className="size-5 shrink-0 text-ink-3" aria-hidden />
           <span className="sr-only">{label}</span>
           <input

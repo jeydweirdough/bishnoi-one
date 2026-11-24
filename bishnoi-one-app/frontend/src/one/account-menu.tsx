@@ -60,7 +60,7 @@ export function AccountMenu({ id, name, email, companies, links = [], compact = 
         )}
       </button>
       {open && (
-        <div role="menu" className="absolute top-12 right-0 z-50 w-72 rounded-2xl border border-rule bg-white p-2 shadow-[0_12px_32px_rgba(20,20,20,0.12)]">
+        <div role="menu" className="absolute top-12 right-0 z-50 w-72 rounded-2xl border border-rule bg-card p-2 shadow-[0_12px_32px_rgba(20,20,20,0.12)]">
           <div className="px-2.5 py-2">
             <p className="truncate text-sm font-medium text-ink">{name}</p>
             <p className="truncate text-meta text-ink-3">{email}</p>

@@ -166,7 +166,7 @@ export function LetterheadForm({ company }: { company: CompanyProfile }) {
         <div className="flex flex-wrap items-center gap-3">
           {shown ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={shown} alt="Company logo" className="h-14 max-w-48 rounded border border-rule bg-white object-contain p-1" />
+            <img src={shown} alt="Company logo" className="h-14 max-w-48 rounded border border-rule bg-card object-contain p-1" />
           ) : (
             <span className="text-meta text-ink-3">No logo yet</span>
           )}

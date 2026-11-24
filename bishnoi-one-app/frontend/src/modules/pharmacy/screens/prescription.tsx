@@ -72,13 +72,13 @@ export default async function PrescriptionPage({ params }: { params: Promise<{ i
       </PageHeader>
 
       {rx.status === "needs_clarification" && rx.verificationNotes && (
-        <div role="note" className="mb-4 rounded-[3px] border border-eosin/40 bg-sheet px-4 py-3">
+        <div role="note" className="mb-4 rounded-lg border border-eosin/40 bg-sheet px-4 py-3">
           <Flag letter="?">Needs clarification</Flag>
           <p className="mt-1 text-sm text-ink">{rx.verificationNotes}</p>
         </div>
       )}
       {rx.status === "rejected" && rx.verificationNotes && (
-        <div role="note" className="mb-4 rounded-[3px] border border-rule-strong bg-sheet px-4 py-3 text-sm">
+        <div role="note" className="mb-4 rounded-lg border border-rule-strong bg-sheet px-4 py-3 text-sm">
           <span className="font-semibold">Rejected:</span> {rx.verificationNotes}
         </div>
       )}

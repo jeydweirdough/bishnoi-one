@@ -301,7 +301,7 @@ function MonthButton({ k, status, current, onClick }: { k: number; status?: Any;
       type="button"
       onClick={onClick}
       aria-pressed={current}
-      className={`flex min-w-36 flex-col items-start rounded-[3px] border px-3 py-2 text-left ${current ? "border-hema bg-hema-tint" : "border-rule-strong bg-sheet hover:border-control"}`}
+      className={`flex min-w-36 flex-col items-start rounded-lg border px-3 py-2 text-left ${current ? "border-hema bg-hema-tint" : "border-rule-strong bg-sheet hover:border-control"}`}
     >
       <span className="text-sm font-semibold">{monthName(k)}</span>
       <span className={`text-meta ${tone}`}>{text}</span>

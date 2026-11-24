@@ -73,7 +73,7 @@ export function Welcome({
   return (
     <section aria-label="Welcome" className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl bg-gradient-to-r from-mint to-mint-2/60 px-5 py-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-sage-deep shadow-[0_1px_2px_rgba(20,20,20,0.06)]">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-card text-sage-deep shadow-[0_1px_2px_rgba(20,20,20,0.06)]">
           <Sparkles className="size-5" aria-hidden />
         </span>
         <div className="min-w-0">
@@ -95,7 +95,7 @@ export function Welcome({
           {team ? `${team} focus` : "Today's focus"}
         </span>
         {focus.map((f) => (
-          <span key={f} className="rounded-full bg-white px-3 py-1 text-meta font-medium text-ink shadow-[0_1px_2px_rgba(20,20,20,0.05)]">
+          <span key={f} className="rounded-full bg-card px-3 py-1 text-meta font-medium text-ink shadow-[0_1px_2px_rgba(20,20,20,0.05)]">
             {f}
           </span>
         ))}

@@ -20,9 +20,12 @@ export async function AccessFrame({ current, children }: { current: "people" | "
   const data = await loadAccess();
   return (
     <>
-      <PageHeader title={current === "people" ? "Employees" : current === "bin" ? "Recycle bin" : "Roles"} crumbs={current === "bin" ? [{ href: "/platform/roles/people", label: "Employees" }] : undefined} actions={current === "roles" && data ? <div className="flex flex-wrap items-center gap-2"><LinkButton href="/platform/roles/policy">AI-assisted import / export</LinkButton><div id={ROLE_ACTIONS} className="flex flex-wrap items-center gap-2" /></div> : undefined}>
+      {/* Employees is a card with its own heading (Studio Admin's Users); the others keep the page heading. */}
+      {current !== "people" && (
+        <PageHeader title={current === "bin" ? "Recycle bin" : "Roles and permissions"} crumbs={current === "bin" ? [{ href: "/platform/roles/people", label: "Employees" }] : undefined} actions={current === "roles" && data ? <div className="flex flex-wrap items-center gap-2"><LinkButton href="/platform/roles/policy">AI-assisted import / export</LinkButton><div id={ROLE_ACTIONS} className="flex flex-wrap items-center gap-2" /></div> : undefined}>
         {data ? INTRO[current] : null}
-      </PageHeader>
+        </PageHeader>
+      )}
       {data ? (
         children
       ) : (

@@ -26,10 +26,10 @@ export default async function Home({ searchParams }: { searchParams: Search }) {
 
   return (
     <OneFrame>
-      <h1 className="text-[2rem] leading-tight font-semibold tracking-[-0.02em] text-ink">Welcome, {first}</h1>
+      <h1 className="text-3xl tracking-tight">Hello, {first}</h1>
       {me.company && (
-        <p className="mt-1.5 text-sm text-ink-2">
-          Working in <span className="font-medium text-ink">{me.company.name}</span>.
+        <p className="mt-1 text-sm text-muted-foreground">
+          Working in <span className="font-medium text-foreground">{me.company.name}</span>.
         </p>
       )}
 
@@ -40,25 +40,25 @@ export default async function Home({ searchParams }: { searchParams: Search }) {
       )}
 
       {groups.length === 0 ? (
-        <div className="mt-10 rounded-2xl border border-rule bg-white px-6 py-12 text-center">
-          <p className="text-base font-semibold text-ink">Nothing to open yet</p>
-          <p className="mx-auto mt-1.5 max-w-md text-sm text-ink-2">Your account hasn&apos;t been given any work yet. Ask your company&apos;s administrator for the access you need.</p>
+        <div className="mt-10 rounded-xl bg-card px-6 py-12 text-center ring-1 ring-foreground/10">
+          <p className="text-base font-medium">Nothing to open yet</p>
+          <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">Your account hasn&apos;t been given any work yet. Ask your company&apos;s administrator for the access you need.</p>
         </div>
       ) : (
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {groups.map((g) => (
-            <li key={g.label} className="rounded-2xl border border-rule bg-white p-5">
-              <p className="flex items-center gap-2.5 text-base font-semibold text-ink">
-                <span className="grid size-9 place-items-center rounded-xl bg-mint-2 text-sage-deep">
+            <li key={g.label} className="flex flex-col gap-3 rounded-xl bg-card py-4 text-card-foreground ring-1 ring-foreground/10">
+              <p className="flex items-center gap-2.5 border-b px-4 pb-3 font-medium">
+                <span className="grid size-8 place-items-center rounded-lg bg-muted text-foreground">
                   <Icon name={g.icon} className="size-4" />
                 </span>
                 {g.label}
               </p>
-              <ul className="mt-3 space-y-0.5">
+              <ul className="space-y-0.5 px-2">
                 {g.steps.map((st) => (
                   <li key={st.href}>
-                    <Link href={st.href} className="flex min-h-9 items-center gap-2.5 rounded-lg px-2 text-sm text-ink-2 hover:bg-bench hover:text-ink">
-                      <Icon name={st.icon} className="size-4 shrink-0 text-ink-3" />
+                    <Link href={st.href} className="flex min-h-8 items-center gap-2.5 rounded-md px-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+                      <Icon name={st.icon} className="size-4 shrink-0" />
                       <span className="truncate">{st.label}</span>
                     </Link>
                   </li>

@@ -1,6 +1,7 @@
 "use client";
 
-import { Dropdown, Modal } from "antd";
+import { Dropdown } from "@/src/platform/ui/compat";
+import { Modal } from "@/src/platform/ui/modal";
 import { Bookmark, MoreHorizontal, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -30,7 +31,7 @@ function Tab({ href, current, children }: { href: string; current: boolean; chil
       scroll={false}
       aria-current={current ? "page" : undefined}
       className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-meta transition-colors ${
-        current ? "border-ink bg-ink font-semibold text-white" : "border-rule-strong bg-sheet text-ink-2 hover:border-ink hover:text-ink"
+        current ? "border-ink bg-primary font-semibold text-primary-foreground" : "border-rule-strong bg-sheet text-ink-2 hover:border-ink hover:text-ink"
       }`}
     >
       {children}

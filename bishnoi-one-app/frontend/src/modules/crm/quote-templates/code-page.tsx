@@ -20,7 +20,7 @@ export function CodeQuotation({ html, title }: { html: string; title: string }) 
         if (body) setHeight(Math.max(body.scrollHeight, 400));
       }}
       style={{ height }}
-      className="mx-auto my-8 block w-full max-w-[210mm] bg-white shadow-sm"
+      className="mx-auto my-8 block w-full max-w-[210mm] bg-card shadow-sm"
     />
   );
 }

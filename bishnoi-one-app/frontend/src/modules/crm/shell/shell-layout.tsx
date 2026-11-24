@@ -1,8 +1,8 @@
+import { AppShell } from "@/src/platform/shell/app-shell";
 import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { Notices } from "@/src/platform/app/notices";
 import { getMe } from "@/src/platform/lib/api";
-import { NavProgress } from "@/src/platform/shell/nav-progress";
 import { LinkButton } from "@/src/platform/ui/ant-button";
 import { Sheet } from "@/src/platform/ui/sheet";
 import { Nav, type Unset, type Waiting } from "./nav";
@@ -10,7 +10,6 @@ import { OneActions } from "@/src/one/one-actions";
 import { getAccount } from "@/src/platform/lib/account";
 import { myModules } from "@/src/one/mine";
 import { TopActions, type Notification } from "./top-actions";
-import { CrumbsSlot } from "@/src/platform/shell/crumbs";
 
 // The CRM's frame inside the one app (decided 2026-10-23): its sidebar, its own
 // actions at the top (search, bell, your CRM pages), then the page. The one
@@ -48,20 +47,11 @@ export async function ShellLayout({ children, waiting, unset, notifications, all
   return (
     <>
       {/* Says at once that a link was clicked; the sidebar stays, the page loads beside it. */}
-      <Suspense fallback={null}>
-        <NavProgress />
-      </Suspense>
-      <div className="group/shell lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
-        <Nav me={me} mine={mine} waiting={waiting} unset={unset} rail={rail} actions={actions} />
-        <main className="min-w-0 px-4 pt-4 pb-12 sm:px-6 lg:px-8 lg:pt-4">
-          <header className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem] mb-4 hidden items-center gap-3 lg:flex"><CrumbsSlot />{actions}</header>
-          <div className="mx-auto max-w-[70rem] lg:group-has-[aside[data-rail=true]]/shell:max-w-[88rem]">
+      <AppShell nav={<Nav me={me} mine={mine} waiting={waiting} unset={unset} rail={rail} actions={actions} />} actions={actions}>
             {/* Announcements from Bishnoi One Platform (kept in Discord), for the CRM and for everyone. */}
             <Notices timeZone={me.org?.timezone} />
             {stranded ? <NoCompany /> : children}
-          </div>
-        </main>
-      </div>
+          </AppShell>
     </>
   );
 }

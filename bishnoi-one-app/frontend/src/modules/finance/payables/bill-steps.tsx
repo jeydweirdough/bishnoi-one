@@ -35,7 +35,7 @@ export function BillSteps({ bill }: { bill: Bill }) {
 
   if (returning) {
     return (
-      <div className="w-full space-y-3 rounded-[3px] border border-danger/40 bg-danger-tint/40 p-4">
+      <div className="w-full space-y-3 rounded-lg border border-danger/40 bg-danger-tint/40 p-4">
         <p className="text-sm">Return bill {bill.no} to whoever submitted it? They&apos;re told why, correct it and submit it again; it goes to approval from the start.</p>
         <Field label="What needs correcting" error={error ?? undefined}>
           {(p) => <Input {...p} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="Wrong withholding code" autoFocus />}
@@ -128,7 +128,7 @@ export function VoidBill({ id, label }: { id: string; label: string }) {
   const [pending, start] = useTransition();
   if (!open) return <Button onClick={() => setOpen(true)}>Void</Button>;
   return (
-    <div className="w-full space-y-3 rounded-[3px] border border-danger/40 bg-danger-tint/40 p-4">
+    <div className="w-full space-y-3 rounded-lg border border-danger/40 bg-danger-tint/40 p-4">
       <p className="text-sm">Void {label}? Its entry is reversed in the books today. The bill stays, marked void; enter it again if it needs correcting.</p>
       <Field label="Reason for voiding" error={error ?? undefined}>
         {(p) => <Input {...p} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="Wrong amount" />}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "antd";
+import { Modal } from "@/src/platform/ui/modal";
 import { ArrowRight, Building2, CornerDownLeft, FileText, Handshake, Package, Plus, Search, UserRound, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -18,6 +18,8 @@ import { Amount } from "@/src/platform/ui/amount";
 // see; the actions are the ones their role allows.
 
 const OPEN_EVENT = "bishnoi:command-menu";
+/** The one search at the top left (src/platform/shell/search-menu.tsx) asks first; on CRM pages this menu answers. */
+const SEARCH_EVENT = "bishnoi:search";
 /** Shown per kind under All; a scope tab shows up to what the API sends (12). */
 const PER_GROUP = 4;
 
@@ -30,7 +32,7 @@ export function CommandMenuButton() {
       <button suppressHydrationWarning
         type="button"
         onClick={ask}
-        className="hidden h-10 items-center gap-2 rounded-[11px] border border-rule bg-bench pr-2 pl-3 text-meta text-ink-3 transition-colors hover:border-[#c9c9c5] hover:bg-sheet hover:text-ink md:inline-flex"
+        className="hidden h-10 items-center gap-2 rounded-[11px] border border-rule bg-bench pr-2 pl-3 text-meta text-ink-3 transition-colors hover:border-input hover:bg-sheet hover:text-ink md:inline-flex"
         aria-keyshortcuts="Control+K"
       >
         <Search className="size-4" aria-hidden />
@@ -84,7 +86,7 @@ function Marked({ text, q }: { text: string; q: string }) {
   return (
     <>
       {text.slice(0, at)}
-      <mark className="rounded-[3px] bg-[#f6e7a8] px-px text-inherit">{text.slice(at, at + q.length)}</mark>
+      <mark className="rounded-lg bg-[#f6e7a8] px-px text-inherit">{text.slice(at, at + q.length)}</mark>
       {text.slice(at + q.length)}
     </>
   );
@@ -114,21 +116,25 @@ export function CommandMenu({ actions }: { actions: MenuAction[] }) {
 
   // Ctrl+K / ⌘K anywhere; "/" when not typing in a field.
   useEffect(() => {
+    // Ctrl+K / Ctrl+J come through the one search (SEARCH_EVENT); "/" is the CRM's own.
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        setOpen((o) => !o);
-      } else if (e.key === "/" && !open && !typingIn(e.target)) {
+      if (e.key === "/" && !open && !typingIn(e.target)) {
         e.preventDefault();
         setOpen(true);
       }
     };
     const onAsk = () => setOpen(true);
+    const onSearch = (e: Event) => {
+      e.preventDefault();
+      setOpen((o) => !o);
+    };
     window.addEventListener("keydown", onKey);
     window.addEventListener(OPEN_EVENT, onAsk);
+    window.addEventListener(SEARCH_EVENT, onSearch);
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener(OPEN_EVENT, onAsk);
+      window.removeEventListener(SEARCH_EVENT, onSearch);
     };
   }, [open]);
 
@@ -267,7 +273,7 @@ export function CommandMenu({ actions }: { actions: MenuAction[] }) {
                 aria-selected={on}
                 onClick={() => setScope(s.key)}
                 className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[9px] border px-3 text-[0.78125rem] font-medium whitespace-nowrap transition-colors ${
-                  on ? "border-ink bg-ink text-white" : "border-rule bg-sheet text-ink-2 hover:border-[#c9c9c5] hover:text-ink"
+                  on ? "border-ink bg-primary text-primary-foreground" : "border-rule bg-sheet text-ink-2 hover:border-input hover:text-ink"
                 }`}
               >
                 {Icon && <Icon className="size-3.5" aria-hidden />}

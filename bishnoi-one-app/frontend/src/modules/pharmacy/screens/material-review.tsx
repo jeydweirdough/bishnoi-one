@@ -40,7 +40,7 @@ export default async function MaterialReviewPage({ params }: { params: Promise<{
       </PageHeader>
 
       {r.status !== "waiting" && r.comments && (
-        <div role="note" className="mb-4 rounded-[3px] border border-rule-strong bg-sheet px-4 py-3 text-sm">
+        <div role="note" className="mb-4 rounded-lg border border-rule-strong bg-sheet px-4 py-3 text-sm">
           <span className="font-semibold">Comments:</span> {r.comments}
         </div>
       )}
@@ -58,7 +58,7 @@ export default async function MaterialReviewPage({ params }: { params: Promise<{
             >
               Design
             </SectionTitle>
-            <div className="mt-3 overflow-hidden rounded-[3px] border border-rule bg-bench/40">
+            <div className="mt-3 overflow-hidden rounded-lg border border-rule bg-bench/40">
               {picture ? (
                 // eslint-disable-next-line @next/next/no-img-element -- the design as sent, through this app's own route
                 <img src={file} alt={`Design of ${r.title}, version ${r.version}`} className="mx-auto max-h-[70vh] w-auto" />

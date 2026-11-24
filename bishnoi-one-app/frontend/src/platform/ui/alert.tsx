@@ -14,9 +14,9 @@ import type { ReactNode } from "react";
 export type Tone = "info" | "ok" | "warn" | "bad";
 
 const TONE: Record<Tone, { icon: typeof Info; ring: string; text: string; fill: string; strip: string }> = {
-  info: { icon: Info, ring: "bg-[#e9f0fb] text-[#1f4f8a]", text: "text-[#1f4f8a]", fill: "border-[#d5e2f5] bg-[#f4f8fd]", strip: "bg-[#e9f0fb] text-[#1f4f8a]" },
-  ok: { icon: CircleCheck, ring: "bg-[#e6f2e1] text-[#3f6f35]", text: "text-[#3f6f35]", fill: "border-[#d3e6cd] bg-[#f1f7ee]", strip: "bg-[#e6f2e1] text-[#3f6f35]" },
-  warn: { icon: TriangleAlert, ring: "bg-[#fbf0d9] text-[#8a5a00]", text: "text-[#8a5a00]", fill: "border-[#f1e0b8] bg-[#fdf8ec]", strip: "bg-[#fbf0d9] text-[#8a5a00]" },
+  info: { icon: Info, ring: "bg-blue-500/10 text-blue-700 dark:text-blue-400", text: "text-blue-700 dark:text-blue-400", fill: "border-[#d5e2f5] bg-[#f4f8fd]", strip: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
+  ok: { icon: CircleCheck, ring: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400", text: "text-emerald-700 dark:text-emerald-400", fill: "border-[#d3e6cd] bg-emerald-500/10", strip: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
+  warn: { icon: TriangleAlert, ring: "bg-amber-500/10 text-amber-700 dark:text-amber-400", text: "text-amber-700 dark:text-amber-400", fill: "border-[#f1e0b8] bg-[#fdf8ec]", strip: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
   bad: { icon: CircleAlert, ring: "bg-danger-tint text-danger", text: "text-danger", fill: "border-[#f5cdc8] bg-[#fef4f3]", strip: "bg-danger-tint text-danger" },
 };
 
@@ -53,7 +53,7 @@ export function Alert({
         <div className="ml-auto flex shrink-0 items-start gap-1.5">
           {actions}
           {onClose && (
-            <button suppressHydrationWarning type="button" onClick={onClose} aria-label="Dismiss" className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-[#f4f4f2] hover:text-ink">
+            <button suppressHydrationWarning type="button" onClick={onClose} aria-label="Dismiss" className="grid size-7 place-items-center rounded-md text-ink-3 hover:bg-muted hover:text-ink">
               <X className="size-4" aria-hidden />
             </button>
           )}
