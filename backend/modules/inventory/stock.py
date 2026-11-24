@@ -190,7 +190,7 @@ def serials_arrive(db: Session, product: Product, serials: list[str], location: 
 def balance(db: Session, product_id: str, location: Location, batch_id: str | None) -> Stock:
     q = select(Stock).where(Stock.product_id == product_id, Stock.location_id == location.id)
     q = q.where(Stock.batch_id.is_(None) if batch_id is None else Stock.batch_id == batch_id)
-    row = db.scalar(q.with_for_update())
+    row = db.scalar(q.with_for_update(of=Stock))  # only the balance: PostgreSQL refuses to lock the joined product's optional category, brand, vendor
     if row is None:
         row = Stock(product_id=product_id, warehouse_id=location.warehouse_id, location_id=location.id, batch_id=batch_id, on_hand=0, damaged=0)
         db.add(row)
