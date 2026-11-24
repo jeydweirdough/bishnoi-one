@@ -23,7 +23,8 @@ from modules.finance.payables import origin_by_name, work_out
 ACTOR = "Bishnoi One"
 
 
-def vendor_for(db: Session, data: dict) -> Supplier:
+def vendor_for(db: Session, data: dict, why: str | None = None) -> Supplier:
+    """Finance's supplier for an Inventory vendor: the same TIN, else the same name, else added from the vendor (one list, never typed twice)."""
     v = data.get("supplier") or {}
     tin = "".join(ch for ch in str(v.get("tin") or "") if ch.isdigit())
     if len(tin) >= 9:
@@ -36,10 +37,10 @@ def vendor_for(db: Session, data: dict) -> Supplier:
     if found is not None:
         return found
     s = Supplier(name=name, origin=origin_by_name(name), tin=f"{tin[:3]}-{tin[3:6]}-{tin[6:9]}" if len(tin) >= 9 else None, email=v.get("email"), created_by=ACTOR,
-                 notes=f"Added from Inventory's consignment settlement {data.get('number')} (vendor {v.get('code')}).")
+                 notes=why or f"Added from Inventory's consignment settlement {data.get('number')} (vendor {v.get('code')}).")
     db.add(s)
     db.flush()
-    audit(db, ACTOR, "supplier.created", target=s.name, target_type="supplier", target_id=s.id, fields=["from a consignment settlement"])
+    audit(db, ACTOR, "supplier.created", target=s.name, target_type="supplier", target_id=s.id, fields=["from Inventory's vendor"])
     return s
 
 
@@ -74,5 +75,5 @@ def from_settlement(db: Session, data: dict, slug: str | None) -> Bill | None:
     b.net_centavos, b.vat_centavos, b.withheld_centavos, b.total_centavos, b.payable_centavos = w.net, w.vat, w.withheld, w.total, w.payable
     db.add(b)
     db.flush()
-    audit(db, ACTOR, "bill.created", target=f"{vendor.name} {number}", target_type="bill", target_id=b.id, fields=["from a consignment settlement"])
+    audit(db, ACTOR, "bill.created", target=f"{vendor.name} {number}", target_type="bill", target_id=b.id, fields=["from Inventory's vendor"])
     return b

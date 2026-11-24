@@ -168,7 +168,20 @@ def receive(db,data,slug):
         raise HTTPException(409,'This handoff ID already belongs to another receipt.')
     item=PurchaseIntake(company='2mg',receipt_id=body.receiptId,handoff_id=body.handoffId,
         digest=digest(snapshot),snapshot=snapshot)
-    db.add(item);db.flush();reply(db,item)
+    db.add(item);db.flush();link_vendor(db,item);reply(db,item)
+
+
+def link_vendor(db,item):
+    """The Inventory vendor is Finance's supplier: linked by TIN or name, or added from the vendor, so nobody types it
+    again (owner, 2026-11-24). An administrator can still change the link on the received purchase."""
+    key=('2mg',item.snapshot['supplierId'])
+    if db.get(PurchaseSupplierLink,key) or company_scope.configured(db,'supplier'):return  # 2MG's books: a person confirms it
+    from modules.finance.consignment_bills import vendor_for
+    s=vendor_for(db,{'supplier':{'name':item.snapshot['supplierName'],'tin':item.snapshot.get('supplierTin')}},
+        why=f"Added from Inventory's vendor on receipt {item.snapshot['receiptNumber']}.")
+    if not s.is_active:return
+    db.add(PurchaseSupplierLink(company=key[0],source_supplier_id=key[1],supplier_id=s.id,reviewed_by='Inventory',
+        evidence='Same vendor in Inventory (matched by TIN or name, or added from it).'));db.flush()
 
 
 def linked(db,bill_id):
