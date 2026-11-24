@@ -304,6 +304,11 @@ export async function BillPage({ params, searchParams }: { params: Promise<{ id:
                 Pay this bill
               </LinkButton>
             )}
+            {b.status === "recorded" && b.withheldCentavos > 0 && (
+              <LinkButton href={`/finance/bir/withholding/draft?form=2307&billId=${enc(b.id)}`}>
+                Download 2307 PDF
+              </LinkButton>
+            )}
             {b.canVoid && <VoidBill id={b.id} label={`Bill ${b.no}`} />}
           </>
         }

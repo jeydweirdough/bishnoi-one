@@ -42,7 +42,7 @@ def tin9(value: str | None) -> str:
 
 def branch4(value: str | None) -> str:
     digits = re.sub(r"\D", "", str(value or ""))
-    return (digits[:4] or "0000").zfill(4)
+    return (digits[-4:] or "0000").zfill(4)
 
 
 def split_addr(address: str | None) -> tuple[str, str]:
@@ -135,35 +135,37 @@ def build_slp_dat(taxpayer: dict, end: date, data: dict) -> tuple[str, str]:
     return "\r\n".join(lines) + "\r\n", filename
 
 
-def build_sawt_dat(taxpayer: dict, end: date, data: dict) -> tuple[str, str]:
+def build_sawt_dat(taxpayer: dict, end: date, data: dict, *, form: str = "1702Q") -> tuple[str, str]:
+    if form not in ("1702Q", "2550Q"):
+        raise ValueError(f"Unsupported SAWT form: {form}")
     seller, reg, _, _, _, rdo = _header_names(taxpayer)
     br = branch4(taxpayer.get("branchCode"))
     period_mm_yyyy = end.strftime("%m/%Y")
     t = data["totals"]
     lines = [
-        ",".join(["HSAWT", "H1702Q", seller, br, qq(reg), qq(""), qq(""), qq(""), period_mm_yyyy, rdo]),
+        ",".join(["HSAWT", f"H{form}", seller, br, qq(reg), qq(""), qq(""), qq(""), period_mm_yyyy, rdo]),
     ]
     for idx, r in enumerate(data["rows"], start=1):
         pt = tin9(r.get("tin"))
         pbr = branch4(None)
         rate_pct = f"{(r.get('rateBp') or 0) / 100:.2f}"
         lines.append(",".join([
-            "DSAWT", "D1702Q", str(idx), pt, pbr, qq(clean_name(r.get("payor"))), qq(""), qq(""), qq(""),
+            "DSAWT", f"D{form}", str(idx), pt, pbr, qq(clean_name(r.get("payor"))), qq(""), qq(""), qq(""),
             period_mm_yyyy, qq(""), clean_text(r.get("atc") or ""), rate_pct,
             amt_h(r.get("incomePaymentCentavos")), amt_h(r.get("withheldCentavos")),
         ]))
     lines.append(",".join([
-        "CSAWT", "C1702Q", seller, br, period_mm_yyyy,
+        "CSAWT", f"C{form}", seller, br, period_mm_yyyy,
         amt_h(t.get("incomePaymentCentavos")), amt_h(t.get("withheldCentavos")),
     ]))
-    filename = f"{seller}{br}{end:%m%Y}1702Q.DAT"
+    filename = f"{seller}{br}{end:%m%Y}{form}.DAT"
     return "\r\n".join(lines) + "\r\n", filename
 
 
 def build_qap_dat(taxpayer: dict, end: date, data: dict) -> tuple[str, str]:
     seller, reg, _, _, _, rdo = _header_names(taxpayer)
     br = branch4(taxpayer.get("branchCode"))
-    period_str = end.strftime("%m/%d/%Y")
+    period_str = end.strftime("%m/%Y")
     t = data["totals"]
     lines = [
         ",".join(["H1601EQ", seller, br, qq(reg), period_str, rdo]),
@@ -185,8 +187,10 @@ def build_qap_dat(taxpayer: dict, end: date, data: dict) -> tuple[str, str]:
     return "\r\n".join(lines) + "\r\n", filename
 
 
-def build_list_dat(which: str, taxpayer: dict, end: date, data: dict) -> tuple[str, str]:
-    builders = {"sls": build_sls_dat, "slp": build_slp_dat, "sawt": build_sawt_dat, "qap": build_qap_dat}
+def build_list_dat(which: str, taxpayer: dict, end: date, data: dict, *, sawt_form: str = "1702Q") -> tuple[str, str]:
+    if which == "sawt":
+        return build_sawt_dat(taxpayer, end, data, form=sawt_form)
+    builders = {"sls": build_sls_dat, "slp": build_slp_dat, "qap": build_qap_dat}
     if which not in builders:
         raise ValueError(f"Unsupported DAT list: {which}")
     return builders[which](taxpayer, end, data)

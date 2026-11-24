@@ -11,7 +11,7 @@ from modules.finance.models import Account
 from .test_invoices import issued, ready
 from .test_payables_asof import ago, posted_bill
 from .test_concurrent_saves import app  # noqa: F401 (the SQLite / PostgreSQL fixture)
-from .test_tax_api import ana, client  # noqa: F401 (fixtures)
+from .test_tax_api import ana, ben, client  # noqa: F401 (fixtures)
 from .test_vouchers import prepare, step, team  # noqa: F401 (fixtures)
 
 TODAY = date.today()
@@ -99,4 +99,42 @@ def test_secondary_trade_receivable_and_oojeema_closing_are_tracked(client, app,
     ov = checks["output_vat"]
     assert ov["booksCentavos"] == 20_000 and ov["closingCentavos"] == -30_000 and ov["beforeClosingCentavos"] == 50_000
     assert any(o["source"] == "oojeema_closing" for o in ov["otherSources"])
+
+
+def test_tamp_audit_flags_unwithheld_local_supplier_and_skips_foreign(client, ana, ben):  # noqa: F811 (fixtures)
+    from .test_payables import account, cleared, supplier
+
+    ready(client, ana)
+    local_unwithheld = supplier(client, ben, name="Local Utility Exempt", tin="111-222-333")
+    local_wc850 = supplier(client, ben, name="Pharma Partner", tin="222-333-444", withholding="WC850")
+    foreign_sup = supplier(client, ben, name="Global Pharma Ltd.", tin="", withholding=None)
+    exp = account(client, ben, "6100")
+
+    def post_one(sup_id, number, withholding, no_reason):
+        r = client.post(
+            "/finance/bills",
+            json={
+                "supplierId": sup_id,
+                "billNumber": number,
+                "billDate": TODAY.isoformat(),
+                "amountsIncludeVat": True,
+                "taxReviewed": True,
+                "lines": [{"accountId": exp, "amountCentavos": 1_120_000, "vat": "vat", "withholding": withholding, "noWithholdingReason": no_reason, "purchaseType": "services"}],
+            },
+            headers=ben,
+        )
+        assert r.status_code == 201, r.text
+        return cleared(client, ana, ben, r.json())
+
+    post_one(local_unwithheld["id"], "SI-UNW-1", None, "exempt_charge")
+    post_one(local_wc850["id"], "SI-WC850-1", "WC850", None)
+    post_one(foreign_sup["id"], "SI-FOR-1", None, None)
+
+    res = client.get(f"/finance/bir/readiness?start={ago(30)}&end={TODAY.isoformat()}", headers=ana)
+    assert res.status_code == 200, res.text
+    tamp = res.json()["tampAudit"]
+    assert tamp["status"] == "review"
+    assert tamp["unwithheldCount"] == 1
+    assert tamp["unwithheldTotalCentavos"] == 1_000_000
+    assert [s["name"] for s in tamp["suppliers"]] == ["Local Utility Exempt"]
 

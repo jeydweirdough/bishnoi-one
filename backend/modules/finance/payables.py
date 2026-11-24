@@ -24,6 +24,7 @@ from modules.finance.tax.packs.ph import VAT
 
 # code: (what it's for, rate in basis points: 100 = 1%)
 WITHHOLDING: dict[str, tuple[str, int]] = {
+    "WC850": ("Direct pharma goods supplier / e-marketplace (0.5%)", 50),
     "WC158": ("Goods, from a company (top withholding agent)", 100),
     "WI158": ("Goods, from an individual (top withholding agent)", 100),
     "WC160": ("Services, from a company (top withholding agent)", 200),
@@ -57,7 +58,13 @@ def origin_by_name(name: str) -> str:
 
 # Why a local supplier's line has no withholding (Batch A, 2026-11-05): every such line says so, so a missing
 # withholding never looks the same as "not needed". Foreign is filled in by itself; "other" needs a note.
-NO_WITHHOLDING = {"foreign": "Foreign supplier", "not_covered": "Payee not covered or exempt", "other": "Other (see note)"}
+NO_WITHHOLDING = {
+    "foreign": "Foreign supplier",
+    "not_covered": "Payee not covered or exempt",
+    "government": "Government / statutory fee",
+    "exempt_charge": "Not qualified / exempt charge",
+    "other": "Other (see note)",
+}
 
 
 def withholding_decision(origin: str | None, code: str | None, reason: str | None, note: str | None, *, complete: bool) -> tuple[str | None, str | None, str | None]:

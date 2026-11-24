@@ -82,7 +82,7 @@ function DatesForm({ action, start, end, keep }: { action: string; start: string
   );
 }
 
-function QuarterForm({ action, year, quarter, keep }: { action: string; year: number; quarter: number; keep?: Record<string, string> }) {
+function QuarterForm({ action, year, quarter, keep, children }: { action: string; year: number; quarter: number; keep?: Record<string, string>; children?: ReactNode }) {
   const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
   return (
     <form className="flex flex-wrap items-end gap-3" action={action}>
@@ -109,6 +109,7 @@ function QuarterForm({ action, year, quarter, keep }: { action: string; year: nu
           ))}
         </Select>
       </label>
+      {children}
       <button suppressHydrationWarning type="submit" className={buttonClass}>
         Show
       </button>
@@ -618,14 +619,25 @@ const LIST_EMPTY = {
   qap: ["No tax withheld from suppliers this quarter", "Bills with an ATC (expanded withholding) appear here."],
 } as const;
 
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export async function BirListsPage({ searchParams }: { searchParams: Search }) {
   const me = await getCompanyMe();
   const fmt = makeFormat(me.org);
   const sp = await searchParams;
   const which = (["sls", "slp", "sawt", "qap"] as const).find((k) => k === one(sp.list)) ?? "sls";
-  const path = `/finance/bir/lists/${which}${quarterQuery(sp)}`;
+  const sawtForm = which === "sawt" ? ((["all", "1702Q", "2550Q"] as const).find((f) => f === one(sp.form)) ?? "all") : "all";
+  const apiQ = new URLSearchParams();
+  if (/^\d{4}$/.test(one(sp.year))) apiQ.set("year", one(sp.year));
+  if (/^[1-4]$/.test(one(sp.quarter))) apiQ.set("quarter", one(sp.quarter));
+  if (/^(?:[1-9]|1[0-2])$/.test(one(sp.month))) apiQ.set("month", one(sp.month));
+  if (which === "sawt" && sawtForm !== "all") apiQ.set("form", sawtForm);
+  const path = `/finance/bir/lists/${which}${apiQ.size ? `?${apiQ}` : ""}`;
   const data = await load<SummaryList>(path);
   const keep = `year=${data.year}&quarter=${data.quarter}`;
+  const qStartMonth = (data.quarter - 1) * 3 + 1;
+  const quarterMonths = [0, 1, 2].map((i) => ({ month: qStartMonth + i, label: MONTHS_SHORT[qStartMonth + i - 1] }));
+  const datBase = `/finance/bir/lists/${which}?year=${data.year}&quarter=${data.quarter}${which === "sawt" && sawtForm !== "all" ? `&form=${sawtForm}` : ""}`;
   const sls = which === "sls";
   const n = (v: unknown) => (typeof v === "number" ? v : 0);
   return (
@@ -647,8 +659,30 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
         />
       </div>
       <Toolbar file={download(path)} datFile={download(`${path}${path.includes("?") ? "&" : "?"}format=dat`)}>
-        <QuarterForm action="/finance/bir/lists" year={data.year} quarter={data.quarter} keep={{ list: which }} />
+        <QuarterForm action="/finance/bir/lists" year={data.year} quarter={data.quarter} keep={{ list: which }}>
+          {which === "sawt" && (
+            <label className="text-meta text-ink-2">
+              Tax form
+              <Select name="form" defaultValue={sawtForm} className={inputClass}>
+                <option value="all">All (1702Q &amp; 2550Q)</option>
+                <option value="1702Q">1702Q (1–2% CWT)</option>
+                <option value="2550Q">2550Q (5% VAT withheld)</option>
+              </Select>
+            </label>
+          )}
+        </QuarterForm>
       </Toolbar>
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-rule bg-sheet px-3 py-2 text-meta print:hidden">
+        <span className="font-semibold text-ink-2">Monthly .DAT (Q{data.quarter} {data.year}):</span>
+        {quarterMonths.map((m) => (
+          <a key={m.month} href={download(`${datBase}&month=${m.month}&format=dat`)} className={buttonClass + " inline-flex items-center"}>
+            {m.label} .DAT
+          </a>
+        ))}
+        {which === "qap" && (
+          <span className="text-ink-3">BIR Alphalist 1601-EQ uses the full quarter .DAT above; monthly .DATs help spot-check one month at a time.</span>
+        )}
+      </div>
       {data.missingTin > 0 && (
         <p className="mb-3 text-meta text-danger">
           {data.missingTin} {data.missingTin === 1 ? "line has" : "lines have"} no TIN. {which === "sls"
@@ -1152,7 +1186,14 @@ type WithholdingReview = {
   missing: { kind: "bill" | "petty_cash"; id: string; label: string; line: number; date: string; centavos: number; href: string }[];
   originNotSet: { id: string; name: string; bills: number }[]; foreignLines: number; importedWithoutWithholding: number;
 };
-type Readiness = { checks: ReadinessCheck[]; counts: Record<"agrees" | "differs" | "not_set", number>; note: string; period: { start: string; end: string; label: string }; withholdingReview?: WithholdingReview };
+type TampAudit = {
+  status: "ok" | "review";
+  unwithheldCount: number;
+  unwithheldTotalCentavos: number;
+  suppliers: { supplierId: string; name: string; tin: string | null; origin: string; netCentavos: number; vatCentavos: number; ewtCentavos: number; purchases: number }[];
+  note: string;
+};
+type Readiness = { checks: ReadinessCheck[]; counts: Record<"agrees" | "differs" | "not_set", number>; note: string; period: { start: string; end: string; label: string }; withholdingReview?: WithholdingReview; tampAudit?: TampAudit };
 const STATUS: Record<ReadinessCheck["status"], { label: string; tone: string }> = {
   agrees: { label: "Agrees with the books", tone: "bg-mint-2 text-sage-deep" },
   differs: { label: "Differs from the books", tone: "bg-due-today/10 text-due-today" },
@@ -1202,6 +1243,7 @@ export async function BirReadinessPage({ searchParams }: { searchParams: Search 
         </tr>)}
       </Table>
       {data.withholdingReview && <WithholdingReviewPanel review={data.withholdingReview} fmt={fmt} />}
+      {data.tampAudit && <TampAuditPanel audit={data.tampAudit} fmt={fmt} />}
       <p className="mt-4 text-meta text-ink-3">{data.note}</p>
     </>
   );
@@ -1235,6 +1277,36 @@ function WithholdingReviewPanel({ review, fmt }: { review: WithholdingReview; fm
       )}
       {review.importedWithoutWithholding > 0 && (
         <p className="mt-3 text-meta text-ink-3">Also: {review.importedWithoutWithholding} imported Zoho expense {review.importedWithoutWithholding === 1 ? "line has" : "lines have"} no withholding. They came in as history, without reasons.</p>
+      )}
+    </section>
+  );
+}
+
+function TampAuditPanel({ audit, fmt }: { audit: TampAudit; fmt: ReturnType<typeof makeFormat> }) {
+  const clean = audit.status === "ok";
+  return (
+    <section className="mt-6 rounded-lg border border-rule bg-sheet p-4" aria-labelledby="tamp-audit">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="tamp-audit" className="text-sm font-semibold">TAMP check: local purchases (SLP) vs. EWT withheld (QAP)</h2>
+        <span className={"inline-block rounded-md px-2 py-1 text-meta font-semibold " + (clean ? "bg-mint-2 text-sage-deep" : "bg-due-today/10 text-due-today")}>
+          {clean ? "All local suppliers have EWT or are foreign" : `${audit.unwithheldCount} local ${audit.unwithheldCount === 1 ? "supplier has" : "suppliers have"} ₱0 EWT`}
+        </span>
+      </div>
+      <p className="mt-1 text-meta text-ink-3">{audit.note}</p>
+      {audit.unwithheldCount > 0 && (
+        <div className="mt-3 text-sm">
+          <p className="font-semibold">
+            {audit.unwithheldCount} {audit.unwithheldCount === 1 ? "local supplier" : "local suppliers"} declared in SLP with ₱0 EWT (total net purchases {fmt.peso(audit.unwithheldTotalCentavos)})
+          </p>
+          <ul className="mt-2 space-y-1 text-meta">
+            {audit.suppliers.map((s) => (
+              <li key={s.supplierId}>
+                <Link href={`/finance/suppliers/${s.supplierId}`} className="text-hema underline">{s.name}</Link>
+                {" "}· {s.tin ? `TIN ${s.tin}` : "No TIN"} · {s.purchases} {s.purchases === 1 ? "purchase" : "purchases"} · net {fmt.peso(s.netCentavos)} · EWT {fmt.peso(s.ewtCentavos)}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );

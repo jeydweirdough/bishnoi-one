@@ -488,10 +488,12 @@ def _clean_tin_parts(raw: str | None) -> tuple[str | None, str]:
     return tin, branch
 
 
-def _pick_withholding_code(base_centavos: int, tax_centavos: int) -> str | None:
+def _pick_withholding_code(base_centavos: int, tax_centavos: int, description: str = "") -> str | None:
     if tax_centavos <= 0 or base_centavos <= 0:
         return None
     bp = round(tax_centavos * 10_000 / base_centavos)
+    if bp <= 75:
+        return "WC850"
     if bp <= 150:
         return "WC158"
     if bp <= 350:
@@ -500,7 +502,7 @@ def _pick_withholding_code(base_centavos: int, tax_centavos: int) -> str | None:
         return "WC100"
     if bp <= 1250:
         return "WC010"
-    return "WC011"
+    return "WC140" if "broker" in (description or "").lower() else "WC011"
 
 
 def _pick_customer_cwt_atc(cwt_centavos: int, settled_centavos: int, inv_total_centavos: int) -> str | None:
@@ -911,7 +913,7 @@ def import_oojeema_operational_records(
         in_vat = abs(parse_centavos(r0[11]))
         ewt = abs(parse_centavos(r0[12]))
         total_base = non_vat + vat_goods + vat_svcs
-        atc = _pick_withholding_code(vat_goods + vat_svcs or total_base, ewt)
+        atc = _pick_withholding_code(vat_goods + vat_svcs or total_base, ewt, r0[4])
         if atc and not is_void:
             counts = supplier_atc_counts.setdefault(sup.id, {})
             counts[atc] = counts.get(atc, 0) + 1

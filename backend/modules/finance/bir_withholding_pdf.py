@@ -33,7 +33,6 @@ def prepare(report:dict)->dict:
     elif form=='1601EQ':
         p=bir.quarter(d['year'],d['quarter'],12)
         if (start,end)!=(p.start,p.end):raise ValueError('Expanded withholding must use the selected calendar quarter.')
-        if len(d['rows'])>6:raise ValueError('More than six ATCs need a reviewed continuation schedule; no rows were omitted.')
     elif (start,end)!=(date(d['year'],1,1),date(d['year'],12,31)):
         raise ValueError('Verify the annual withholding calendar-year source period.')
     rows=d['payees'] if form=='1604E' else d['rows']
@@ -87,6 +86,22 @@ def _identity(c,who,form,page=0):
     _fit(c,who.get('registeredName'),*name,565)
     _fit(c,who.get('address'),*address,550,8)
 
+def _eq_continuation(d):
+    from html import escape
+    styles=getSampleStyleSheet();style=styles['BodyText'];style.fontSize=8;style.leading=10
+    who=d['taxpayer'];tin=re.sub(r'\D','',who.get('tin') or '')
+    tin_label=f"{tin[:3]}-{tin[3:6]}-{tin[6:9]}-{who.get('branchCode') or '00000'}" if len(tin)==9 else 'TIN missing'
+    story=[Paragraph('1601EQ - ATC continuation schedule (draft)',styles['Title']),
+           Paragraph(f"{escape(str(who.get('registeredName') or ''))} · TIN {escape(tin_label)} · {escape(str(d['period'].get('label') or ''))}",style),
+           Paragraph('NOT FOR FILING. Lists all expanded withholding tax ATCs when more than six appear in the quarter. Verify inside eBIRForms before filing.',style),Spacer(1,10)]
+    rows=[['ATC','Nature of income payment','Tax base PHP','Rate','Tax withheld PHP']]
+    for r in d['rows']:
+        rows.append([r['atc'],Paragraph(escape(str(r.get('nature') or '')),style),f"{Decimal(r['baseCentavos'])/100:,.2f}",f"{Decimal(r['rateBp'])/100}%",f"{Decimal(r['taxCentavos'])/100:,.2f}"])
+    total_base=sum(_integer(r['baseCentavos']) for r in d['rows'])
+    rows.append(['TOTAL','',f"{Decimal(total_base)/100:,.2f}",'',f"{Decimal(d['totalCentavos'])/100:,.2f}"])
+    t=Table(rows,colWidths=[55,245,95,50,95],repeatRows=1);t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),HexColor('#E6EEF3')),('VALIGN',(0,0),(-1,-1),'TOP'),('FONTSIZE',(0,0),(-1,-1),8),('ALIGN',(2,1),(-1,-1),'RIGHT'),('LINEBELOW',(0,0),(-1,-1),.3,HexColor('#CAD4DB')),('LINEABOVE',(0,-1),(-1,-1),.8,HexColor('#4A5568')),('FONTNAME',(0,-1),(-1,-1),'Helvetica-Bold'),('TOPPADDING',(0,0),(-1,-1),6),('BOTTOMPADDING',(0,0),(-1,-1),6)]));story.append(t)
+    b=BytesIO();SimpleDocTemplate(b,pagesize=(612,936),leftMargin=36,rightMargin=36).build(story);return PdfReader(BytesIO(b.getvalue()))
+
 def _annual_appendix(d):
     from html import escape
     styles=getSampleStyleSheet();style=styles['BodyText'];style.fontSize=8;style.leading=10
@@ -131,13 +146,15 @@ def render(d:dict)->bytes:
             _boxes(c,str(d['year']),[39.1+i*14.3 for i in range(4)],122.2)
             c.setFont('Helvetica-Bold',10);c.drawCentredString((124.3,168.3,211.3,255.3)[d['quarter']-1],height-123.3,'X')
             c.drawCentredString(413.3 if d['anyTaxesWithheld'] else 456.3,height-123.3,'X')
-            for index,r in enumerate(d['rows']):
+            for index,r in enumerate(d['rows'][:6]):
                 top=310.0+17.44*index
                 _boxes(c,r['atc'],[39.1+i*14.3 for i in range(5)],top)
                 _money(c,r['baseCentavos'],top,base=True)
                 _fit(c,f"{Decimal(r['rateBp'])/100}%",335,top,45,8)
                 _money(c,r['taxCentavos'],top)
             _money(c,d['totalCentavos'],414.7)
+            if len(d['rows'])>6:
+                _fit(c,f"INCLUDES {len(d['rows'])} ATCS - SEE ATTACHED CONTINUATION SCHEDULE",23,20,560,7.5)
             # Remittance deductions and remaining payable remain blank: the report
             # cannot turn calculated monthly tax into evidence of actual payment.
         else:
@@ -151,5 +168,7 @@ def render(d:dict)->bytes:
         c.save();page.merge_page(PdfReader(BytesIO(b.getvalue())).pages[0]);writer.add_page(page)
     if form=='1604E':
         for p in _annual_appendix(d).pages:writer.add_page(p)
+    elif form=='1601EQ' and len(d['rows'])>6:
+        for p in _eq_continuation(d).pages:writer.add_page(p)
     writer.add_metadata({'/Title':form+' review draft - not for filing'})
     out=BytesIO();writer.write(out);return out.getvalue()

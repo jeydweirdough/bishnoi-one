@@ -219,6 +219,11 @@ export async function VoucherPage({ params, searchParams }: { params: Promise<{ 
         actions={
           <>
             {v.canEdit && <LinkButton href={`/finance/vouchers/${v.id}?edit=1`}>Edit</LinkButton>}
+            {v.lines.some((l) => (l.withheldCentavos ?? 0) > 0) && v.status !== "cancelled" && v.status !== "void" && (
+              <LinkButton href={`/finance/bir/withholding/draft?form=2307&voucherId=${enc(v.id)}`}>
+                Download 2307 PDF
+              </LinkButton>
+            )}
             <LinkButton href={`/finance/vouchers/${v.id}/print`} icon={<Printer className="size-4" aria-hidden />}>
               Voucher
             </LinkButton>

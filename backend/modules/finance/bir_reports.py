@@ -27,7 +27,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from modules.finance.models import Account, Bill, CreditNote, ImportedExpense, Invoice, InvoicePayment, JournalEntry, JournalLine, PettyCashLine, PettyCashVoucher, Supplier, TaxProfile, VendorCredit
+from modules.finance.models import Account, Bill, CreditNote, ImportedExpense, Invoice, InvoicePayment, JournalEntry, JournalLine, PaymentVoucher, PettyCashLine, PettyCashVoucher, Supplier, TaxProfile, VendorCredit, VoucherLine
 from modules.finance import payables
 from modules.finance.tax.packs.ph import PERCENTAGE
 from modules.finance.tax.rates import lookup
@@ -382,6 +382,7 @@ def sls(db: Session, p: Period) -> dict:
 
 
 CWT_STATUTORY_BP: dict[str, int] = {
+    "WC850": 50,
     "WC158": 100, "WI158": 100, "WC640": 100,
     "WC160": 200, "WI160": 200, "WC157": 200, "WC120": 200, "WI120": 200,
     "WV010": 500, "WC100": 500, "WI100": 500, "WI010": 500,
@@ -390,8 +391,12 @@ CWT_STATUTORY_BP: dict[str, int] = {
 }
 
 
-def sawt(db: Session, p: Period) -> dict:
-    """Summary Alphalist of Withholding Taxes: tax customers withheld from what they paid us (their Forms 2307), by customer and ATC."""
+def sawt(db: Session, p: Period, form: str = "all") -> dict:
+    """Summary Alphalist of Withholding Taxes: tax customers withheld from what they paid us (their Forms 2307), by customer and ATC.
+
+    `form` separates 2550Q (5% government VAT withholding, `WV*`) from 1702Q (1%/2% creditable income tax withheld)."""
+    if form not in ("all", "1702Q", "2550Q"):
+        raise ValueError(f"Unsupported SAWT form filter: {form}")
     payments = db.scalars(
         select(InvoicePayment).join(Invoice).where(InvoicePayment.removed_at.is_(None), InvoicePayment.cwt_centavos > 0,
                                                    InvoicePayment.paid_on >= p.start, InvoicePayment.paid_on <= p.end)
@@ -399,14 +404,20 @@ def sawt(db: Session, p: Period) -> dict:
     ).all()
     by: dict[tuple, dict] = {}
     for pay in payments:
+        atc = (pay.cwt_atc or "").strip().upper()
+        is_vat_withholding = atc.startswith("WV")
+        if form == "2550Q" and not is_vat_withholding:
+            continue
+        if form == "1702Q" and is_vat_withholding:
+            continue
         inv = pay.invoice
         # The income payment the tax was withheld on: what this payment settled, net of VAT, in the invoice's own proportion.
         settled = pay.amount_centavos + pay.cwt_centavos
         base = round(settled * (inv.total_centavos - inv.tax_centavos) / inv.total_centavos) if inv.total_centavos else settled
-        expected_bp = CWT_STATUTORY_BP.get((pay.cwt_atc or "").strip().upper())
+        expected_bp = CWT_STATUTORY_BP.get(atc)
         if expected_bp and base > 0:
             raw_bp = round(pay.cwt_centavos * 10_000 / base)
-            if raw_bp != expected_bp and (raw_bp not in (50, 100, 200, 500, 1000, 1500) or (pay.cwt_atc or "").upper() == "WV010"):
+            if raw_bp != expected_bp and (raw_bp not in (50, 100, 200, 500, 1000, 1500) or atc == "WV010"):
                 base = round(pay.cwt_centavos * 10_000 / expected_bp)
         key = ((inv.customer_tin or "").strip(), inv.customer_name.strip().upper(), pay.cwt_atc)
         row = by.setdefault(key, {"tin": inv.customer_tin, "payor": inv.customer_name, "atc": pay.cwt_atc, "incomePaymentCentavos": 0, "withheldCentavos": 0, "certificates": []})
@@ -686,9 +697,17 @@ def form_1604e(db: Session, year: int, fiscal_month_end: int = 12) -> dict:
     }
 
 
-def form_2307(db: Session, p: Period, supplier_id: str) -> dict:
-    """Certificate of creditable tax withheld at source, for one supplier and quarter: by ATC, each month's income payments, and the tax withheld."""
-    bills = withheld_bills(db, p.start, p.end, supplier_id)
+def form_2307(db: Session, p: Period, supplier_id: str, *, bill_id: str | None = None, voucher_id: str | None = None) -> dict:
+    """Certificate of creditable tax withheld at source, for one supplier and quarter (or filtered to one bill or payment voucher)."""
+    if bill_id or voucher_id:
+        q = select(Bill).where(Bill.status == "recorded", Bill.supplier_id == supplier_id, Bill.bill_date >= p.start, Bill.bill_date <= p.end)
+        if bill_id:
+            q = q.where(Bill.id == bill_id)
+        if voucher_id:
+            q = q.join(VoucherLine, VoucherLine.bill_id == Bill.id).where(VoucherLine.voucher_id == voucher_id)
+        bills = [pu for b in db.scalars(q.order_by(Bill.bill_date, Bill.no)) if (pu := purchase(db, b)).held]
+    else:
+        bills = withheld_bills(db, p.start, p.end, supplier_id)
     months = months_of(p)
     rows: dict[tuple, dict] = {}
     for pu in bills:
@@ -735,7 +754,7 @@ def income_tax_1702q(db: Session, p: Period, rate_bp: int = 2500) -> dict:
     mcit_bp = 200
     mcit = round(max(0, gross_income) * mcit_bp / 10_000)
     tax_due = max(rcit, mcit)
-    cwt_credits = sawt(db, p)["totals"]["withheldCentavos"]
+    cwt_credits = sawt(db, p, form="1702Q")["totals"]["withheldCentavos"]
     net_payable = tax_due - cwt_credits
     return {
         "form": "1702Q",

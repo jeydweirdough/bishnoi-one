@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from modules.finance import bir_reports as bir
 from modules.finance.ledger import settings as posting_settings
-from modules.finance.models import Account, Bill, ImportedExpense, ImportedExpenseLine, Invoice, InvoicePayment, JournalEntry, JournalLine, PaymentVoucher, PettyCashVoucher
+from modules.finance.models import Account, Bill, ImportedExpense, ImportedExpenseLine, Invoice, InvoicePayment, JournalEntry, JournalLine, PaymentVoucher, PettyCashVoucher, Supplier
 
 SOURCE_NAMES = {"invoice": "Sales invoices and collections", "credit_note": "Customer credit notes",
                 "bill": "Supplier bills", "vendor_credit": "Supplier vendor credits",
@@ -142,6 +142,45 @@ def withholding_review(db: Session, start: date, end: date) -> dict:
             "foreignLines": foreign, "importedWithoutWithholding": imported}
 
 
+def tamp_audit(db: Session, start: date, end: date) -> dict:
+    """Read-only TAMP audit check comparing local SLP purchases against QAP withholding per supplier."""
+    origins = {s.id: s.origin for s in db.scalars(select(Supplier))}
+    by_supplier: dict[str, dict] = {}
+    for pu in bir.bills_between(db, start, end):
+        origin = origins.get(pu.payee_id)
+        if origin == "foreign":
+            continue
+        row = by_supplier.setdefault(
+            pu.payee_id,
+            {
+                "supplierId": pu.payee_id,
+                "name": pu.name,
+                "tin": pu.tin,
+                "origin": origin or "unset",
+                "netCentavos": 0,
+                "vatCentavos": 0,
+                "ewtCentavos": 0,
+                "purchases": 0,
+            },
+        )
+        row["netCentavos"] += pu.net
+        row["vatCentavos"] += pu.vat
+        row["ewtCentavos"] += pu.withheld
+        if pu.source != "vendor_credit":
+            row["purchases"] += 1
+    flagged = sorted(
+        (r for r in by_supplier.values() if r["netCentavos"] > 0 and r["ewtCentavos"] == 0),
+        key=lambda r: (-r["netCentavos"], r["name"].lower()),
+    )
+    return {
+        "status": "review" if flagged else "ok",
+        "unwithheldCount": len(flagged),
+        "unwithheldTotalCentavos": sum(r["netCentavos"] for r in flagged),
+        "suppliers": flagged[:REVIEW_LISTED],
+        "note": "Read-only TAMP check (BIR Top Withholding Agent rule): compares local recorded purchases (SLP) against QAP EWT withheld per supplier so ₱0-EWT local suppliers are reviewed before filing.",
+    }
+
+
 VOID_CAUSE = ("A document voided in a later period: the tax list leaves it out of its own period, while the books keep "
               "it there and reverse it on the day it was voided. Which period should carry it is a question for Sir Mel.")
 
@@ -195,5 +234,6 @@ def readiness(db: Session, start: date, end: date, zone: ZoneInfo) -> dict:
     counts = {k: sum(1 for c in checks if c["status"] == k) for k in ("agrees", "differs", "not_set")}
     return {"from": start.isoformat(), "to": end.isoformat(), "checks": checks, "counts": counts,
             "withholdingReview": withholding_review(db, start, end),
+            "tampAudit": tamp_audit(db, start, end),
             "note": "Read-only. A difference isn't automatically an error in either: it says where a return built from the tax lists "
                     "would disagree with the books, and why. Treatment questions go to Sir Mel."}

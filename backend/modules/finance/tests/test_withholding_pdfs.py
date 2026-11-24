@@ -32,11 +32,13 @@ def test_third_month_cannot_be_exported_as_monthly_filing_and_quarter_must_match
     with pytest.raises(ValueError,match='calendar quarter'):prepare(d)
 
 
-def test_remittances_never_inferred_and_overflow_is_refused():
+def test_remittances_never_inferred_and_seven_rows_attach_continuation_schedule():
     d=prepare(source('1601EQ'))
     assert 'dueCentavos' not in d and 'remitted' not in d
     d=source('1601EQ');d['rows']*=7;d['totalCentavos']=14000
-    with pytest.raises(ValueError,match='continuation'):prepare(d)
+    rendered=render(prepare(d))
+    pdf=PdfReader(BytesIO(rendered))
+    assert len(pdf.pages)==3 and 'CONTINUATION SCHEDULE' in (pdf.pages[-1].extract_text() or '').upper()
     d=source('0619E');d['rows'][0]['taxCentavos']=20.0
     with pytest.raises(ValueError,match='integer'):prepare(d)
 
