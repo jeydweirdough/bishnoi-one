@@ -180,3 +180,15 @@ def test_the_cpr_comes_over_and_says_where_it_stands(client, ana, fake):
     fake.products[0] = item("amx-500", "Amoxicillin 500mg", 25000, cprNumber="DR-XY12345", cprValidUntil="2099-01-01")
     client.post("/products/sync", headers=ana)
     assert products(client, ana)["AMX-500"]["cpr"]["state"] == "valid"
+
+
+def test_an_item_saved_in_inventory_shows_at_once_not_after_the_refresh(client, ana, fake, app):
+    from modules.crm.business_events import HANDLERS
+
+    products(client, ana)
+    fake.products = fake.products + [item("NEW-2", "Cotton balls", 5000)]
+    assert "NEW-2" not in products(client, ana)  # within the 15-minute refresh: not yet
+    with app.state.sessions() as db:
+        HANDLERS["product.saved"](db, {"id": "inv-NEW-2", "sku": "NEW-2", "name": "Cotton balls"}, "")
+        db.commit()
+    assert "NEW-2" in products(client, ana)

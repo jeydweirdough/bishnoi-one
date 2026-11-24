@@ -11,3 +11,8 @@ def test_adding_changing_and_sending_all_vendors_tells_finance(app, ana, world):
     before = len(outbox(app, "vendor.saved"))
     every = ana.post("/inventory/suppliers/send-to-finance", {})
     assert every["sent"] >= 2 and len(outbox(app, "vendor.saved")) == before + every["sent"]
+
+
+def test_adding_or_changing_an_item_tells_the_crm(app, ana, world):
+    ana.patch(f"/inventory/products/{world['gloves']}", {"name": "Nitrile gloves M"})
+    assert outbox(app, "product.saved")[-1] == {"id": world["gloves"], "sku": outbox(app, "product.saved")[-1]["sku"], "name": "Nitrile gloves M"}

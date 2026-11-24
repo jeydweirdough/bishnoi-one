@@ -54,6 +54,7 @@ KINDS: dict[str, Kind] = {
     "invoice.paid": Kind("finance", ("crm", "inventory"), "An invoice was paid in full"),
     # What sold from a vendor's consignment, to pay them (step 15d): a draft vendor bill in Finance.
     "consignment.billed": Kind("inventory", ("finance",), "A vendor's consignment sales were settled"),
+    "product.saved": Kind("inventory", ("crm",), "An item was added or changed in Inventory; the CRM's product list follows it"),
     "vendor.saved": Kind("inventory", ("finance",), "A vendor was added or changed in Inventory; Finance's supplier follows it"),
     "purchase.receipt_submitted": Kind("inventory", ("finance",), "Received purchase evidence sent for bill preparation"),
     "purchase.receipt_finance_updated": Kind("finance", ("inventory",), "Finance acknowledged or updated a received purchase"),

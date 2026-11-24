@@ -97,8 +97,16 @@ def _approval_decided(db, data: dict, slug: str) -> None:
         quote_slips.decided(db, data)
 
 
+def _product_saved(db, data: dict, slug: str) -> None:
+    """An item was added or changed in Inventory: the product list is brought over the next time it's opened or quoted,
+    instead of waiting for its 15-minute refresh (owner, 2026-11-24: nothing should look missing)."""
+    from modules.crm.pricing import sales_settings
+
+    sales_settings(db).inventory_synced_at = None
+
+
 HANDLERS: dict[str, Callable] = {"organisation.changed": _organisation, "sales_order.updated": _sales_order,
-                                 "approval.decided": _approval_decided}
+                                 "approval.decided": _approval_decided, "product.saved": _product_saved}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])
