@@ -655,7 +655,7 @@ def budget_vs_actual(c: Ctx):
             budgeted[b.account_id] = budgeted.get(b.account_id, 0) + (b.months[i] if i < len(b.months) else 0)
     from modules.finance.bir_reports import balances
 
-    moves = balances(c.db, start=c.first, end=c.last)
+    moves = balances(c.db, start=c.first, end=c.last, exclude_closing=True)
     rows = []
     for a in c.db.scalars(select(Account).where(Account.id.in_(list(budgeted))).order_by(Account.code)):
         d, cr = moves.get(a.id, (0, 0))

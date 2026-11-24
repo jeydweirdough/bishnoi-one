@@ -6,7 +6,7 @@ import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import { Empty, PageHeader, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import type {
-  AtcRow, BalanceSheet, Book, CashDisbursements, CashReceipts, GeneralJournal, GeneralLedger, IncomeStatement, PurchaseJournal, SalesJournal, SummaryList, Taxpayer, VatReturn,
+  AtcRow, BalanceSheet, Book, CashDisbursements, CashReceipts, GeneralJournal, GeneralLedger, IncomeStatement, IncomeTaxReturn, PurchaseJournal, SalesJournal, SummaryList, Taxpayer, VatReturn,
   Withholding0619E, Withholding1601EQ, Withholding1604E, Withholding2307,
 } from "@/src/modules/finance/bir/types";
 
@@ -115,14 +115,23 @@ function QuarterForm({ action, year, quarter, keep }: { action: string; year: nu
   );
 }
 
-function Toolbar({ children, file }: { children: ReactNode; file?: string }) {
+function Toolbar({ children, file, datFile }: { children: ReactNode; file?: string; datFile?: string }) {
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       {children}
-      {file && (
-        <a href={file} className={buttonClass + " inline-flex items-center"}>
-          Download CSV
-        </a>
+      {(file || datFile) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {file && (
+            <a href={file} className={buttonClass + " inline-flex items-center"}>
+              Download CSV
+            </a>
+          )}
+          {datFile && (
+            <a href={datFile} className="inline-flex h-8 items-center rounded-[3px] border border-ink bg-ink px-3 text-meta font-semibold text-white hover:bg-ink/90">
+              Download .DAT (draft)
+            </a>
+          )}
+        </div>
       )}
     </div>
   );
@@ -412,6 +421,14 @@ export async function BirStatementsPage({ searchParams }: { searchParams: Search
       <TaxpayerLine who={inc.taxpayer} />
       <Toolbar>
         <DatesForm action="/finance/bir/statements" start={inc.period.start} end={inc.period.end} />
+        <div className="flex flex-wrap gap-2">
+          <a href={download(`/finance/bir/statements/income?start=${inc.period.start}&end=${inc.period.end}&format=csv`)} className={buttonClass + " inline-flex items-center"}>
+            Income statement (CSV)
+          </a>
+          <a href={download(`/finance/bir/statements/balance?asOf=${bs.asOf}&format=csv`)} className={buttonClass + " inline-flex items-center"}>
+            Balance sheet (CSV)
+          </a>
+        </div>
       </Toolbar>
       <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         <Sheet className="overflow-x-auto">
@@ -468,54 +485,117 @@ export async function BirVatPage({ searchParams }: { searchParams: Search }) {
         The figures for the return, {vat.period.label} ({fmt.dateLabel(vat.period.start)} to {fmt.dateLabel(vat.period.end)}), from your issued invoices and recorded supplier bills. File it in eBIRForms or eFPS.
       </PageHeader>
       <TaxpayerLine who={vat.taxpayer} />
-      <Toolbar>
+      <Sheet className="mb-4 flex flex-wrap items-center justify-between gap-4 px-4 py-3 print:hidden">
         <QuarterForm action="/finance/bir/vat" year={vat.year} quarter={vat.quarter} />
-        {isVat && <Link className={buttonClass + " inline-flex items-center"} href={`/finance/bir/vat/draft?year=${vat.year}&quarter=${vat.quarter}`}>Download 2550Q review PDF</Link>}
-      </Toolbar>
-      {isVat && <FilingNotice form="2550Q" />}
-      <ReviewExports dates={false} filters={`year=${vat.year}&quarter=${vat.quarter}`} options={[["vat", "Return figures and monthly breakdown"], ["vat-sources", "Records behind the VAT figures"]]} />
-      {isVat && <p className="mb-4 text-sm text-ink-2">Review copy only: missing credits, adjustments and payment details stay blank. The PDF is not a filing-ready return.</p>}
+        {isVat && (
+          <Link className={primaryPdfBtn} href={`/finance/bir/vat/draft?year=${vat.year}&quarter=${vat.quarter}`}>
+            Download 2550Q official draft PDF
+          </Link>
+        )}
+      </Sheet>
       <div className="space-y-5">
-        <section className="min-w-0"><h2 className="mb-2 text-base font-semibold text-ink">Monthly breakdown</h2>
-        <Table
-          wide="min-w-[36rem]"
-          head={isVat ? [{ label: "Month" }, { label: "VATable sales", right: true }, { label: "Output VAT", right: true }, { label: "Purchases", right: true }, { label: "Input VAT", right: true }] : [{ label: "Month" }, { label: "Gross sales", right: true }]}
-        >
-          {vat.months.map((m) => (
-            <tr key={m.start}>
-              <td className={td}>{m.label}</td>
-              {isVat ? (
-                <>
-                  <td className={`${td} ${num}`}>{fmt.peso(m.taxableSalesCentavos)}</td>
-                  <td className={`${td} ${num}`}>{fmt.peso(m.taxCentavos)}</td>
-                  <td className={`${td} ${num}`}>{fmt.peso(m.purchasesCentavos ?? 0)}</td>
-                  <td className={`${td} ${num}`}>{fmt.peso(m.inputTaxCentavos ?? 0)}</td>
-                </>
-              ) : (
-                <td className={`${td} ${num}`}>{fmt.peso(m.nonTaxableSalesCentavos)}</td>
-              )}
-            </tr>
-          ))}
-        </Table>
+        <section className="min-w-0">
+          <h2 className="mb-2 text-base font-semibold text-ink">Monthly breakdown</h2>
+          <Table
+            wide="min-w-[36rem]"
+            head={isVat ? [{ label: "Month" }, { label: "VATable sales", right: true }, { label: "Output VAT", right: true }, { label: "Purchases", right: true }, { label: "Input VAT", right: true }] : [{ label: "Month" }, { label: "Gross sales", right: true }]}
+          >
+            {vat.months.map((m) => (
+              <tr key={m.start}>
+                <td className={td}>{m.label}</td>
+                {isVat ? (
+                  <>
+                    <td className={`${td} ${num}`}>{fmt.peso(m.taxableSalesCentavos)}</td>
+                    <td className={`${td} ${num}`}>{fmt.peso(m.taxCentavos)}</td>
+                    <td className={`${td} ${num}`}>{fmt.peso(m.purchasesCentavos ?? 0)}</td>
+                    <td className={`${td} ${num}`}>{fmt.peso(m.inputTaxCentavos ?? 0)}</td>
+                  </>
+                ) : (
+                  <td className={`${td} ${num}`}>{fmt.peso(m.nonTaxableSalesCentavos)}</td>
+                )}
+              </tr>
+            ))}
+          </Table>
         </section>
         <section className="min-w-0">
           <h2 className="mb-2 text-base font-semibold text-ink">Return figures</h2>
-          <Table wide="min-w-[28rem]" head={[{label: "Return item"}, {label: "Amount", right: true}]}>
-
-              {vat.lines.map((l) => (
-                <tr key={l.key} className={l.key === "payable" || l.key === "due" ? "border-t-2 border-ink font-semibold" : ""}>
-                  <td className={td}>
-                    {l.label}
-                  </td>
-                  <td className={`${td} ${num}`}>{l.rateBp !== undefined ? `${(l.rateBp / 100).toFixed(2)}%` : fmt.peso(l.amountCentavos ?? 0)}</td>
-                </tr>
-              ))}
-
+          <Table wide="min-w-[28rem]" head={[{ label: "Return item" }, { label: "Amount", right: true }]}>
+            {vat.lines.map((l) => (
+              <tr key={l.key} className={l.key === "payable" || l.key === "due" ? "border-t-2 border-ink font-semibold" : ""}>
+                <td className={td}>{l.label}</td>
+                <td className={`${td} ${num}`}>{l.rateBp !== undefined ? `${(l.rateBp / 100).toFixed(2)}%` : fmt.peso(l.amountCentavos ?? 0)}</td>
+              </tr>
+            ))}
           </Table>
           {vat.notes.map((n) => (
-            <p key={n} className="px-5 pb-4 text-meta text-ink-3">{n}</p>
+            <p key={n} className="px-5 pt-2 pb-1 text-meta text-ink-3">{n}</p>
           ))}
         </section>
+        {isVat && <FilingNotice form="2550Q" />}
+        <ReviewExports dates={false} filters={`year=${vat.year}&quarter=${vat.quarter}`} options={[["vat", "Return figures and monthly breakdown"], ["vat-sources", "Records behind the VAT figures"]]} />
+      </div>
+    </>
+  );
+}
+
+export async function BirIncomeTaxPage({ searchParams }: { searchParams: Search }) {
+  const me = await getCompanyMe();
+  const fmt = makeFormat(me.org);
+  const sp = await searchParams;
+  const q = new URLSearchParams();
+  if (/^\d{4}$/.test(one(sp.year))) q.set("year", one(sp.year));
+  if (/^[1-4]$/.test(one(sp.quarter))) q.set("quarter", one(sp.quarter));
+  const rateBp = one(sp.rateBp) === "2000" ? 2000 : 2500;
+  q.set("rateBp", String(rateBp));
+  const apiPath = `/finance/bir/returns/income-tax?${q}`;
+  const data = await load<IncomeTaxReturn>(apiPath);
+  const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
+  return (
+    <>
+      <PageHeader title={`${data.title} (BIR Form ${data.form})`}>
+        Draft calculation for {data.period.label} ({fmt.dateLabel(data.period.start)} to {fmt.dateLabel(data.period.end)}) from the Income Statement and Customer CWT (SAWT). Confirm non-deductible expenses and CREATE 20% eligibility with Compliance before filing.
+      </PageHeader>
+      <TaxpayerLine who={data.taxpayer} />
+      <Sheet className="mb-4 flex flex-wrap items-end justify-between gap-4 px-4 py-3 print:hidden">
+        <form className="flex flex-wrap items-end gap-3" action="/finance/bir/income-tax">
+          <label className="text-meta text-ink-2">
+            Year
+            <select suppressHydrationWarning name="year" defaultValue={data.year} className={inputClass}>
+              {years.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </label>
+          <label className="text-meta text-ink-2">
+            Quarter
+            <select suppressHydrationWarning name="quarter" defaultValue={data.quarter} className={inputClass}>
+              {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{["1st", "2nd", "3rd", "4th"][n - 1]}</option>)}
+            </select>
+          </label>
+          <label className="text-meta text-ink-2">
+            Corporate rate
+            <select suppressHydrationWarning name="rateBp" defaultValue={rateBp} className={inputClass}>
+              <option value="2500">25% Standard RCIT</option>
+              <option value="2000">20% CREATE Small Corp</option>
+            </select>
+          </label>
+          <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
+        </form>
+        <a href={download(apiPath)} className={secondaryCsvBtn}>
+          Download 1702Q working CSV
+        </a>
+      </Sheet>
+      <div className="space-y-5">
+        <Table wide="min-w-[32rem]" head={[{ label: "1702Q working item" }, { label: "Amount", right: true }]}>
+          {data.lines.map((l) => (
+            <tr key={l.key} className={l.key === "net_payable" || l.key === "tax_due" || l.key === "gross_income" ? "border-t border-ink/40 font-semibold" : ""}>
+              <td className={td}>{l.label}</td>
+              <td className={`${td} ${num}`}>{fmt.peso(l.amountCentavos)}</td>
+            </tr>
+          ))}
+        </Table>
+        {data.notes.map((n) => (
+          <p key={n} className="text-meta text-ink-3">{n}</p>
+        ))}
+        <FilingNotice form="1702Q" />
       </div>
     </>
   );
@@ -565,7 +645,7 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
           ]}
         />
       </div>
-      <Toolbar file={download(path)}>
+      <Toolbar file={download(path)} datFile={download(`${path}${path.includes("?") ? "&" : "?"}format=dat`)}>
         <QuarterForm action="/finance/bir/lists" year={data.year} quarter={data.quarter} keep={{ list: which }} />
       </Toolbar>
       {data.missingTin > 0 && (
@@ -579,7 +659,7 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
         </p>
       )}
       <p className="mb-3 text-meta text-ink-3">
-        The CSV has the BIR template&apos;s columns. The DAT file for eSubmission comes once its official layout is confirmed.
+        The CSV matches the BIR template&apos;s columns. The draft .DAT file follows public BIR RELIEF / Alphalist formatting — verify it inside the official BIR Validation Module before eSubmission.
       </p>
       {data.rows.length === 0 ? (
         <Sheet>
@@ -686,20 +766,40 @@ export async function BirListsPage({ searchParams }: { searchParams: Search }) {
 
 // ---- Withholding tax: what you withheld from your suppliers ----------------------------------
 
+const primaryPdfBtn = "inline-flex h-9 items-center gap-2 rounded-lg bg-ink px-4 text-meta font-semibold text-white shadow-sm transition-colors hover:bg-ink/90";
+const secondaryCsvBtn = "inline-flex h-9 items-center gap-2 rounded-lg border border-rule-strong bg-sheet px-3.5 text-meta font-semibold text-ink transition-colors hover:border-control hover:bg-bench/30";
+
 async function FilingNotice({ form }: { form: string }) {
-  const g=await load<{ online: string; attachments: string; kind: string }>(`/finance/bir/filing-guidance?form=${encodeURIComponent(form)}`);
-  return <section className="mb-4 rounded-xl border border-rule bg-sheet px-4 py-3">
-    <div className="flex flex-wrap gap-x-5 gap-y-2 text-meta"><span className="font-semibold">Prepared: review draft</span><span>Online validation: not verified</span><span>Filing evidence: not recorded here</span></div>
-    <details className="mt-2 text-meta text-ink-2"><summary className="cursor-pointer">How to validate and file</summary><p className="mt-2">{g.online}</p><p className="mt-1">{g.attachments}</p></details>
-  </section>;
+  const g = await load<{ online: string; attachments: string; kind: string }>(`/finance/bir/filing-guidance?form=${encodeURIComponent(form)}`);
+  return (
+    <section className="rounded-xl border border-rule bg-sheet px-4 py-3 print:hidden">
+      <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 text-meta">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="inline-flex items-center rounded-full bg-bench px-2.5 py-0.5 font-semibold text-ink">Draft for review</span>
+          <span className="text-ink-2">Online validation: <strong className="font-medium text-ink">not verified</strong></span>
+          <span className="text-ink-2">Filing evidence: <strong className="font-medium text-ink">not recorded here</strong></span>
+        </div>
+        <span className="text-ink-3">Missing filing details and actual payments stay unresolved</span>
+      </div>
+      <details className="mt-2 text-meta text-ink-2">
+        <summary className="cursor-pointer font-semibold text-hema hover:underline">How to validate and file {form}</summary>
+        <p className="mt-2 leading-relaxed">{g.online}</p>
+        <p className="mt-1 leading-relaxed">{g.attachments}</p>
+      </details>
+    </section>
+  );
 }
 
-function WithholdingPdf({ form, year, quarter, month, supplierId }: { form: string; year: number; quarter?: number; month?: number; supplierId?: string }) {
+function WithholdingPdfButton({ form, year, quarter, month, supplierId, label }: { form: string; year: number; quarter?: number; month?: number; supplierId?: string; label?: string }) {
   const q = new URLSearchParams({ form, year: String(year) });
   if (quarter) q.set("quarter", String(quarter));
   if (month) q.set("month", String(month));
   if (supplierId) q.set("supplierId", supplierId);
-  return <div className="mb-4 print:hidden"><FilingNotice form={form.toUpperCase()} /><Link href={`/finance/bir/withholding/draft?${q}`} className={buttonClass + " inline-flex items-center"}>Download {form.toUpperCase()} review PDF</Link><p className="mt-2 text-meta text-ink-3">Review draft. Missing filing details and actual payments stay unresolved. This download does not submit a return.</p></div>;
+  return (
+    <Link href={`/finance/bir/withholding/draft?${q}`} className={primaryPdfBtn}>
+      {label ?? `Download ${form.toUpperCase()} official draft PDF`}
+    </Link>
+  );
 }
 
 const FORMS = [
@@ -724,11 +824,11 @@ function AtcTable({ rows, fmt, total }: { rows: AtcRow[]; fmt: Fmt; total: numbe
     >
       {rows.map((r) => (
         <tr key={`${r.atc}-${r.rateBp}`}>
-          <td className={td}>{r.atc}</td>
+          <td className={`${td} font-mono font-semibold text-ink`}>{r.atc}</td>
           <td className={td}>{r.nature ?? ""}</td>
           <td className={`${td} ${num}`}>{fmt.peso(r.baseCentavos)}</td>
           <td className={`${td} ${num}`}>{(r.rateBp / 100).toFixed(2)}%</td>
-          <td className={`${td} ${num}`}>{fmt.peso(r.taxCentavos)}</td>
+          <td className={`${td} ${num} font-medium`}>{fmt.peso(r.taxCentavos)}</td>
         </tr>
       ))}
     </Table>
@@ -739,15 +839,15 @@ function MonthForm({ year, month }: { year: number; month: number }) {
   const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
   const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   return (
-    <form className="flex flex-wrap items-end gap-3" action="/finance/bir/withholding">
+    <form className="flex flex-wrap items-center gap-3" action="/finance/bir/withholding">
       <input suppressHydrationWarning type="hidden" name="form" value="0619e" />
-      <label className="text-meta text-ink-2">
+      <label className="flex items-center gap-1.5 text-meta font-medium text-ink-2">
         Year
         <select suppressHydrationWarning name="year" defaultValue={year} className={inputClass}>
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
       </label>
-      <label className="text-meta text-ink-2">
+      <label className="flex items-center gap-1.5 text-meta font-medium text-ink-2">
         Month
         <select suppressHydrationWarning name="month" defaultValue={month} className={inputClass}>
           {names.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
@@ -776,10 +876,15 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
     }
     return { value: f.value, label: f.label, href: `/finance/bir/withholding?${query}` };
   })} />;
-  const header = (title: string, says: ReactNode) => (
+  const header = (title: string, says: ReactNode, who: Taxpayer) => (
     <>
       <PageHeader title={title}>{says}</PageHeader>
-      <div className="mb-4">{tabs}</div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        {tabs}
+        <div className="[&_p]:mb-0">
+          <TaxpayerLine who={who} />
+        </div>
+      </div>
     </>
   );
 
@@ -790,12 +895,18 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
     const d = await load<Withholding0619E>(`/finance/bir/withholding/0619e${q.size ? `?${q}` : ""}`);
     return (
       <>
-        {header("Withholding tax", <>Monthly remittance (BIR Form 0619E) for {d.period.label}: the expanded withholding on bills dated in the month. Filed for the quarter&apos;s first two months; the third is on the 1601EQ.</>)}
-        <TaxpayerLine who={d.taxpayer} />
-        <Toolbar><MonthForm year={d.year} month={d.month} /></Toolbar>
-        <WithholdingPdf form="0619e" year={d.year} month={d.month} />
-        <ReviewExports dates={false} filters={`year=${d.year}&month=${d.month}`} options={[["0619e", "Monthly withholding review"], ["withholding-sources", "Records behind monthly withholding"]]} />
-        <AtcTable rows={d.rows} fmt={fmt} total={d.totalCentavos} />
+        {header("Withholding tax", <>Monthly remittance (BIR Form 0619E) for {d.period.label}: the expanded withholding on bills dated in the month. Filed for the quarter&apos;s first two months; the third is on the 1601EQ.</>, d.taxpayer)}
+        <Sheet className="mb-4 flex flex-wrap items-center justify-between gap-4 px-4 py-3 print:hidden">
+          <MonthForm year={d.year} month={d.month} />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <WithholdingPdfButton form="0619e" year={d.year} month={d.month} />
+          </div>
+        </Sheet>
+        <div className="space-y-4">
+          <AtcTable rows={d.rows} fmt={fmt} total={d.totalCentavos} />
+          <FilingNotice form="0619E" />
+          <ReviewExports dates={false} filters={`year=${d.year}&month=${d.month}`} options={[["0619e", "Monthly withholding review"], ["withholding-sources", "Records behind monthly withholding"]]} />
+        </div>
       </>
     );
   }
@@ -804,27 +915,37 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
     const d = await load<Withholding1601EQ>(`/finance/bir/withholding/1601eq${quarterQuery(sp)}`);
     return (
       <>
-        {header("Withholding tax", <>Quarterly return of expanded withholding (BIR Form 1601EQ), {d.period.label}. The Quarterly Alphalist of Payees (QAP) goes with it: under Summary lists.</>)}
-        <TaxpayerLine who={d.taxpayer} />
-        <Toolbar file={download(`/finance/bir/lists/qap?year=${d.year}&quarter=${d.quarter}`)}>
+        {header("Withholding tax", <>Quarterly return of expanded withholding (BIR Form 1601EQ), {d.period.label}. The Quarterly Alphalist of Payees (QAP) goes with it: under Summary lists.</>, d.taxpayer)}
+        <Sheet className="mb-4 flex flex-wrap items-center justify-between gap-4 px-4 py-3 print:hidden">
           <QuarterForm action="/finance/bir/withholding" year={d.year} quarter={d.quarter} keep={{ form: "1601eq" }} />
-        </Toolbar>
-        <WithholdingPdf form="1601eq" year={d.year} quarter={d.quarter} />
-        <ReviewExports dates={false} filters={`year=${d.year}&quarter=${d.quarter}`} options={[["1601eq", "Quarterly withholding review"], ["withholding-sources", "Records behind quarterly withholding"]]} />
-        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] xl:items-start">
-          <AtcTable rows={d.rows} fmt={fmt} total={d.totalCentavos} />
-          <Sheet className="min-w-0 overflow-x-auto">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-rule">
-                <tr><td className={td}>Total withheld for the quarter</td><td className={`${td} ${num}`}>{fmt.peso(d.totalCentavos)}</td></tr>
-                {d.remitted.map((r) => (
-                  <tr key={r.label}><td className={td}>Withheld in {r.label} (not proof of remittance)</td><td className={`${td} ${num}`}>{fmt.peso(r.calculatedWithholdingCentavos)}</td></tr>
-                ))}
-                <tr className="border-t-2 border-ink font-semibold"><td className={td}>Remaining payable</td><td className={`${td} ${num}`}>{d.dueCentavos === null ? "Not verified" : fmt.peso(d.dueCentavos)}</td></tr>
-              </tbody>
-            </table>
-            {d.notes.map((n) => <p key={n} className="px-5 pb-4 text-meta text-ink-3">{n}</p>)}
-          </Sheet>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <a href={download(`/finance/bir/lists/qap?year=${d.year}&quarter=${d.quarter}`)} className={secondaryCsvBtn}>
+              Download QAP CSV
+            </a>
+            <WithholdingPdfButton form="1601eq" year={d.year} quarter={d.quarter} />
+          </div>
+        </Sheet>
+        <div className="space-y-4">
+          <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] xl:items-start">
+            <AtcTable rows={d.rows} fmt={fmt} total={d.totalCentavos} />
+            <Sheet className="min-w-0 overflow-x-auto">
+              <div className="border-b border-rule px-5 py-3">
+                <h2 className="text-sm font-semibold text-ink">Quarterly remittance summary</h2>
+              </div>
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-rule">
+                  <tr><td className={td}>Total withheld for the quarter</td><td className={`${td} ${num} font-medium`}>{fmt.peso(d.totalCentavos)}</td></tr>
+                  {d.remitted.map((r) => (
+                    <tr key={r.label}><td className={`${td} text-ink-2`}>Withheld in {r.label} (computed from books)</td><td className={`${td} ${num}`}>{fmt.peso(r.calculatedWithholdingCentavos)}</td></tr>
+                  ))}
+                  <tr className="border-t-2 border-ink font-semibold"><td className={td}>Remaining payable</td><td className={`${td} ${num}`}>{d.dueCentavos === null ? "Not verified" : fmt.peso(d.dueCentavos)}</td></tr>
+                </tbody>
+              </table>
+              {d.notes.map((n) => <p key={n} className="border-t border-rule bg-bench/25 px-5 py-3 text-meta text-ink-3">{n}</p>)}
+            </Sheet>
+          </div>
+          <FilingNotice form="1601EQ" />
+          <ReviewExports dates={false} filters={`year=${d.year}&quarter=${d.quarter}`} options={[["1601eq", "Quarterly withholding review"], ["withholding-sources", "Records behind quarterly withholding"]]} />
         </div>
       </>
     );
@@ -836,12 +957,11 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
     const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
     return (
       <>
-        {header("Withholding tax", <>Annual information return of expanded withholding (BIR Form 1604E) for {d.year}, with its alphalist of payees.</>)}
-        <TaxpayerLine who={d.taxpayer} />
-        <Toolbar file={download(`/finance/bir/withholding/1604e?year=${d.year}`)}>
-          <form className="flex items-end gap-3" action="/finance/bir/withholding">
+        {header("Withholding tax", <>Annual information return of expanded withholding (BIR Form 1604E) for {d.year}, with its alphalist of payees.</>, d.taxpayer)}
+        <Sheet className="mb-4 flex flex-wrap items-center justify-between gap-4 px-4 py-3 print:hidden">
+          <form className="flex flex-wrap items-center gap-3" action="/finance/bir/withholding">
             <input suppressHydrationWarning type="hidden" name="form" value="1604e" />
-            <label className="text-meta text-ink-2">
+            <label className="flex items-center gap-1.5 text-meta font-medium text-ink-2">
               Year
               <select suppressHydrationWarning name="year" defaultValue={d.year} className={inputClass}>
                 {years.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -849,9 +969,14 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
             </label>
             <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
           </form>
-        </Toolbar>
-        <WithholdingPdf form="1604e" year={d.year}  />
-        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <a href={download(`/finance/bir/withholding/1604e?year=${d.year}`)} className={secondaryCsvBtn}>
+              Download Alphalist CSV
+            </a>
+            <WithholdingPdfButton form="1604e" year={d.year} />
+          </div>
+        </Sheet>
+        <div className="space-y-4">
           <AtcTable rows={d.byAtc} fmt={fmt} total={d.totals.taxCentavos} />
           {d.payees.length > 0 && (
             <Table
@@ -866,15 +991,16 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
             >
               {d.payees.map((r, i) => (
                 <tr key={i}>
-                  <td className={td}>{r.tin || <span className="text-danger">None</span>}</td>
-                  <td className={td}>{r.payee}</td>
-                  <td className={td}>{r.atc}</td>
+                  <td className={`${td} font-mono text-meta`}>{r.tin || <span className="text-danger">None</span>}</td>
+                  <td className={`${td} font-medium`}>{r.payee}</td>
+                  <td className={`${td} font-mono`}>{r.atc}</td>
                   <td className={`${td} ${num}`}>{fmt.peso(r.baseCentavos)}</td>
-                  <td className={`${td} ${num}`}>{fmt.peso(r.taxCentavos)}</td>
+                  <td className={`${td} ${num} font-medium`}>{fmt.peso(r.taxCentavos)}</td>
                 </tr>
               ))}
             </Table>
           )}
+          <FilingNotice form="1604E" />
         </div>
       </>
     );
@@ -883,91 +1009,128 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
   // 2307: the suppliers withheld from in the quarter, and the certificate for the one picked.
   const q = new URLSearchParams(quarterQuery(sp).slice(1));
   if (one(sp.supplierId)) q.set("supplierId", one(sp.supplierId));
-  const d = await load<Withholding2307>(`/finance/bir/withholding/2307${q.size ? `?${q}` : ""}`);
+  let d = await load<Withholding2307>(`/finance/bir/withholding/2307${q.size ? `?${q}` : ""}`);
+  if (!d.certificate && d.suppliers.length > 0 && !one(sp.supplierId)) {
+    const autoQ = new URLSearchParams(q);
+    autoQ.set("supplierId", d.suppliers[0].id);
+    d = await load<Withholding2307>(`/finance/bir/withholding/2307?${autoQ}`);
+  }
   const keep = `form=2307&year=${d.year}&quarter=${d.quarter}`;
   const c = d.certificate;
+  const totalQuarterWithheld = d.suppliers.reduce((sum, s) => sum + s.taxCentavos, 0);
   return (
     <>
-      {header("Withholding tax", <>Certificates of creditable tax withheld at source (BIR Form 2307), {d.period.label}: one for each supplier you withheld from, to give them.</>)}
-      <TaxpayerLine who={d.taxpayer} />
-      <ReviewExports dates={false} filters={q.toString()} options={[["2307", "2307 supporting figures"], ["withholding-sources", "Records behind the certificates"]]} />
-      <Toolbar>
+      {header("Withholding tax", <>Certificates of creditable tax withheld at source (BIR Form 2307), {d.period.label}: one for each supplier you withheld from, to give them.</>, d.taxpayer)}
+      <Sheet className="mb-4 flex flex-wrap items-center justify-between gap-4 px-4 py-3 print:hidden">
         <QuarterForm action="/finance/bir/withholding" year={d.year} quarter={d.quarter} keep={{ form: "2307" }} />
-      </Toolbar>
-      {c && <WithholdingPdf form="2307" year={d.year} quarter={d.quarter} supplierId={c.payee.id} />}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-meta text-ink-2">
+            <strong>{d.suppliers.length}</strong> suppliers · Total withheld: <strong className="text-ink tabular-nums">{fmt.peso(totalQuarterWithheld)}</strong>
+          </span>
+          {c && <WithholdingPdfButton form="2307" year={d.year} quarter={d.quarter} supplierId={c.payee.id} label={`Download 2307 PDF (${(c.payee.name ?? "Supplier").slice(0, 22)}${(c.payee.name ?? "").length > 22 ? "…" : ""})`} />}
+        </div>
+      </Sheet>
       {d.suppliers.length === 0 ? (
         <Sheet><Empty title="No tax withheld from suppliers this quarter" icon="lists">Bills with an ATC (expanded withholding) appear here.</Empty></Sheet>
       ) : (
-        <div className={c ? "grid min-w-0 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start" : "max-w-3xl space-y-3"}>
-          <Sheet className="min-w-0 px-2 py-2">
-            <h2 className="px-3 py-2 text-sm font-semibold">Suppliers ({d.suppliers.length})</h2>
-            <ul aria-label="Choose a supplier" className="max-h-[50vh] overflow-y-auto overscroll-contain">
-              {d.suppliers.map((s) => (
-                <li key={s.id}>
-                  <Link
-                    href={`/finance/bir/withholding?${keep}&supplierId=${encodeURIComponent(s.id)}`}
-                    aria-current={c?.payee.id === s.id ? "page" : undefined}
-                    className={`block break-words rounded-[3px] px-3 py-2 text-sm ${c?.payee.id === s.id ? "bg-hema-tint font-semibold text-hema" : "hover:bg-sheet"}`}
-                  >
-                    {s.name}
-                    <span className="block text-meta font-normal text-ink-3">{fmt.peso(s.taxCentavos)} withheld</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Sheet>
-          {c ? (
-            <Sheet className="min-w-0 overflow-x-auto px-5 py-4 print:shadow-none">
-              <h2 className="text-base font-semibold text-ink">BIR Form 2307: {c.title}</h2>
-              <p className="mt-1 text-meta text-ink-2">For {d.period.label} ({fmt.dateLabel(d.period.start)} to {fmt.dateLabel(d.period.end)})</p>
-              <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-                <div>
-                  <p className="text-caps text-ink-3 uppercase">Payee</p>
-                  <p className="font-semibold">{c.payee.name}</p>
-                  <p>TIN {c.payee.tin ?? <span className="text-danger">none: add it to the supplier in Inventory</span>}</p>
-                  <p className="text-ink-2">{c.payee.address}</p>
-                </div>
-                <div>
-                  <p className="text-caps text-ink-3 uppercase">Payor</p>
-                  <p className="font-semibold">{d.taxpayer.registeredName}</p>
-                  <p>TIN {d.taxpayer.tin ? `${d.taxpayer.tin}-${d.taxpayer.branchCode}` : ""}</p>
-                  <p className="text-ink-2">{d.taxpayer.address}</p>
-                </div>
+        <div className="space-y-4">
+          <div className="grid min-w-0 gap-5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
+            <Sheet className="min-w-0 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-rule bg-bench/25 px-4 py-3">
+                <h2 className="text-sm font-semibold text-ink">Suppliers ({d.suppliers.length})</h2>
+                <span className="text-meta text-ink-3">Select to preview 2307</span>
               </div>
-              <table className="mt-4 w-full min-w-[40rem] text-sm">
-                <thead>
-                  <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                    <th className={`${td} font-semibold`}>Income payment (ATC)</th>
-                    {c.monthLabels.map((m) => <th key={m} className={`${td} text-right font-semibold`}>{m}</th>)}
-                    <th className={`${td} text-right font-semibold`}>Total</th>
-                    <th className={`${td} text-right font-semibold`}>Tax withheld</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-rule">
-                  {c.rows.map((r) => (
-                    <tr key={`${r.atc}-${r.rateBp}`}>
-                      <td className={td}>{r.nature} <span className="text-ink-3">({r.atc}, {(r.rateBp / 100).toFixed(2)}%)</span></td>
-                      {r.months.map((m, i) => <td key={i} className={`${td} ${num}`}>{money(fmt, m)}</td>)}
-                      <td className={`${td} ${num}`}>{fmt.peso(r.baseCentavos)}</td>
-                      <td className={`${td} ${num}`}>{fmt.peso(r.taxCentavos)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 border-ink font-semibold tabular-nums">
-                    <td className={td} colSpan={c.monthLabels.length + 1}>Total</td>
-                    <td className={`${td} ${num}`}>{fmt.peso(c.totals.baseCentavos)}</td>
-                    <td className={`${td} ${num}`}>{fmt.peso(c.totals.taxCentavos)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-              <p className="mt-4 text-meta text-ink-3">
-                Fill in the official Form 2307 (eBIRForms or the BIR&apos;s PDF) with these figures, sign it, and give it to the supplier: they claim the tax as a credit.
-              </p>
+              <ul aria-label="Choose a supplier" className="max-h-[58vh] divide-y divide-rule overflow-y-auto overscroll-contain">
+                {d.suppliers.map((s) => {
+                  const active = c?.payee.id === s.id;
+                  return (
+                    <li key={s.id}>
+                      <Link
+                        href={`/finance/bir/withholding?${keep}&supplierId=${encodeURIComponent(s.id)}`}
+                        aria-current={active ? "page" : undefined}
+                        className={`block px-4 py-3 text-sm transition-colors ${active ? "border-l-4 border-hema bg-hema-tint/70 font-semibold text-hema" : "hover:bg-bench/30"}`}
+                      >
+                        <span className="block break-words leading-snug">{s.name}</span>
+                        <span className="mt-1 flex items-center justify-between text-meta font-normal text-ink-3">
+                          <span className="font-mono">{s.tin ? `TIN ${s.tin}` : "TIN missing"}</span>
+                          <span className="font-semibold text-ink-2 tabular-nums">{fmt.peso(s.taxCentavos)}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
             </Sheet>
-          ) : (
-            <p className="text-sm text-ink-2">Choose a supplier above to review their certificate and download its PDF.</p>
-          )}
+            {c ? (
+              <Sheet className="min-w-0 overflow-x-auto px-6 py-5 print:shadow-none">
+                <div className="flex flex-wrap items-start justify-between gap-4 border-b border-rule pb-4">
+                  <div>
+                    <span className="inline-block rounded-full bg-bench px-2.5 py-0.5 text-caps font-semibold text-ink-2 uppercase">BIR Form No. 2307</span>
+                    <h2 className="mt-1.5 text-lg font-semibold text-ink">{c.payee.name}</h2>
+                    <p className="mt-0.5 text-meta text-ink-2">Certificate of Creditable Tax Withheld at Source · {d.period.label} ({fmt.dateLabel(d.period.start)} to {fmt.dateLabel(d.period.end)})</p>
+                  </div>
+                  <div className="print:hidden">
+                    <WithholdingPdfButton form="2307" year={d.year} quarter={d.quarter} supplierId={c.payee.id} label="Download Form 2307 PDF" />
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border border-rule bg-bench/20 p-3.5 text-sm">
+                    <p className="text-caps font-semibold text-ink-3 uppercase">Payee (Supplier)</p>
+                    <p className="mt-1 font-semibold text-ink">{c.payee.name}</p>
+                    <p className="mt-0.5 font-mono text-meta">TIN: {c.payee.tin ?? <span className="font-sans text-danger">Missing — add to supplier profile</span>}</p>
+                    {c.payee.address && <p className="mt-1 text-meta text-ink-2">{c.payee.address}</p>}
+                  </div>
+                  <div className="rounded-lg border border-rule bg-bench/20 p-3.5 text-sm">
+                    <p className="text-caps font-semibold text-ink-3 uppercase">Payor (Withholding Agent)</p>
+                    <p className="mt-1 font-semibold text-ink">{d.taxpayer.registeredName}</p>
+                    <p className="mt-0.5 font-mono text-meta">TIN: {d.taxpayer.tin ? `${d.taxpayer.tin}-${d.taxpayer.branchCode}` : "—"}</p>
+                    {d.taxpayer.address && <p className="mt-1 text-meta text-ink-2">{d.taxpayer.address}</p>}
+                  </div>
+                </div>
+                <div className="mt-5 overflow-x-auto rounded-lg border border-rule">
+                  <table className="w-full min-w-[40rem] text-sm">
+                    <thead className="bg-bench/30">
+                      <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
+                        <th className={`${td} font-semibold`}>Income payment (ATC)</th>
+                        {c.monthLabels.map((m) => <th key={m} className={`${td} text-right font-semibold`}>{m}</th>)}
+                        <th className={`${td} text-right font-semibold`}>Total base</th>
+                        <th className={`${td} text-right font-semibold`}>Tax withheld</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-rule">
+                      {c.rows.map((r) => (
+                        <tr key={`${r.atc}-${r.rateBp}`}>
+                          <td className={td}>
+                            <span className="font-medium text-ink">{r.nature}</span>{" "}
+                            <span className="inline-block rounded bg-bench px-1.5 py-0.5 font-mono text-meta text-ink-2">{r.atc} · {(r.rateBp / 100).toFixed(2)}%</span>
+                          </td>
+                          {r.months.map((m, i) => <td key={i} className={`${td} ${num}`}>{money(fmt, m)}</td>)}
+                          <td className={`${td} ${num} font-medium`}>{fmt.peso(r.baseCentavos)}</td>
+                          <td className={`${td} ${num} font-semibold text-ink`}>{fmt.peso(r.taxCentavos)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-ink bg-bench/15 font-semibold tabular-nums">
+                        <td className={td} colSpan={c.monthLabels.length + 1}>Total</td>
+                        <td className={`${td} ${num}`}>{fmt.peso(c.totals.baseCentavos)}</td>
+                        <td className={`${td} ${num}`}>{fmt.peso(c.totals.taxCentavos)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <p className="mt-4 text-meta text-ink-3">
+                  Download the official Form 2307 PDF above, sign it, and issue it to the supplier so they may claim the creditable withholding tax.
+                </p>
+              </Sheet>
+            ) : (
+              <Sheet className="flex min-h-[16rem] items-center justify-center p-8 text-center">
+                <p className="text-sm text-ink-2">Select a supplier on the left to preview their Form 2307 certificate and download its PDF.</p>
+              </Sheet>
+            )}
+          </div>
+          <FilingNotice form="2307" />
+          <ReviewExports dates={false} filters={q.toString()} options={[["2307", "2307 supporting figures"], ["withholding-sources", "Records behind the certificates"]]} />
         </div>
       )}
     </>
@@ -978,7 +1141,7 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
 
 type ReadinessCheck = {
   key: string; title: string; says: string; status: "agrees" | "differs" | "not_set"; listName: string;
-  listCentavos: number; booksCentavos: number | null; differenceCentavos: number | null; message: string | null; causes: string[];
+  listCentavos: number; booksCentavos: number | null; closingCentavos?: number; beforeClosingCentavos?: number | null; differenceCentavos: number | null; message: string | null; causes: string[];
   accounts: { id: string; code: string; name: string }[];
   otherSources: { source: string; name: string; entries: number; centavos: number; listed: { id: string; number: string; date: string; memo: string; centavos: number }[] }[];
 };
@@ -1022,8 +1185,18 @@ export async function BirReadinessPage({ searchParams }: { searchParams: Search 
             </details>
           </td>
           <td className={td + " " + num + " align-top whitespace-nowrap"}>{fmt.peso(c.listCentavos)}</td>
-          <td className={td + " " + num + " align-top whitespace-nowrap"}>{c.booksCentavos === null ? "Not available" : fmt.peso(c.booksCentavos)}</td>
-          <td className={td + " " + num + " align-top whitespace-nowrap"}>{c.differenceCentavos === null ? "Not available" : fmt.peso(c.differenceCentavos)}</td>
+          <td className={td + " " + num + " align-top whitespace-nowrap"}>
+            <div>{c.booksCentavos === null ? "Not available" : fmt.peso(c.booksCentavos)}</div>
+            {c.beforeClosingCentavos != null && (
+              <div className="mt-0.5 text-meta font-normal text-ink-3">Before closings: {fmt.peso(c.beforeClosingCentavos)}</div>
+            )}
+          </td>
+          <td className={td + " " + num + " align-top whitespace-nowrap"}>
+            <div>{c.differenceCentavos === null ? "Not available" : fmt.peso(c.differenceCentavos)}</div>
+            {c.beforeClosingCentavos != null && (
+              <div className="mt-0.5 text-meta font-normal text-ink-3">Before closings: {fmt.peso(c.listCentavos - c.beforeClosingCentavos)}</div>
+            )}
+          </td>
           <td className={td + " align-top"}><span className={"inline-block rounded-md px-2 py-1 text-meta font-semibold " + STATUS[c.status].tone}>{STATUS[c.status].label}</span></td>
         </tr>)}
       </Table>

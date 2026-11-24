@@ -16,12 +16,44 @@ from sqlalchemy.orm import Session
 
 from modules.finance import bir_reports as bir
 from modules.finance.ledger import settings as posting_settings
-from modules.finance.models import Account, Bill, ImportedExpense, ImportedExpenseLine, JournalEntry, JournalLine, PettyCashVoucher
+from modules.finance.models import Account, Bill, ImportedExpense, ImportedExpenseLine, Invoice, InvoicePayment, JournalEntry, JournalLine, PaymentVoucher, PettyCashVoucher
 
-SOURCE_NAMES = {"invoice": "Sales invoices and collections", "bill": "Supplier bills", "voucher": "Payment vouchers",
+SOURCE_NAMES = {"invoice": "Sales invoices and collections", "credit_note": "Customer credit notes",
+                "bill": "Supplier bills", "vendor_credit": "Supplier vendor credits",
+                "voucher": "Payment vouchers", "advance": "Supplier prepayments and customer deposits",
                 "fund": "Marketing requests and liquidations", "manual": "Journal entries typed by hand", "admin": "Setup",
-                "pack": "Imported pack", "petty_cash": "Petty cash vouchers", "expense": "Imported expenses"}
+                "pack": "Imported pack", "petty_cash": "Petty cash vouchers", "expense": "Imported expenses",
+                "oojeema_gl": "Oojeema journal entries outside subledgers",
+                "oojeema_closing": "Tax closings, remittances & reclassifications"}
+CLOSING_MARKERS = ("2550-Q", "0619-", "TO CLOSE ", "TO SET UP EWT", "INCOME TAX EXPENSE", "PAYMENT OF EWT")
 ENTRIES_LISTED = 50
+
+
+def _closing_entry_ids(db: Session, entry_ids: set[str]) -> set[str]:
+    if not entry_ids:
+        return set()
+    hits: set[str] = set()
+    for eid, memo, desc in db.execute(
+        select(JournalEntry.id, JournalEntry.memo, JournalLine.description)
+        .join(JournalLine, JournalLine.entry_id == JournalEntry.id)
+        .where(JournalEntry.id.in_(entry_ids), JournalEntry.source == "oojeema_gl")
+    ):
+        text = f"{memo or ''} {desc or ''}".upper()
+        if any(marker in text for marker in CLOSING_MARKERS):
+            hits.add(eid)
+    return hits
+
+
+def _subledger_links(db: Session) -> dict[str, set[str]]:
+    def col(model):
+        return {eid for (eid,) in db.execute(select(model.entry_id).where(model.entry_id.is_not(None)))}
+
+    return {
+        "invoice_sale": col(Invoice),
+        "invoice_collection": col(InvoicePayment),
+        "bill": col(Bill),
+        "voucher": col(PaymentVoucher),
+    }
 
 
 def lines_on(db: Session, accounts: set[str], start: date | None, end: date) -> list[tuple]:
@@ -34,28 +66,38 @@ def lines_on(db: Session, accounts: set[str], start: date | None, end: date) -> 
     return [(e, int(d or 0), int(c or 0)) for e, d, c in db.execute(q)]
 
 
-def check(db, key, title, says, list_figure, accounts, start, end, credit_normal, expected, list_name, causes):
+def check(db, key, title, says, list_figure, accounts, start, end, credit_normal, expected, list_name, causes, *, linked_ids: set[str] = frozenset(), closing_ids: set[str] = frozenset()):
     """One comparison. `start` None: the balance at `end` (aging); else the movement in the period."""
     found = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_(accounts)))} if accounts else {}
     if not found:
         return {"key": key, "title": title, "says": says, "status": "not_set", "listName": list_name, "listCentavos": list_figure,
-                "booksCentavos": None, "differenceCentavos": None, "accounts": [], "otherSources": [], "causes": [],
+                "booksCentavos": None, "closingCentavos": 0, "beforeClosingCentavos": None,
+                "differenceCentavos": None, "accounts": [], "otherSources": [], "causes": [],
                 "message": "The account isn't set under Accounting → Default accounts, so the books can't be compared."}
     rows = lines_on(db, set(found), start, end)
     books = sum((c - d) if credit_normal else (d - c) for _, d, c in rows)
     others: dict[str, dict] = {}
+    closing_centavos = 0
     for e, d, c in rows:
-        if e.source in expected:
+        # Imported Oojeema GL entries linked directly to an invoice, bill, collection or voucher belong
+        # to that tax list; only unlinked JVs and closing entries sit outside the subledgers.
+        if e.source in expected or (e.source == "oojeema_gl" and e.id in linked_ids):
             continue
-        o = others.setdefault(e.source, {"source": e.source, "name": SOURCE_NAMES.get(e.source, e.source), "entries": 0, "centavos": 0, "listed": []})
+        delta = (c - d) if credit_normal else (d - c)
+        bucket = "oojeema_closing" if (e.source == "oojeema_gl" and e.id in closing_ids) else e.source
+        if bucket == "oojeema_closing" and start is not None:
+            closing_centavos += delta
+        o = others.setdefault(bucket, {"source": bucket, "name": SOURCE_NAMES.get(bucket, bucket), "entries": 0, "centavos": 0, "listed": []})
         o["entries"] += 1
-        o["centavos"] += (c - d) if credit_normal else (d - c)
+        o["centavos"] += delta
         if len(o["listed"]) < ENTRIES_LISTED:
-            o["listed"].append({"id": e.id, "number": e.number, "date": e.entry_date.isoformat(), "memo": e.memo, "centavos": (c - d) if credit_normal else (d - c)})
+            o["listed"].append({"id": e.id, "number": e.number, "date": e.entry_date.isoformat(), "memo": e.memo, "centavos": delta})
     difference = list_figure - books
+    before_closing = books - closing_centavos if (start is not None and closing_centavos) else None
     return {"key": key, "title": title, "says": says, "status": "agrees" if difference == 0 else "differs", "listName": list_name,
-            "listCentavos": list_figure, "booksCentavos": books, "differenceCentavos": difference,
-            "accounts": [{"id": a.id, "code": a.code, "name": a.name} for a in found.values()],
+            "listCentavos": list_figure, "booksCentavos": books, "closingCentavos": closing_centavos, "beforeClosingCentavos": before_closing,
+            "differenceCentavos": difference,
+            "accounts": [{"id": a.id, "code": a.code, "name": a.name} for a in sorted(found.values(), key=lambda x: x.code)],
             "otherSources": sorted(others.values(), key=lambda o: -abs(o["centavos"])),
             "causes": causes if difference else [], "message": None}
 
@@ -116,25 +158,39 @@ def readiness(db: Session, start: date, end: date, zone: ZoneInfo) -> dict:
     other = "Entries from other sources reach this account but not the tax list (listed below)."
     # Bills may post to a supplier's own payables account (e.g. AP - Trade), not only the default.
     payables = one(s.payables_account_id) | {a for (a,) in db.execute(select(Bill.payables_account_id).where(Bill.payables_account_id.is_not(None)).distinct())}
+    all_accts = list(db.scalars(select(Account)))
+    receivables_accts = one(s.receivables_account_id) | {
+        a.id for a in all_accts
+        if a.code == "0002-000" or (a.type == "asset" and a.name.strip().lower() in ("accounts receivable", "accounts receivable - trade"))
+    }
+    input_vat_accts = one(s.input_tax_account_id) | {a.id for a in all_accts if a.code.startswith(("1600-", "1601-", "1602-", "1603-")) or a.name.strip().lower().startswith("input vat")}
+    ewt_accts = one(s.withholding_account_id) | {a.id for a in all_accts if a.code.startswith(("2302-", "2303-", "2304-", "2305-", "2306-", "2307-")) or "1601-e" in a.name.lower()}
+    sub_links = _subledger_links(db)
+    oojeema_ids = {eid for (eid,) in db.execute(select(JournalEntry.id).where(JournalEntry.source == "oojeema_gl", JournalEntry.status == "approved", JournalEntry.entry_date <= end))}
+    closing_ids = _closing_entry_ids(db, oojeema_ids)
     checks = [
         check(db, "output_vat", "Output VAT", "Sales journal output VAT against the Output VAT account.",
-              sales.get("taxCentavos", 0), one(s.output_tax_account_id), start, end, True, {"invoice"}, "Sales journal",
-              [other, VOID_CAUSE]),
-        check(db, "input_vat", "Input VAT", "Purchase journal input VAT (what SLP and 2550Q read) against the Input VAT account.",
-              purchases["inputTaxCentavos"], one(s.input_tax_account_id), start, end, False, {"bill", "petty_cash", "expense"}, "Purchase journal",
-              [other, VOID_CAUSE, "Import VAT, or VAT on receipts recorded outside supplier bills, petty cash vouchers and imported expenses, never reaches the purchase lists."]),
-        check(db, "ewt", "Tax withheld from suppliers (EWT)", "Purchase journal tax withheld (what QAP, 0619-E and 1601-EQ read) against the withholding tax payable account.",
-              purchases["ewtCentavos"], one(s.withholding_account_id), start, end, True, {"bill", "petty_cash", "expense"}, "Purchase journal / QAP",
-              [other, VOID_CAUSE]),
+              sales.get("taxCentavos", 0), one(s.output_tax_account_id), start, end, True, {"invoice", "credit_note"}, "Sales journal",
+              [other, VOID_CAUSE], linked_ids=sub_links["invoice_sale"], closing_ids=closing_ids),
+        check(db, "input_vat", "Input VAT", "Purchase journal input VAT (what SLP and 2550Q read) against the Input VAT account(s).",
+              purchases["inputTaxCentavos"], input_vat_accts, start, end, False, {"bill", "petty_cash", "expense", "vendor_credit"}, "Purchase journal",
+              [other, VOID_CAUSE, "Import VAT, or VAT on receipts recorded outside supplier bills, petty cash vouchers and imported expenses, never reaches the purchase lists."],
+              linked_ids=sub_links["bill"], closing_ids=closing_ids),
+        check(db, "ewt", "Tax withheld from suppliers (EWT)", "Purchase journal tax withheld (what QAP, 0619-E and 1601-EQ read) against the withholding tax payable account(s).",
+              purchases["ewtCentavos"], ewt_accts, start, end, True, {"bill", "petty_cash", "expense", "vendor_credit"}, "Purchase journal / QAP",
+              [other, VOID_CAUSE], linked_ids=sub_links["bill"], closing_ids=closing_ids),
         check(db, "cwt", "Tax withheld by customers (CWT)", "Cash receipts tax withheld (what SAWT reads) against the creditable withholding tax account.",
               receipts["cwtCentavos"], one(s.cwt_account_id), start, end, False, {"invoice"}, "Cash receipts / SAWT",
-              [other, "A collection taken off in a later period: the books reverse it on the day it was taken off."]),
-        check(db, "receivables", "What customers owe at the period's end", "Receivables aging as of the last day against the receivables account balance.",
-              receivables_owed(db, end, zone), one(s.receivables_account_id), None, end, False, {"invoice"}, "Receivables aging",
-              [other, "Opening balances or adjustments posted to receivables without an invoice never appear in the aging."]),
+              [other, "A collection taken off in a later period: the books reverse it on the day it was taken off."],
+              linked_ids=sub_links["invoice_collection"], closing_ids=closing_ids),
+        check(db, "receivables", "What customers owe at the period's end", "Receivables aging as of the last day against the receivables account balance(s).",
+              receivables_owed(db, end, zone), receivables_accts, None, end, False, {"invoice", "credit_note", "advance"}, "Receivables aging",
+              [other, "Opening balances or adjustments posted to receivables without an invoice never appear in the aging."],
+              linked_ids=sub_links["invoice_sale"] | sub_links["invoice_collection"], closing_ids=closing_ids),
         check(db, "payables", "What we owe suppliers at the period's end", "Payables aging as of the last day against the payables account balance(s).",
-              payables_owed(db, end), payables, None, end, True, {"bill", "voucher"}, "Payables aging",
-              [other, "Opening balances, or supplier payments recorded by journal entry instead of a voucher, never appear in the aging (Oojeema's own AP aging is about 16% above its ledger for this reason)."]),
+              payables_owed(db, end), payables, None, end, True, {"bill", "voucher", "vendor_credit", "advance"}, "Payables aging",
+              [other, "Opening balances, or supplier payments recorded by journal entry instead of a voucher, never appear in the aging (Oojeema's own AP aging is about 16% above its ledger for this reason)."],
+              linked_ids=sub_links["bill"] | sub_links["voucher"], closing_ids=closing_ids),
     ]
     counts = {k: sum(1 for c in checks if c["status"] == k) for k in ("agrees", "differs", "not_set")}
     return {"from": start.isoformat(), "to": end.isoformat(), "checks": checks, "counts": counts,

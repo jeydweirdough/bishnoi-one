@@ -27,7 +27,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from modules.finance.models import Account, Bill, ImportedExpense, Invoice, InvoicePayment, JournalEntry, JournalLine, PettyCashLine, PettyCashVoucher, Supplier, TaxProfile
+from modules.finance.models import Account, Bill, CreditNote, ImportedExpense, Invoice, InvoicePayment, JournalEntry, JournalLine, PettyCashLine, PettyCashVoucher, Supplier, TaxProfile, VendorCredit
 from modules.finance import payables
 from modules.finance.tax.packs.ph import PERCENTAGE
 from modules.finance.tax.rates import lookup
@@ -106,6 +106,14 @@ def issued_between(db: Session, start: date, end: date, *, with_void: bool = Fal
     ))
 
 
+def credit_notes_between(db: Session, start: date, end: date, *, with_void: bool = False) -> list[CreditNote]:
+    statuses = ("issued", "void") if with_void else ("issued",)
+    return list(db.scalars(
+        select(CreditNote).where(CreditNote.status.in_(statuses), CreditNote.credit_date >= start, CreditNote.credit_date <= end)
+        .order_by(CreditNote.credit_date, CreditNote.number)
+    ))
+
+
 def sales_journal(db: Session, start: date, end: date) -> dict:
     rows, totals = [], {"gross": 0, **{k: 0 for k in SALES_KEYS}}
     for inv in issued_between(db, start, end, with_void=True):
@@ -120,6 +128,19 @@ def sales_journal(db: Session, start: date, end: date) -> dict:
         totals["gross"] += gross
         for k, v in a.items():
             totals[k] += v
+    for cn in credit_notes_between(db, start, end, with_void=True):
+        void = cn.status == "void"
+        a = {k: 0 for k in SALES_KEYS} if void else {k: -v for k, v in amounts_of(cn).items()}
+        gross = 0 if void else -cn.total_centavos
+        rows.append({
+            "date": cn.credit_date.isoformat(), "number": cn.number or "", "customer": cn.customer_name, "tin": cn.customer_tin,
+            "address": cn.customer_address, "void": void, "grossCentavos": gross,
+            **{f"{camel(k)}Centavos": v for k, v in a.items()},
+        })
+        totals["gross"] += gross
+        for k, v in a.items():
+            totals[k] += v
+    rows.sort(key=lambda r: (r["date"], r["number"] or ""))
     return {"rows": rows, "totals": {("grossCentavos" if k == "gross" else f"{camel(k)}Centavos"): v for k, v in totals.items()}}
 
 
@@ -187,9 +208,11 @@ def cash_disbursements(db: Session, start: date, end: date) -> dict:
     return {"rows": rows, "totals": {"amountCentavos": total}}
 
 
-def balances(db: Session, *, before: date | None = None, start: date | None = None, end: date | None = None) -> dict[str, tuple[int, int]]:
+def balances(db: Session, *, before: date | None = None, start: date | None = None, end: date | None = None, exclude_closing: bool = False) -> dict[str, tuple[int, int]]:
     """By account: (debits, credits) of the lines dated in the range."""
     q = select(JournalLine.account_id, func.sum(JournalLine.debit_centavos), func.sum(JournalLine.credit_centavos)).join(JournalEntry).where(JournalEntry.status == 'approved')
+    if exclude_closing:
+        q = q.where(JournalEntry.source != "closing")
     if before is not None:
         q = q.where(JournalEntry.entry_date < before)
     if start is not None:
@@ -236,7 +259,7 @@ def general_ledger(db: Session, start: date, end: date) -> dict:
 
 
 def income_statement(db: Session, start: date, end: date) -> dict:
-    moves = balances(db, start=start, end=end)
+    moves = balances(db, start=start, end=end, exclude_closing=True)
     accounts = db.scalars(select(Account).where(Account.type.in_(("income", "expense"))).order_by(Account.code)).all()
     income = [{"code": a.code, "account": a.name, "amountCentavos": signed(a, *moves.get(a.id, (0, 0)))} for a in accounts if a.type == "income"]
     expenses = [{"code": a.code, "account": a.name, "amountCentavos": signed(a, *moves.get(a.id, (0, 0)))} for a in accounts if a.type == "expense"]
@@ -274,11 +297,14 @@ def balance_sheet(db: Session, as_of: date) -> dict:
 # ---- Returns -----------------------------------------------------------------------------
 
 
-def sales_totals(invoices: list[Invoice]) -> dict[str, int]:
+def sales_totals(invoices: list[Invoice], credit_notes: list[CreditNote] = ()) -> dict[str, int]:
     t = {k: 0 for k in SALES_KEYS}
     for inv in invoices:
         for k, v in amounts_of(inv).items():
             t[k] += v
+    for cn in credit_notes:
+        for k, v in amounts_of(cn).items():
+            t[k] -= v
     return t
 
 
@@ -287,9 +313,9 @@ def vat_return(db: Session, p: Period) -> dict:
     who = taxpayer(db)
     months = []
     for m in months_of(p):
-        t = sales_totals(issued_between(db, m.start, m.end))
+        t = sales_totals(issued_between(db, m.start, m.end), credit_notes_between(db, m.start, m.end))
         months.append({"label": m.label, "start": m.start.isoformat(), "end": m.end.isoformat(), **{f"{camel(k)}Centavos": v for k, v in t.items()}})
-    t = sales_totals(issued_between(db, p.start, p.end))
+    t = sales_totals(issued_between(db, p.start, p.end), credit_notes_between(db, p.start, p.end))
     if who["regime"] == "non_vat":
         rate = lookup(db, "PH")(PERCENTAGE, p.end) or 0
         gross = t["non_taxable_sales"]
@@ -337,21 +363,31 @@ def vat_return(db: Session, p: Period) -> dict:
 
 
 def sls(db: Session, p: Period) -> dict:
-    """Summary List of Sales: by customer (TIN), the quarter's sales by kind."""
+    """Summary List of Sales: by customer (TIN), the quarter's sales by kind (net of issued credit notes)."""
     by: dict[tuple, dict] = {}
-    for inv in issued_between(db, p.start, p.end):
-        key = ((inv.customer_tin or "").strip(), inv.customer_name.strip().upper())
-        row = by.setdefault(key, {"tin": inv.customer_tin, "name": inv.customer_name, "address": inv.customer_address,
+    items = [(inv, 1) for inv in issued_between(db, p.start, p.end)] + [(cn, -1) for cn in credit_notes_between(db, p.start, p.end)]
+    for doc, sign in items:
+        key = ((doc.customer_tin or "").strip(), doc.customer_name.strip().upper())
+        row = by.setdefault(key, {"tin": doc.customer_tin, "name": doc.customer_name, "address": doc.customer_address,
                                    "exemptCentavos": 0, "zeroRatedCentavos": 0, "taxableCentavos": 0, "outputTaxCentavos": 0, "grossTaxableCentavos": 0})
-        a = amounts_of(inv)
-        row["exemptCentavos"] += a["exempt_sales"] + a["non_taxable_sales"]
-        row["zeroRatedCentavos"] += a["zero_rated_sales"]
-        row["taxableCentavos"] += a["taxable_sales"]
-        row["outputTaxCentavos"] += a["tax"]
-        row["grossTaxableCentavos"] += a["taxable_sales"] + a["tax"]
+        a = amounts_of(doc)
+        row["exemptCentavos"] += sign * (a["exempt_sales"] + a["non_taxable_sales"])
+        row["zeroRatedCentavos"] += sign * a["zero_rated_sales"]
+        row["taxableCentavos"] += sign * a["taxable_sales"]
+        row["outputTaxCentavos"] += sign * a["tax"]
+        row["grossTaxableCentavos"] += sign * (a["taxable_sales"] + a["tax"])
     rows = sorted(by.values(), key=lambda r: r["name"].upper())
     totals = {k: sum(r[k] for r in rows) for k in ("exemptCentavos", "zeroRatedCentavos", "taxableCentavos", "outputTaxCentavos", "grossTaxableCentavos")}
     return {"rows": rows, "totals": totals, "missingTin": sum(1 for r in rows if not r["tin"])}
+
+
+CWT_STATUTORY_BP: dict[str, int] = {
+    "WC158": 100, "WI158": 100, "WC640": 100,
+    "WC160": 200, "WI160": 200, "WC157": 200, "WC120": 200, "WI120": 200,
+    "WV010": 500, "WC100": 500, "WI100": 500, "WI010": 500,
+    "WC010": 1000, "WI011": 1000,
+    "WC011": 1500, "WC140": 1500,
+}
 
 
 def sawt(db: Session, p: Period) -> dict:
@@ -367,6 +403,11 @@ def sawt(db: Session, p: Period) -> dict:
         # The income payment the tax was withheld on: what this payment settled, net of VAT, in the invoice's own proportion.
         settled = pay.amount_centavos + pay.cwt_centavos
         base = round(settled * (inv.total_centavos - inv.tax_centavos) / inv.total_centavos) if inv.total_centavos else settled
+        expected_bp = CWT_STATUTORY_BP.get((pay.cwt_atc or "").strip().upper())
+        if expected_bp and base > 0:
+            raw_bp = round(pay.cwt_centavos * 10_000 / base)
+            if raw_bp != expected_bp and (raw_bp not in (50, 100, 200, 500, 1000, 1500) or (pay.cwt_atc or "").upper() == "WV010"):
+                base = round(pay.cwt_centavos * 10_000 / expected_bp)
         key = ((inv.customer_tin or "").strip(), inv.customer_name.strip().upper(), pay.cwt_atc)
         row = by.setdefault(key, {"tin": inv.customer_tin, "payor": inv.customer_name, "atc": pay.cwt_atc, "incomePaymentCentavos": 0, "withheldCentavos": 0, "certificates": []})
         row["incomePaymentCentavos"] += base
@@ -444,6 +485,9 @@ def classify(lines: list[dict]) -> tuple[dict, dict, list]:
 
 def purchase(db: Session, bill: Bill) -> Purchase:
     worked = payables.work_out(db, bill.lines or [], bill.bill_date, bill.amounts_include_vat)
+    withheld_lines = [ln for ln in worked.lines if ln.get("withholding") and ln.get("withheldCentavos")]
+    if len(withheld_lines) == 1 and bill.withheld_centavos and worked.withheld != bill.withheld_centavos:
+        withheld_lines[0]["withheldCentavos"] = bill.withheld_centavos
     kinds, types, held = classify(worked.lines)
     return Purchase("bill", bill.bill_date, bill.no, bill.bill_number, bill.supplier_id,
                     (bill.supplier.company_name or bill.supplier.name).strip(), bill.supplier.tin, bill.supplier.address,
@@ -476,8 +520,22 @@ def imported_expense(x: ImportedExpense) -> Purchase:
                     x.status == "void", x.net_centavos, x.vat_centavos, x.withheld_centavos, kinds, types, held)
 
 
+def vendor_credit_purchase(db: Session, vc: VendorCredit) -> Purchase:
+    worked = payables.work_out(db, vc.lines or [], vc.credit_date, vc.amounts_include_vat)
+    kinds, types, held = classify(worked.lines)
+    neg_kinds = {k: -v for k, v in kinds.items()}
+    neg_types = {k: {"netCentavos": -v["netCentavos"], "vatCentavos": -v["vatCentavos"]} for k, v in types.items()}
+    neg_held = [(code, bp, -base, -tax) for code, bp, base, tax in held]
+    return Purchase(
+        "vendor_credit", vc.credit_date, vc.number or "", vc.reference, vc.supplier_id,
+        (vc.supplier.company_name or vc.supplier.name).strip(), vc.supplier.tin, vc.supplier.address,
+        vc.status == "void", -vc.net_centavos, -vc.vat_centavos, -vc.withheld_centavos,
+        neg_kinds, neg_types, neg_held,
+    )
+
+
 def bills_between(db: Session, start: date, end: date, *, with_void: bool = False, supplier_id: str | None = None) -> list[Purchase]:
-    """Every purchase dated in the period: supplier bills, petty cash receipts and imported expenses, in date order."""
+    """Every purchase dated in the period: supplier bills, vendor credits, petty cash receipts and imported expenses, in date order."""
     statuses = ("recorded", "void") if with_void else ("recorded",)
     out: list[Purchase] = []
     if not supplier_id or not supplier_id.startswith("store:"):
@@ -485,6 +543,10 @@ def bills_between(db: Session, start: date, end: date, *, with_void: bool = Fals
         if supplier_id:
             q = q.where(Bill.supplier_id == supplier_id)
         out += [purchase(db, b) for b in db.scalars(q.order_by(Bill.bill_date, Bill.no))]
+        vc_q = select(VendorCredit).where(VendorCredit.status.in_(statuses), VendorCredit.credit_date >= start, VendorCredit.credit_date <= end)
+        if supplier_id:
+            vc_q = vc_q.where(VendorCredit.supplier_id == supplier_id)
+        out += [vendor_credit_purchase(db, vc) for vc in db.scalars(vc_q.order_by(VendorCredit.credit_date, VendorCredit.number))]
     if not supplier_id or supplier_id.startswith("store:"):
         q = select(PettyCashVoucher).where(PettyCashVoucher.status.in_(("posted", "void") if with_void else ("posted",)),
                                           PettyCashVoucher.voucher_date >= start, PettyCashVoucher.voucher_date <= end)
@@ -658,3 +720,56 @@ def withheld_suppliers(db: Session, p: Period) -> list[dict]:
         row = seen.setdefault(pu.supplier_id, {"id": pu.supplier_id, "name": pu.name, "tin": pu.tin, "taxCentavos": 0})
         row["taxCentavos"] += sum(h[3] for h in pu.held)
     return sorted(seen.values(), key=lambda r: r["name"].upper())
+
+
+def income_tax_1702q(db: Session, p: Period, rate_bp: int = 2500) -> dict:
+    """Quarterly Corporate Income Tax (BIR Form 1702Q) working draft from the Income Statement and SAWT."""
+    stmt = income_statement(db, p.start, p.end)
+    gross_sales = stmt["totals"]["incomeCentavos"]
+    cost_of_sales = sum(r["amountCentavos"] for r in stmt["expenses"] if str(r["code"]).startswith("5"))
+    operating_expenses = stmt["totals"]["expensesCentavos"] - cost_of_sales
+    gross_income = gross_sales - cost_of_sales
+    net_book_income = stmt["totals"]["netCentavos"]
+    taxable_income = max(0, net_book_income)
+    rcit = round(taxable_income * rate_bp / 10_000)
+    mcit_bp = 200
+    mcit = round(max(0, gross_income) * mcit_bp / 10_000)
+    tax_due = max(rcit, mcit)
+    cwt_credits = sawt(db, p)["totals"]["withheldCentavos"]
+    net_payable = tax_due - cwt_credits
+    return {
+        "form": "1702Q",
+        "title": "Quarterly income tax return (corporations)",
+        "rateBp": rate_bp,
+        "mcitRateBp": mcit_bp,
+        "lines": [
+            {"key": "gross_sales", "label": "Sales / revenues / receipts / fees", "amountCentavos": gross_sales},
+            {"key": "cost_of_sales", "label": "Less: Cost of sales / services (5xxx accounts)", "amountCentavos": cost_of_sales},
+            {"key": "gross_income", "label": "Gross income from operations", "amountCentavos": gross_income},
+            {"key": "operating_expenses", "label": "Less: Operating & itemized deductions", "amountCentavos": operating_expenses},
+            {"key": "net_book_income", "label": "Net income / (loss) per books", "amountCentavos": net_book_income},
+            {"key": "taxable_income", "label": "Taxable income (this quarter)", "amountCentavos": taxable_income},
+            {"key": "rcit", "label": f"Regular corporate income tax ({rate_bp / 100:.0f}%)", "amountCentavos": rcit},
+            {"key": "mcit", "label": "Minimum corporate income tax (2% of gross income, if applicable)", "amountCentavos": mcit},
+            {"key": "tax_due", "label": "Income tax due (higher of RCIT or MCIT)", "amountCentavos": tax_due},
+            {"key": "cwt_credits", "label": "Less: Creditable withholding tax (Forms 2307 / SAWT)", "amountCentavos": cwt_credits},
+            {"key": "net_payable", "label": "Net income tax payable / (overpayment)" if net_payable >= 0 else "Excess tax credits / (overpayment)", "amountCentavos": net_payable},
+        ],
+        "totals": {
+            "grossSalesCentavos": gross_sales,
+            "costOfSalesCentavos": cost_of_sales,
+            "grossIncomeCentavos": gross_income,
+            "operatingExpensesCentavos": operating_expenses,
+            "netBookIncomeCentavos": net_book_income,
+            "taxableIncomeCentavos": taxable_income,
+            "rcitCentavos": rcit,
+            "mcitCentavos": mcit,
+            "taxDueCentavos": tax_due,
+            "cwtCreditsCentavos": cwt_credits,
+            "netPayableCentavos": net_payable,
+        },
+        "notes": [
+            "Figures are derived from the General Ledger Income Statement (5xxx accounts treated as Cost of Sales) and SAWT Form 2307 credits.",
+            "Confirm non-deductible expenses, NOLCO, MCIT applicability (Year 4+ rule), CREATE 20% eligibility, and prior-quarter excess CWT with BIR Compliance before filing in eBIRForms.",
+        ],
+    }

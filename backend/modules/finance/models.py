@@ -54,8 +54,8 @@ class SalesOrder(Base):
     terms_days: Mapped[int] = mapped_column(Integer, default=30)
     prices_include_tax: Mapped[bool] = mapped_column(default=True)
     lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
-    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    tax_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    total_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    tax_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     notes: Mapped[str | None] = mapped_column(String(1000), default=None)
     created_by_id: Mapped[str] = mapped_column(ForeignKey("nbfi_users.id"))
     created_by: Mapped[str] = mapped_column(String(120))
@@ -480,7 +480,7 @@ class YearClosing(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     year_end: Mapped[date] = mapped_column(Date, unique=True)
     entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
-    net_income_centavos: Mapped[int] = mapped_column(Integer)
+    net_income_centavos: Mapped[int] = mapped_column(BigInteger)
     closed_by: Mapped[str] = mapped_column(String(120))
     closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -496,13 +496,13 @@ class FixedAsset(Base):
     asset_account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"))
     accumulated_account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"))
     expense_account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"))
-    cost_centavos: Mapped[int] = mapped_column(Integer)
-    salvage_centavos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    cost_centavos: Mapped[int] = mapped_column(BigInteger)
+    salvage_centavos: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     acquired_on: Mapped[date] = mapped_column(Date)
     useful_months: Mapped[int] = mapped_column(Integer)
     # The last month end depreciated; none yet.
     depreciated_until: Mapped[date | None] = mapped_column(Date, default=None)
-    accumulated_centavos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    accumulated_centavos: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     status: Mapped[str] = mapped_column(String(10), default="active", server_default="active")
     division_name: Mapped[str | None] = mapped_column(String(120), default=None)
     notes: Mapped[str | None] = mapped_column(String(500), default=None)
@@ -539,7 +539,7 @@ class JournalEntry(Base):
     memo: Mapped[str] = mapped_column(String(300))
     reference: Mapped[str | None] = mapped_column(String(80), default=None)
     # manual: written by Finance. fund: posted by a marketing request's step.
-    source: Mapped[str] = mapped_column(String(10), default="manual")
+    source: Mapped[str] = mapped_column(String(24), default="manual")
     fund_request_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_fund_requests.id", ondelete="SET NULL"), index=True, default=None)
     # The entry this one reverses, or that reversed this one.
     reverses_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
@@ -571,8 +571,8 @@ class JournalLine(Base):
     entry_id: Mapped[str] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="CASCADE"), index=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
     account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"), index=True)
-    debit_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    credit_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    debit_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    credit_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     description: Mapped[str | None] = mapped_column(String(200), default=None)
     # The bank reconciliation that found it on the statement (cleared); None while it hasn't shown up there.
     reconciliation_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_bank_reconciliations.id", ondelete="SET NULL"), index=True, default=None)
@@ -608,15 +608,15 @@ class FundRequest(Base):
     needed_on: Mapped[date | None] = mapped_column(Date, default=None)
     # Whether receipts and unused funds come back after it's spent.
     liquidate: Mapped[bool] = mapped_column(default=True)
-    requested_centavos: Mapped[int] = mapped_column(Integer)
-    approved_centavos: Mapped[int] = mapped_column(Integer)
+    requested_centavos: Mapped[int] = mapped_column(BigInteger)
+    approved_centavos: Mapped[int] = mapped_column(BigInteger)
     approved_by_name: Mapped[str] = mapped_column(String(120))
     approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     approval_note: Mapped[str | None] = mapped_column(String(500), default=None)
 
     status: Mapped[str] = mapped_column(String(16), default="to_release", index=True)
     # The release: how much, how it was handed over, and when it's to be liquidated by.
-    released_centavos: Mapped[int | None] = mapped_column(Integer, default=None)
+    released_centavos: Mapped[int | None] = mapped_column(BigInteger, default=None)
     release_method: Mapped[str | None] = mapped_column(String(20), default=None)
     release_reference: Mapped[str | None] = mapped_column(String(80), default=None)
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
@@ -628,11 +628,11 @@ class FundRequest(Base):
     checked_by_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_users.id", ondelete="SET NULL"), default=None)
     # What was sent back to be fixed, the last time it was.
     sent_back_note: Mapped[str | None] = mapped_column(String(500), default=None)
-    covered_centavos: Mapped[int | None] = mapped_column(Integer, default=None)
-    return_due_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    returned_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    reimburse_due_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    reimbursed_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    covered_centavos: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    return_due_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    returned_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    reimburse_due_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    reimbursed_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     cancel_reason: Mapped[str | None] = mapped_column(String(500), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -656,7 +656,7 @@ class FundExpense(Base):
     spent_on: Mapped[date] = mapped_column(Date)
     description: Mapped[str] = mapped_column(String(200))
     category_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_expense_categories.id", ondelete="SET NULL"), default=None)
-    amount_centavos: Mapped[int] = mapped_column(Integer)
+    amount_centavos: Mapped[int] = mapped_column(BigInteger)
     # The receipt (nbfi_stored_files), or why there isn't one.
     receipt_ref: Mapped[str | None] = mapped_column(String(32), default=None)
     receipt_name: Mapped[str | None] = mapped_column(String(160), default=None)
@@ -682,7 +682,7 @@ class FundEvent(Base):
     kind: Mapped[str] = mapped_column(String(20))
     who: Mapped[str] = mapped_column(String(120))
     text: Mapped[str] = mapped_column(String(500))
-    amount_centavos: Mapped[int | None] = mapped_column(Integer, default=None)
+    amount_centavos: Mapped[int | None] = mapped_column(BigInteger, default=None)
 
 
 class StoredFile(Base):
@@ -772,11 +772,11 @@ class Invoice(Base):
     computed: Mapped[dict | None] = mapped_column(JSON, default=None)
     # What its goods cost us, booked when it's issued (migration 0024): the total, and each line's
     # cost per unit as Inventory gave it (None: not known, by its item code).
-    cost_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    cost_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     line_costs: Mapped[list | None] = mapped_column(JSON, default=None)
-    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    tax_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    paid_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    total_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    tax_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    paid_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     created_by: Mapped[str] = mapped_column(String(120))
@@ -812,7 +812,7 @@ class InvoicePayment(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     invoice_id: Mapped[str] = mapped_column(ForeignKey("nbfi_invoices.id", ondelete="CASCADE"), index=True)
     paid_on: Mapped[date] = mapped_column(Date)
-    amount_centavos: Mapped[int] = mapped_column(Integer)
+    amount_centavos: Mapped[int] = mapped_column(BigInteger)
     # cash, bank, ewallet, check: the money account it lands in (Default accounts).
     method: Mapped[str] = mapped_column(String(10))
     reference: Mapped[str | None] = mapped_column(String(80), default=None)
@@ -823,7 +823,7 @@ class InvoicePayment(Base):
     check_date: Mapped[date | None] = mapped_column(Date, default=None)
     # What the customer withheld from this payment and paid the BIR for us (their Form 2307):
     # it settles the invoice as much as cash does. Its ATC ("WC158") and the certificate's reference.
-    cwt_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    cwt_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     cwt_atc: Mapped[str | None] = mapped_column(String(8), default=None)
     cwt_certificate: Mapped[str | None] = mapped_column(String(60), default=None)
     entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
@@ -1056,15 +1056,15 @@ class Bill(Base):
     lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
     tax_reviewed: Mapped[bool] = mapped_column(default=False)
     # Worked out (app/payables.py), and kept as recorded.
-    net_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    vat_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    withheld_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
-    payable_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    net_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    vat_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    withheld_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    total_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    payable_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
     # What released payment vouchers have paid on it, and the payables account it posted to
     # when recorded (vouchers take it off that same account). Migration 0019.
-    paid_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    paid_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     payables_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
     # Where a draft stands in its approval (Aubrey's flow, 2026-10-23; migration 0020): none (being
     # made), to_approve (Malou; Cristal backup), to_check (Mel, only with tax withheld), returned.
@@ -1148,7 +1148,7 @@ class PaymentVoucher(Base):
     method: Mapped[str] = mapped_column(String(10), default="bank")
     # The bank or cash account it's paid from (an account under CASH in the chart).
     paid_from_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
-    total_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    total_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     # The same payment in the other systems (Aubrey Q9, Q13; step 6).
     oojeema_ref: Mapped[str | None] = mapped_column(String(60), default=None)
     zoho_ref: Mapped[str | None] = mapped_column(String(60), default=None)
@@ -1187,7 +1187,7 @@ class VoucherLine(Base):
     voucher_id: Mapped[str] = mapped_column(ForeignKey("nbfi_payment_vouchers.id", ondelete="CASCADE"), index=True)
     bill_id: Mapped[str] = mapped_column(ForeignKey("nbfi_bills.id"), index=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
-    amount_centavos: Mapped[int] = mapped_column(Integer)
+    amount_centavos: Mapped[int] = mapped_column(BigInteger)
 
     bill: Mapped[Bill] = relationship(lazy="joined")
 
@@ -1234,8 +1234,8 @@ class BankReconciliation(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"), index=True)
     statement_date: Mapped[date] = mapped_column(Date)
-    statement_balance_centavos: Mapped[int] = mapped_column(Integer)
-    opening_balance_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    statement_balance_centavos: Mapped[int] = mapped_column(BigInteger)
+    opening_balance_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
     status: Mapped[str] = mapped_column(String(6), default="open", index=True)
     # While open: the journal lines ticked as on the statement.
     cleared: Mapped[list[int]] = mapped_column(JSON, default=list)
@@ -1598,6 +1598,218 @@ class CompanyScopeReview(Base):
     evidence: Mapped[dict] = mapped_column(JSON)
     reviewed_by: Mapped[str] = mapped_column(String(120))
     reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CreditNote(Base):
+    """Customer credit note: sales return or post-invoice adjustment (migration 0042)."""
+
+    __tablename__ = "nbfi_credit_notes"
+    __table_args__ = (CheckConstraint("status IN ('draft', 'issued', 'void')", name="credit_note_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    status: Mapped[str] = mapped_column(String(10), default="draft", index=True)
+    number: Mapped[str | None] = mapped_column(String(30), unique=True, default=None)
+    invoice_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_invoices.id", ondelete="SET NULL"), index=True, default=None)
+    customer_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
+    customer_name: Mapped[str] = mapped_column(String(200))
+    customer_tin: Mapped[str | None] = mapped_column(String(20), default=None)
+    customer_address: Mapped[str | None] = mapped_column(String(300), default=None)
+    treatment: Mapped[str] = mapped_column(String(20), default="regular")
+    buyer_id_number: Mapped[str | None] = mapped_column(String(40), default=None)
+    credit_date: Mapped[date] = mapped_column(Date)
+    reference: Mapped[str | None] = mapped_column(String(80), default=None)
+    reason: Mapped[str | None] = mapped_column(String(500), default=None)
+    prices_include_tax: Mapped[bool | None] = mapped_column(default=None)
+    lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    computed: Mapped[dict | None] = mapped_column(JSON, default=None)
+    total_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    tax_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    applied_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    issued_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    voided_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    void_reason: Mapped[str | None] = mapped_column(String(300), default=None)
+
+    allocations: Mapped[list["CreditAllocation"]] = relationship(
+        back_populates="credit_note", order_by="CreditAllocation.applied_on", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class CreditAllocation(Base):
+    """Applies an issued customer credit note against an unpaid issued invoice (migration 0042)."""
+
+    __tablename__ = "nbfi_credit_allocations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    credit_note_id: Mapped[str] = mapped_column(ForeignKey("nbfi_credit_notes.id", ondelete="CASCADE"), index=True)
+    invoice_id: Mapped[str] = mapped_column(ForeignKey("nbfi_invoices.id", ondelete="CASCADE"), index=True)
+    applied_on: Mapped[date] = mapped_column(Date)
+    amount_centavos: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    removed_by: Mapped[str | None] = mapped_column(String(120), default=None)
+
+    credit_note: Mapped[CreditNote] = relationship(back_populates="allocations")
+
+
+class VendorCredit(Base):
+    """Supplier vendor credit / debit memo (migration 0042)."""
+
+    __tablename__ = "nbfi_vendor_credits"
+    __table_args__ = (CheckConstraint("status IN ('draft', 'recorded', 'void')", name="vendor_credit_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    status: Mapped[str] = mapped_column(String(10), default="draft", index=True)
+    number: Mapped[str | None] = mapped_column(String(30), unique=True, default=None)
+    bill_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_bills.id", ondelete="SET NULL"), index=True, default=None)
+    supplier_id: Mapped[str] = mapped_column(ForeignKey("nbfi_suppliers.id"), index=True)
+    credit_date: Mapped[date] = mapped_column(Date)
+    reference: Mapped[str] = mapped_column(String(60))
+    reason: Mapped[str | None] = mapped_column(String(500), default=None)
+    amounts_include_vat: Mapped[bool] = mapped_column(default=True)
+    lines: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    net_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    vat_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    withheld_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    total_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    credit_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    applied_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    payables_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_accounts.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    recorded_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    voided_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    void_reason: Mapped[str | None] = mapped_column(String(300), default=None)
+
+    supplier: Mapped[Supplier] = relationship(lazy="joined")
+    allocations: Mapped[list["VendorCreditAllocation"]] = relationship(
+        back_populates="vendor_credit", order_by="VendorCreditAllocation.applied_on", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class VendorCreditAllocation(Base):
+    """Applies a recorded vendor credit against an unpaid recorded bill (migration 0042)."""
+
+    __tablename__ = "nbfi_vendor_credit_allocations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    vendor_credit_id: Mapped[str] = mapped_column(ForeignKey("nbfi_vendor_credits.id", ondelete="CASCADE"), index=True)
+    bill_id: Mapped[str] = mapped_column(ForeignKey("nbfi_bills.id", ondelete="CASCADE"), index=True)
+    applied_on: Mapped[date] = mapped_column(Date)
+    amount_centavos: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    removed_by: Mapped[str | None] = mapped_column(String(120), default=None)
+
+    vendor_credit: Mapped[VendorCredit] = relationship(back_populates="allocations")
+
+
+class Advance(Base):
+    """Supplier prepayment (1401-000) or customer deposit/retainer (2205-000) before a bill/invoice exists (migration 0042)."""
+
+    __tablename__ = "nbfi_advances"
+    __table_args__ = (
+        CheckConstraint("kind IN ('supplier', 'customer')", name="advance_kind"),
+        CheckConstraint("status IN ('posted', 'void')", name="advance_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(10), index=True)
+    status: Mapped[str] = mapped_column(String(10), default="posted", index=True)
+    number: Mapped[str] = mapped_column(String(30), unique=True)
+    party_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
+    party_name: Mapped[str] = mapped_column(String(200))
+    advance_date: Mapped[date] = mapped_column(Date)
+    method: Mapped[str] = mapped_column(String(12), default="bank")
+    bank_account_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_bank_accounts.id", ondelete="SET NULL"), default=None)
+    advance_account_id: Mapped[str] = mapped_column(ForeignKey("nbfi_accounts.id"))
+    reference: Mapped[str | None] = mapped_column(String(80), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    amount_centavos: Mapped[int] = mapped_column(BigInteger)
+    applied_centavos: Mapped[int] = mapped_column(BigInteger, default=0)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    voided_by: Mapped[str | None] = mapped_column(String(120), default=None)
+    void_reason: Mapped[str | None] = mapped_column(String(300), default=None)
+
+    applications: Mapped[list["AdvanceApplication"]] = relationship(
+        back_populates="advance", order_by="AdvanceApplication.applied_on", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class AdvanceApplication(Base):
+    """Applies a posted supplier prepayment to a bill, or customer deposit to an invoice (migration 0042)."""
+
+    __tablename__ = "nbfi_advance_applications"
+    __table_args__ = (CheckConstraint("target_kind IN ('bill', 'invoice')", name="advance_app_target"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    advance_id: Mapped[str] = mapped_column(ForeignKey("nbfi_advances.id", ondelete="CASCADE"), index=True)
+    target_kind: Mapped[str] = mapped_column(String(10))
+    target_id: Mapped[str] = mapped_column(String(36), index=True)
+    applied_on: Mapped[date] = mapped_column(Date)
+    amount_centavos: Mapped[int] = mapped_column(BigInteger)
+    entry_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_journal_entries.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    removed_by: Mapped[str | None] = mapped_column(String(120), default=None)
+
+    advance: Mapped[Advance] = relationship(back_populates="applications")
+
+
+class RecurringTemplate(Base):
+    """Schedule to generate draft bills or draft invoices without auto-posting unreviewed entries (migration 0042)."""
+
+    __tablename__ = "nbfi_recurring_templates"
+    __table_args__ = (
+        CheckConstraint("kind IN ('bill', 'invoice')", name="recurring_kind"),
+        CheckConstraint("frequency IN ('weekly', 'monthly', 'quarterly', 'yearly')", name="recurring_frequency"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(10), index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    frequency: Mapped[str] = mapped_column(String(12), default="monthly")
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date | None] = mapped_column(Date, default=None)
+    next_run_date: Mapped[date] = mapped_column(Date, index=True)
+    is_active: Mapped[bool] = mapped_column(default=True, server_default=true())
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    generated_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
+
+
+class DocumentScan(Base):
+    """Uploaded supplier invoice/receipt scan waiting to become a draft bill (migration 0042)."""
+
+    __tablename__ = "nbfi_document_scans"
+    __table_args__ = (CheckConstraint("status IN ('ready', 'linked', 'archived')", name="document_scan_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    file_ref: Mapped[str] = mapped_column(String(32))
+    file_name: Mapped[str] = mapped_column(String(200))
+    file_type: Mapped[str] = mapped_column(String(100))
+    file_size: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(12), default="ready", index=True)
+    raw_text: Mapped[str] = mapped_column(Text, default="")
+    parsed: Mapped[dict] = mapped_column(JSON, default=dict)
+    linked_bill_id: Mapped[str | None] = mapped_column(ForeignKey("nbfi_bills.id", ondelete="SET NULL"), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120))
 
 
 # Numbers on SQLite as records are saved (on Postgres the database gives them).

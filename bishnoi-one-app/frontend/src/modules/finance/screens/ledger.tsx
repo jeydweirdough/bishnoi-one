@@ -227,9 +227,11 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
 }
 
 export async function ChartPage({ searchParams }: { searchParams: Search }) {
+  const me = await getCompanyMe();
   const requested = one((await searchParams).company_use);
   const companyUse = ["history", "review", "legacy", "all"].includes(requested) ? requested : "2mg";
   const chart = await load<Chart>(`/finance/ledger/accounts?company_use=${companyUse}`);
+  const canApprove2mg = companyUse !== "2mg" && Boolean(me.permissions?.includes("accounts.manage"));
   return (
     <>
       <PageHeader title="Chart of accounts">
@@ -239,9 +241,9 @@ export async function ChartPage({ searchParams }: { searchParams: Search }) {
       <nav aria-label="Account company use" className="mb-3 flex flex-wrap gap-3 text-sm">
         {[['2mg', '2MG accounts'], ['history', 'Retained history (read only)']].map(([value, label]) => <Link key={value} href={screen(`/ledger/accounts?company_use=${value}`)} aria-current={companyUse === value ? "page" : undefined} className={companyUse === value ? "font-semibold text-hema underline" : "text-ink-2 hover:underline"}>{label}</Link>)}
       </nav>
-      {companyUse !== '2mg' && <p className="mb-3 text-meta">These accounts are read only and retained for historical links. They cannot be used for new 2MG entries. Existing transactions remain in the books; no accounts or transactions were deleted.</p>}
+      {companyUse !== '2mg' && <p className="mb-3 text-meta">These accounts are retained outside active 2MG use. Select accounts below to approve them for 2MG, or leave them here as historical links.</p>}
       <Sheet className="px-5 py-4">
-        <ChartEditor accounts={chart.items} canEdit={chart.canEdit} importer={<ChartImport key="import" />} />
+        <ChartEditor accounts={chart.items} canEdit={chart.canEdit} canApprove2mg={canApprove2mg} importer={<ChartImport key="import" />} />
       </Sheet>
     </>
   );
@@ -281,47 +283,49 @@ export async function AccountPage({ params, searchParams }: { params: Promise<{ 
           Show
         </button>
       </form>
-      <Sheet className="overflow-x-auto">
-        <table className="w-full min-w-[40rem] text-sm">
-          <thead>
-            <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-              <th className="px-5 py-2.5 font-semibold">Date</th>
-              <th className="px-3 py-2.5 font-semibold">Entry</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Debit</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Credit</th>
-              <th className="px-5 py-2.5 text-right font-semibold">Balance</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-rule">
-            {isDate(from) && (
-              <tr className="text-ink-2">
-                <td className="px-5 py-2" colSpan={4}>
-                  Opening balance
-                </td>
-                <td className="px-5 py-2 text-right tabular-nums">{fmt.peso(ledger.openingCentavos)}</td>
+      <Sheet className="min-w-0 max-w-full">
+        <div role="region" aria-label="Account ledger entries" tabIndex={0} className="max-h-[62vh] max-w-full overflow-auto overscroll-contain rounded-xl focus-visible:outline-2 focus-visible:outline-hema print:max-h-none print:overflow-visible">
+          <table className="w-full min-w-[40rem] text-sm">
+            <thead className="sticky top-0 z-10 bg-sheet shadow-[0_1px_0_0_var(--color-rule)] print:static">
+              <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
+                <th className="px-5 py-2.5 font-semibold">Date</th>
+                <th className="px-3 py-2.5 font-semibold">Entry</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Debit</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Credit</th>
+                <th className="px-5 py-2.5 text-right font-semibold">Balance</th>
               </tr>
-            )}
-            {ledger.lines.map((ln, i) => (
-              <tr key={i}>
-                <td className="px-5 py-2 whitespace-nowrap text-ink-2">{fmt.dateLabel(ln.date)}</td>
-                <td className="px-3 py-2">
-                  <span className="font-mono text-meta">{ln.number}</span> {ln.memo}
-                  {ln.description && <span className="text-ink-3"> · {ln.description}</span>}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">{ln.debitCentavos ? fmt.peso(ln.debitCentavos) : ""}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{ln.creditCentavos ? fmt.peso(ln.creditCentavos) : ""}</td>
-                <td className="px-5 py-2 text-right font-medium tabular-nums">{fmt.peso(ln.balanceCentavos)}</td>
-              </tr>
-            ))}
-            {ledger.lines.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-5 py-6 text-center text-meta text-ink-3">
-                  No entries in this period.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-rule">
+              {isDate(from) && (
+                <tr className="text-ink-2">
+                  <td className="px-5 py-2" colSpan={4}>
+                    Opening balance
+                  </td>
+                  <td className="px-5 py-2 text-right tabular-nums">{fmt.peso(ledger.openingCentavos)}</td>
+                </tr>
+              )}
+              {ledger.lines.map((ln, i) => (
+                <tr key={i} className="hover:bg-bench/30">
+                  <td className="px-5 py-2 whitespace-nowrap text-ink-2">{fmt.dateLabel(ln.date)}</td>
+                  <td className="px-3 py-2">
+                    <span className="font-mono text-meta font-semibold">{ln.number}</span> {ln.memo}
+                    {ln.description && <span className="text-ink-3"> · {ln.description}</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{ln.debitCentavos ? fmt.peso(ln.debitCentavos) : ""}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{ln.creditCentavos ? fmt.peso(ln.creditCentavos) : ""}</td>
+                  <td className="px-5 py-2 text-right font-medium tabular-nums">{fmt.peso(ln.balanceCentavos)}</td>
+                </tr>
+              ))}
+              {ledger.lines.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-6 text-center text-meta text-ink-3">
+                    No entries in this period.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </Sheet>
     </>
   );
@@ -349,48 +353,75 @@ export async function TrialBalancePage({ searchParams }: { searchParams: Search 
           </>
         )}
       </PageHeader>
-      <form className="mb-4 flex items-end gap-3" action="/finance/ledger/trial-balance">
-        <label className="text-meta text-ink-2">
-          As of
-          <input suppressHydrationWarning type="date" name="to" defaultValue={tb.to} className="ml-2 h-8 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
-        </label>
-        <button suppressHydrationWarning type="submit" className="h-8 rounded-[3px] border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control">
-          Show
-        </button>
-      </form>
-      <Sheet className="overflow-x-auto">
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <Sheet className="px-4 py-3.5">
+          <p className="text-meta text-ink-3">Total debits</p>
+          <p className="mt-1 text-heading tabular-nums">{fmt.peso(tb.debitCentavos)}</p>
+        </Sheet>
+        <Sheet className="px-4 py-3.5">
+          <p className="text-meta text-ink-3">Total credits</p>
+          <p className="mt-1 text-heading tabular-nums">{fmt.peso(tb.creditCentavos)}</p>
+        </Sheet>
+        <Sheet className="px-4 py-3.5">
+          <p className="text-meta text-ink-3">Trial balance status ({tb.rows.length} accounts)</p>
+          <p className={`mt-1 text-heading font-semibold ${balanced ? "text-sage-deep" : "text-danger"}`}>
+            {balanced ? "Balanced (₱0.00 diff)" : `Out of balance by ${fmt.peso(Math.abs(tb.debitCentavos - tb.creditCentavos))}`}
+          </p>
+        </Sheet>
+      </div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rule bg-sheet px-4 py-3">
+        <form className="flex flex-wrap items-center gap-3" action="/finance/ledger/trial-balance">
+          <label className="flex items-center gap-2 text-meta font-medium text-ink-2">
+            As of
+            <input suppressHydrationWarning type="date" name="to" defaultValue={tb.to} className="h-8 rounded-lg border border-rule-strong bg-sheet px-2.5 text-sm text-ink" />
+          </label>
+          <button suppressHydrationWarning type="submit" className="h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold text-ink hover:border-control">
+            Show
+          </button>
+        </form>
+        <span className="text-meta text-ink-3">Click any account row to inspect its ledger transactions</span>
+      </div>
+      <Sheet className="min-w-0 max-w-full">
         {tb.rows.length === 0 ? (
           <Empty title="No entries yet" icon="lists" />
         ) : (
-          <table className="w-full min-w-[36rem] text-sm">
-            <thead>
-              <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                <th className="px-5 py-2.5 font-semibold">Account</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Debit</th>
-                <th className="px-5 py-2.5 text-right font-semibold">Credit</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-rule">
-              {tb.rows.map((r) => (
-                <tr key={r.account.id}>
-                  <td className="px-5 py-2">
-                    <Link href={`/finance/ledger/accounts/${r.account.id}`} className="hover:text-hema hover:underline">
-                      <span className="font-mono text-meta text-ink-2">{r.account.code}</span> {r.account.name}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.debitCentavos ? fmt.peso(r.debitCentavos) : ""}</td>
-                  <td className="px-5 py-2 text-right tabular-nums">{r.creditCentavos ? fmt.peso(r.creditCentavos) : ""}</td>
+          <div role="region" aria-label="Trial balance table" tabIndex={0} className="max-h-[60vh] max-w-full overflow-auto overscroll-contain rounded-xl focus-visible:outline-2 focus-visible:outline-hema print:max-h-none print:overflow-visible">
+            <table className="w-full min-w-[36rem] text-sm">
+              <thead className="sticky top-0 z-10 bg-sheet shadow-[0_1px_0_0_var(--color-rule)] print:static">
+                <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
+                  <th className="w-28 py-2.5 pr-3 pl-5 font-semibold">Code</th>
+                  <th className="px-3 py-2.5 font-semibold">Account</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Debit</th>
+                  <th className="px-5 py-2.5 text-right font-semibold">Credit</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className={`border-t-2 border-ink font-semibold tabular-nums ${balanced ? "" : "text-danger"}`}>
-                <td className="px-5 py-2.5">Total</td>
-                <td className="px-3 py-2.5 text-right">{fmt.peso(tb.debitCentavos)}</td>
-                <td className="px-5 py-2.5 text-right">{fmt.peso(tb.creditCentavos)}</td>
-              </tr>
-            </tfoot>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-rule">
+                {tb.rows.map((r) => (
+                  <tr key={r.account.id} className="transition-colors hover:bg-bench/30">
+                    <td className="py-2.5 pr-3 pl-5 font-mono text-meta font-semibold text-ink-2">
+                      <Link href={`/finance/ledger/accounts/${r.account.id}`} className="hover:text-hema hover:underline">
+                        {r.account.code}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <Link href={`/finance/ledger/accounts/${r.account.id}`} className="font-medium text-ink hover:text-hema hover:underline">
+                        {r.account.name}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{r.debitCentavos ? fmt.peso(r.debitCentavos) : ""}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums">{r.creditCentavos ? fmt.peso(r.creditCentavos) : ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="sticky bottom-0 z-10 bg-sheet shadow-[0_-1px_0_0_var(--color-ink)] print:static">
+                <tr className={`border-t-2 border-ink font-semibold tabular-nums ${balanced ? "" : "text-danger"}`}>
+                  <td className="py-3 pr-3 pl-5" colSpan={2}>Total</td>
+                  <td className="px-3 py-3 text-right">{fmt.peso(tb.debitCentavos)}</td>
+                  <td className="px-5 py-3 text-right">{fmt.peso(tb.creditCentavos)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         )}
       </Sheet>
     </>

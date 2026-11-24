@@ -74,3 +74,29 @@ def test_a_bill_voided_in_a_later_period_shows_as_a_difference(client, ana, team
 def test_an_end_before_the_start_is_refused(client, ana):  # noqa: F811
     r = client.get("/finance/bir/readiness", params={"start": TODAY.isoformat(), "end": (TODAY - timedelta(days=1)).isoformat()}, headers=ana)
     assert r.status_code == 422
+
+
+def test_secondary_trade_receivable_and_oojeema_closing_are_tracked(client, app, ana):  # noqa: F811
+    from modules.finance import company_scope
+
+    ready(client, ana)
+    with app.state.sessions() as db:
+        s = posting_settings(db)
+        ar2 = Account(code="0002-000", name="Accounts Receivable", type="asset", is_active=True)
+        vat = db.get(Account, s.output_tax_account_id)
+        db.add(ar2)
+        db.flush()
+        company_scope.approve_for_2mg(db, "account", [ar2.id], reviewed_by="Test")
+        post(db, date.fromisoformat(ago(10)), "Opening secondary AR", [Leg(ar2, debit=50_000), Leg(vat, credit=50_000)], "Import", source="opening")
+        post(db, TODAY, "Oojeema 2550-Q closing", [Leg(vat, debit=30_000), Leg(ar2, credit=30_000)], "Import", reference="JV-CLS", source="oojeema_gl")
+        db.commit()
+    checks = readiness(client, ana, ago(30), TODAY.isoformat())
+    # Both receivables accounts (1100 and 0002-000) combine cleanly in the receivables check.
+    ar = checks["receivables"]
+    assert any(a["code"] == "0002-000" for a in ar["accounts"])
+    assert ar["booksCentavos"] == 20_000
+    # Quarter-end VAT closing shows separately in beforeClosingCentavos so Output VAT isn't masked.
+    ov = checks["output_vat"]
+    assert ov["booksCentavos"] == 20_000 and ov["closingCentavos"] == -30_000 and ov["beforeClosingCentavos"] == 50_000
+    assert any(o["source"] == "oojeema_closing" for o in ov["otherSources"])
+

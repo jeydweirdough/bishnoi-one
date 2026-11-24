@@ -73,18 +73,17 @@ def _money(c,value,top,*,base=False,monthly=False):
     for i,ch in enumerate(f'{cents:02}'):c.drawCentredString(cent+14.3*i,h-top,ch)
 
 def _identity(c,who,form,page=0):
-    if form=='0619E':groups=(224.8,282.6,340.6);top=180.2;name,address=(23,205),(23,234)
-    elif form=='1601EQ':groups=(240.5,297.7,354.9);top=158.5;name,address=(23,183.5),(23,212)
-    else:groups=(244.0,301.2,358.4);top=173.6;name,address=(28,202),(28,235)
+    if form=='0619E':groups=(224.8,282.6,340.6);top=178.5;name,address=(23,205),(23,234);b_first,b_step=399.5,14.3;r_first,r_step=543.5,14.3
+    elif form=='1601EQ':groups=(240.5,297.7,354.9);top=157.0;name,address=(23,183.5),(23,212);b_first,b_step=412.5,14.3;r_first,r_step=557.0,14.3
+    else:groups=(242.5,299.7,356.9);top=170.5;name,address=(28,201),(28,234);b_first,b_step=414.5,13.6;r_first,r_step=555.5,14.2
     tin=re.sub(r'\D','',who.get('tin') or '')
     if tin and len(tin)!=9:raise ValueError('TIN requires nine main digits and a separate five-digit branch.')
     _boxes(c,tin,[g+i*14.3 for g in groups for i in range(3)],top)
     branch=str(who.get('branchCode') or '')
     if branch and not re.fullmatch(r'\d{5}',branch):raise ValueError('Branch requires five digits.')
-    first={'0619E':399.5,'1601EQ':412.5,'1604E':416.0}[form]
-    _boxes(c,branch,[first+i*14.3 for i in range(5)],top)
-    rdo=str(who.get('rdoCode') or '').upper()
-    _boxes(c,rdo,[{'0619E':543.5,'1601EQ':557.0,'1604E':556.8}[form]+i*14.3 for i in range(3)],top)
+    _boxes(c,branch,[b_first+i*b_step for i in range(5)],top)
+    rdo=re.sub(r'^0(\d{2}[0-9A-Z])$',r'\1',str(who.get('rdoCode') or '').strip().upper())
+    _boxes(c,rdo,[r_first+i*r_step for i in range(3)],top)
     _fit(c,who.get('registeredName'),*name,565)
     _fit(c,who.get('address'),*address,550,8)
 
@@ -111,10 +110,13 @@ def render(d:dict)->bytes:
         if i>0:
             if form=='1604E':
                 supplement=BytesIO();sc=canvas.Canvas(supplement,pagesize=(width,height),invariant=1)
-                _fit(sc,d['taxpayer'].get('registeredName'),225,131,362)
+                _fit(sc,d['taxpayer'].get('registeredName'),225,130,362)
                 tin=re.sub(r'\D','',d['taxpayer'].get('tin') or '')+str(d['taxpayer'].get('branchCode') or '')
-                _boxes(sc,tin,[29.6+j*14.3 for j in range(len(tin))],134.5)
-                _fit(sc,'SEE ATTACHED REVIEW ALPHALIST - ELECTRONIC ACCEPTANCE NOT VERIFIED',24,230,560,7)
+                _boxes(sc,tin,[28.5+j*13.75 for j in range(len(tin))],134.0)
+                _fit(sc,'SEE ATTACHED REVIEW ALPHALIST - ELECTRONIC ACCEPTANCE NOT VERIFIED',150,229,265,6.5)
+                sc.setFont('Helvetica-Bold',8)
+                sc.drawRightString(442,height-271,f"{Decimal(d['totals']['baseCentavos'])/100:,.2f}")
+                sc.drawRightString(584,height-271,f"{Decimal(d['totals']['taxCentavos'])/100:,.2f}")
                 sc.save();page.merge_page(PdfReader(BytesIO(supplement.getvalue())).pages[0])
             writer.add_page(page);continue
         b=BytesIO();c=canvas.Canvas(b,pagesize=(width,height),invariant=1)
@@ -141,7 +143,7 @@ def render(d:dict)->bytes:
         else:
             year=str(d['year'])
             if not year.startswith('20'):raise ValueError('Official annual template preprints year 20; unsupported century.')
-            _boxes(c,year[-2:],[181.4,199.8],134.3)
+            _boxes(c,year[-2:],[179.0,197.5],131.5)
             # Both actual remittance schedules intentionally remain blank. The
             # existing annual report supplies a computed alphalist, not payments.
         c.setFillColor(HexColor('#9B2525'));c.setFont('Helvetica-Bold',8)

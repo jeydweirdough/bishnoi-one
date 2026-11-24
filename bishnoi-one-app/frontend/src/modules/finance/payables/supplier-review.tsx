@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/src/modules/finance/platform/ui/button";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
-import { loadSupplierReview, saveSupplierReview } from "./actions";
+import { approveSuppliersFor2mg, loadSupplierReview, saveSupplierReview } from "./actions";
 import type { SupplierReviewChange, SupplierReviewList, SupplierReviewRow } from "./supplier-review-types";
 
 type Edit = { before: SupplierReviewRow; after: SupplierReviewRow };
@@ -13,7 +13,7 @@ const control = "h-9 max-w-full rounded border border-rule-strong bg-sheet px-2 
 const where = (s: SupplierReviewRow) => s.origin === "local" ? "Local" : s.origin === "foreign" ? "Foreign" : "Not set";
 
 /** Editing is visible in the list; review stays in the same workspace. */
-export function SupplierReview({ initial, initialQuery, org }: { initial: SupplierReviewList; initialQuery: string; org: Org }) {
+export function SupplierReview({ initial, initialQuery, org, canApprove2mg = false }: { initial: SupplierReviewList; initialQuery: string; org: Org; canApprove2mg?: boolean }) {
   const fmt = makeFormat(org);
   const [list, setList] = useState(initial);
   const [search, setSearch] = useState(initialQuery);
@@ -100,6 +100,22 @@ export function SupplierReview({ initial, initialQuery, org }: { initial: Suppli
     } finally { setBusy(false); setSaving(false); }
   }
 
+  async function approveFor2mg() {
+    if (busy || uncertain || !picks.length) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const result = await approveSuppliersFor2mg(picks.map(p => p.id));
+      if (!result.ok) { setError(result.error); return; }
+      setSelected({});
+      setMessage(`Approved ${result.data.approved} supplier${result.data.approved === 1 ? "" : "s"} for 2MG.`);
+      await load(list.page);
+    } catch {
+      setError("Could not approve the selected suppliers for 2MG.");
+    } finally { setBusy(false); }
+  }
+
+  const showSelection = list.canEdit || (applied.companyUse !== "2mg" && canApprove2mg);
+
   return <div className="space-y-4">
     {list.reconciliation && <section className="space-y-2 rounded border border-rule bg-sheet p-3" aria-label="2MG export reconciliation">
       <p className="text-sm">2MG Oojeema export: <strong>{list.reconciliation.sourceRows} source rows</strong> · {list.reconciliation.matchedRows} linked to existing suppliers · {list.reconciliation.createdRows} newly added · {list.reconciliation.issues.length} identity issues. Trade-name aliases can link to one supplier.</p>
@@ -115,6 +131,11 @@ export function SupplierReview({ initial, initialQuery, org }: { initial: Suppli
     </form>
     {applied.companyUse !== "2mg" && <p role="status" className="rounded border border-rule bg-bench/30 p-3 text-sm">Retained records are read only. They support existing history and are not verified for new 2MG work. Being outside the verified list does not prove a supplier is GPI-only.</p>}
     <p className="text-meta text-ink-3">Edit verified 2MG suppliers directly in the table. Local/Foreign is a supplier classification; importation is a bill purchase type. No usual code means no default is selected.</p>
+    {applied.companyUse !== "2mg" && canApprove2mg && <div className="flex flex-wrap items-center gap-3 rounded border border-rule bg-bench/30 p-3">
+      <p className="text-sm font-semibold">{picks.length} selected supplier{picks.length === 1 ? "" : "s"}</p>
+      <Button type="button" variant="primary" disabled={busy || uncertain || !picks.length} onClick={() => void approveFor2mg()}>Approve selected for 2MG</Button>
+      {!!picks.length && <Button type="button" disabled={busy} onClick={() => setSelected({})}>Clear selection</Button>}
+    </div>}
     {list.canEdit && <div className="flex flex-wrap items-end gap-3 rounded border border-rule bg-bench/30 p-3">
       <p className="self-center text-sm font-semibold">{picks.length} selected suppliers{hidden ? ` · ${hidden} outside this page` : ""}</p>
       <label className="grid gap-1 text-meta">Set classification<select className={control} value={bulkOrigin} onChange={e => setBulkOrigin(e.target.value)} disabled={busy || uncertain}><option value="">Keep current</option><option value="local">Local</option><option value="foreign">Foreign</option></select></label>
@@ -131,22 +152,31 @@ export function SupplierReview({ initial, initialQuery, org }: { initial: Suppli
     </section>}
     {error && <div role="alert" className="space-y-2 rounded border border-rule-strong p-3"><p>{error}</p><p className="text-meta">Reloading replaces this view and discards unsaved changes.</p><Button type="button" disabled={busy} onClick={() => window.location.reload()}>Reload saved values</Button></div>}
     {message && <p ref={statusRef} tabIndex={-1} role="status" className="text-sm">{message}</p>}
-    <div className="overflow-x-auto rounded border border-rule bg-sheet" aria-busy={busy}>
-      <table className="w-full min-w-[48rem] text-sm"><caption className="sr-only">Suppliers with directly editable classification and usual withholding tax code</caption><thead><tr className="border-b border-rule text-left text-meta">
-        {list.canEdit && <th className="p-3"><input type="checkbox" aria-label="Select suppliers on this page only" disabled={busy || uncertain || !list.items.length} checked={!!list.items.length && list.items.every(s => !!selected[s.id])} onChange={e => { const checked = e.target.checked; setSelected(previous => { const next = { ...previous }; for (const s of list.items) { if (checked) next[s.id] = s; else delete next[s.id]; } return next; }); }} /></th>}
-        <th className="p-3">Supplier / contact</th><th className="p-3">Local / Foreign</th><th className="p-3">Usual tax withheld</th><th className="p-3">Tax defaults</th><th className="p-3 text-right">Payables</th>
-      </tr></thead><tbody>{list.items.map(saved => {
-        const row = edits[saved.id]?.after ?? saved;
-        return <tr key={row.id} className={`border-b border-rule ${edits[row.id] ? "bg-bench/50" : ""}`}>
-          {list.canEdit && <td className="p-3"><input type="checkbox" aria-label={`Select ${row.name}`} checked={!!selected[row.id]} disabled={busy || uncertain} onChange={e => { const checked = e.target.checked; setSelected(previous => { const next = { ...previous }; if (checked) next[row.id] = saved; else delete next[row.id]; return next; }); }} /></td>}
-          <td className="p-3"><Link className="font-semibold text-hema underline" href={`/finance/suppliers/${row.id}`} onClick={e => { if (changes.length) { e.preventDefault(); setError("Save or discard your list changes before opening supplier details."); } }}>{row.name}</Link><span className="block text-meta">{row.companyName}</span><span className="block text-meta">{row.tin ? `TIN ${row.tin}${row.branchCode ? `-${row.branchCode}` : ""}` : "No TIN"}</span><span className="block text-meta">{[row.email, row.phone].filter(Boolean).join(" · ")}</span>{!row.isActive && <span className="block text-meta">Switched off</span>}{!!edits[row.id] && <span className="block text-meta">Unsaved change</span>}</td>
-          <td className="p-3">{list.canEdit ? <select aria-label={`${row.name}: Local or Foreign`} className={control} value={row.origin ?? ""} disabled={busy || uncertain} onChange={e => edit([saved], { origin: e.target.value as "local" | "foreign" })}><option value="" disabled>Not set</option><option value="local">Local</option><option value="foreign">Foreign</option></select> : where(row)}</td>
-          <td className="p-3">{list.canEdit ? <select aria-label={`${row.name}: usual tax withheld`} className={`${control} w-80`} value={row.withholding ?? ""} disabled={busy || uncertain} onChange={e => edit([saved], { withholding: e.target.value || null })}><option value="">No usual code</option>{list.withholding.map(w => <option key={w.code} value={w.code}>{w.code} · {w.name} · {w.rateBp / 100}%</option>)}</select> : codeLabel(row.withholding)}</td>
-          <td className="p-3 text-meta">{edits[row.id] ? "Will need confirmation" : row.taxDefaultsConfirmed ? "Confirmed" : "Confirm on bill"}</td>
-          <td className="p-3 text-right tabular-nums">{fmt.peso(row.owedCentavos)}</td>
-        </tr>;
-      })}{!list.items.length && <tr><td className="p-5" colSpan={list.canEdit ? 6 : 5}>No suppliers match these filters.</td></tr>}</tbody></table>
+    <div className="flex flex-wrap items-center justify-between gap-3 text-meta text-ink-2">
+      <p className="tabular-nums">{list.total} matching suppliers · Page {list.page} of {list.pages} ({list.items.length} shown)</p>
+      <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" type="button" disabled={busy || uncertain || list.page <= 1} onClick={() => void load(1)}>First</Button>
+        <Button size="sm" type="button" disabled={busy || uncertain || list.page <= 1} onClick={() => void load(list.page - 1)}>Previous</Button>
+        <Button size="sm" type="button" disabled={busy || uncertain || list.page >= list.pages} onClick={() => void load(list.page + 1)}>Next</Button>
+        <Button size="sm" type="button" disabled={busy || uncertain || list.page >= list.pages} onClick={() => void load(list.pages)}>Last</Button>
+      </div>
     </div>
-    <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><p>{list.total} matching suppliers · Page {list.page} of {list.pages} · {list.items.length} on this page</p><div className="flex flex-wrap gap-2"><Button type="button" disabled={busy || uncertain || list.page <= 1} onClick={() => void load(1)}>First</Button><Button type="button" disabled={busy || uncertain || list.page <= 1} onClick={() => void load(list.page - 1)}>Previous</Button><Button type="button" disabled={busy || uncertain || list.page >= list.pages} onClick={() => void load(list.page + 1)}>Next</Button><Button type="button" disabled={busy || uncertain || list.page >= list.pages} onClick={() => void load(list.pages)}>Last</Button></div></div>
+    <div role="region" aria-label="Suppliers list" tabIndex={0} className="max-h-[60vh] max-w-full overflow-auto overscroll-contain rounded-xl border border-rule bg-sheet shadow-sheet focus-visible:outline-2 focus-visible:outline-hema" aria-busy={busy}>
+      <table className="w-full min-w-[52rem] text-sm"><caption className="sr-only">Suppliers with directly editable classification and usual withholding tax code</caption><thead className="sticky top-0 z-10 bg-sheet shadow-[0_1px_0_0_var(--color-rule)]"><tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
+        {showSelection && <th className="w-10 py-3 pr-2 pl-4"><input type="checkbox" aria-label="Select suppliers on this page only" disabled={busy || uncertain || !list.items.length} checked={!!list.items.length && list.items.every(s => !!selected[s.id])} onChange={e => { const checked = e.target.checked; setSelected(previous => { const next = { ...previous }; for (const s of list.items) { if (checked) next[s.id] = s; else delete next[s.id]; } return next; }); }} /></th>}
+        <th className="px-3 py-3 font-semibold first:pl-5">Supplier / contact</th><th className="px-3 py-3 font-semibold">Local / Foreign</th><th className="px-3 py-3 font-semibold">Usual tax withheld</th><th className="px-3 py-3 font-semibold">Tax defaults</th><th className="py-3 pr-5 pl-3 text-right font-semibold">Payables</th>
+      </tr></thead><tbody className="divide-y divide-rule">{list.items.map(saved => {
+        const row = edits[saved.id]?.after ?? saved;
+        return <tr key={row.id} className={`transition-colors ${edits[row.id] ? "bg-bench/50" : "hover:bg-bench/30"}`}>
+          {showSelection && <td className="py-3 pr-2 pl-4 align-top"><input type="checkbox" aria-label={`Select ${row.name}`} checked={!!selected[row.id]} disabled={busy || uncertain} onChange={e => { const checked = e.target.checked; setSelected(previous => { const next = { ...previous }; if (checked) next[row.id] = saved; else delete next[row.id]; return next; }); }} /></td>}
+          <td className="px-3 py-3 first:pl-5"><Link className="font-semibold text-hema hover:underline" href={`/finance/suppliers/${row.id}`} onClick={e => { if (changes.length) { e.preventDefault(); setError("Save or discard your list changes before opening supplier details."); } }}>{row.name}</Link>{row.companyName && row.companyName !== row.name && <span className="block text-meta text-ink-2">{row.companyName}</span>}<span className="mt-0.5 block font-mono text-meta text-ink-3">{row.tin ? `TIN ${row.tin}${row.branchCode ? `-${row.branchCode}` : ""}` : "No TIN"}</span>{(row.email || row.phone) && <span className="block text-meta text-ink-3">{[row.email, row.phone].filter(Boolean).join(" · ")}</span>}{!row.isActive && <span className="block text-meta text-danger">Switched off</span>}{!!edits[row.id] && <span className="block text-meta font-semibold text-due-today">Unsaved change</span>}</td>
+          <td className="px-3 py-3 align-middle">{list.canEdit ? <select aria-label={`${row.name}: Local or Foreign`} className={control} value={row.origin ?? ""} disabled={busy || uncertain} onChange={e => edit([saved], { origin: e.target.value as "local" | "foreign" })}><option value="" disabled>Not set</option><option value="local">Local</option><option value="foreign">Foreign</option></select> : where(row)}</td>
+          <td className="px-3 py-3 align-middle">{list.canEdit ? <select aria-label={`${row.name}: usual tax withheld`} className={`${control} w-80`} value={row.withholding ?? ""} disabled={busy || uncertain} onChange={e => edit([saved], { withholding: e.target.value || null })}><option value="">No usual code</option>{list.withholding.map(w => <option key={w.code} value={w.code}>{w.code} · {w.name} · {w.rateBp / 100}%</option>)}</select> : codeLabel(row.withholding)}</td>
+          <td className="px-3 py-3 align-middle text-meta">{edits[row.id] ? <span className="font-semibold text-due-today">Will need confirmation</span> : row.taxDefaultsConfirmed ? <span className="rounded-full bg-mint-2 px-2 py-0.5 font-medium text-sage-deep">Confirmed</span> : <span className="text-ink-3">Confirm on bill</span>}</td>
+          <td className="py-3 pr-5 pl-3 align-middle text-right font-medium tabular-nums">{fmt.peso(row.owedCentavos)}</td>
+        </tr>;
+      })}{!list.items.length && <tr><td className="p-6 text-center text-ink-3" colSpan={showSelection ? 6 : 5}>No suppliers match these filters.</td></tr>}</tbody></table>
+    </div>
+    <div className="flex flex-wrap items-center justify-between gap-3 text-meta text-ink-2"><p className="tabular-nums">{list.total} matching suppliers · Page {list.page} of {list.pages} · {list.items.length} on this page</p><div className="flex flex-wrap gap-1.5"><Button size="sm" type="button" disabled={busy || uncertain || list.page <= 1} onClick={() => void load(1)}>First</Button><Button size="sm" type="button" disabled={busy || uncertain || list.page <= 1} onClick={() => void load(list.page - 1)}>Previous</Button><Button size="sm" type="button" disabled={busy || uncertain || list.page >= list.pages} onClick={() => void load(list.page + 1)}>Next</Button><Button size="sm" type="button" disabled={busy || uncertain || list.page >= list.pages} onClick={() => void load(list.pages)}>Last</Button></div></div>
   </div>;
 }

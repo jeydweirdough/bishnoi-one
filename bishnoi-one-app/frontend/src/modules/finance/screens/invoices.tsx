@@ -2,6 +2,8 @@ import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import { loadLetterhead } from "@/src/platform/print/letterhead";
 import { ExternalLink, Pencil, Plus, ReceiptText, Trash2, Wallet } from "lucide-react";
 import { RowMenu } from "@/src/platform/ui/row-menu";
+import { Pager } from "@/src/platform/ui/pager";
+import { pageOf, slicePage } from "@/src/platform/ui/paging";
 import { Trash2 as BulkTrash } from "lucide-react";
 import { bulkDeleteInvoices, deleteInvoice } from "@/src/modules/finance/invoices/actions";
 import Link from "next/link";
@@ -12,7 +14,7 @@ import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import { InvoiceEditor } from "@/src/modules/finance/invoices/editor";
 import { AddSeries, AutoInvoiceSetting, SwitchSeries } from "@/src/modules/finance/invoices/series-editor";
 import { DeleteDraft, IssueInvoice, PrintButton, RecordPayment, ReissueInvoice, RemovePayment, VoidInvoice } from "@/src/modules/finance/invoices/steps";
-import { STATUS_LABELS, type Ageing, type Invoice, type InvoiceStatus, type InvoiceSummary, type Series, type TaxChoices } from "@/src/modules/finance/invoices/types";
+import { STATUS_LABELS, type Ageing, type IncomeAccountOption, type Invoice, type InvoiceStatus, type InvoiceSummary, type Series, type TaxChoices } from "@/src/modules/finance/invoices/types";
 import { Amount } from "@/src/modules/finance/platform/ui/amount";
 import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Figure, type PillTone } from "@/src/platform/ui/list-layout";
 import { ExpandableTable } from "@/src/platform/ui/expandable-table";
@@ -25,7 +27,7 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 const may = (me: { permissions?: string[] }, p: string) => me.permissions?.includes(p) ?? false;
 
-type SeriesList = { items: Series[]; canSetup: boolean; crmLinked: boolean };
+type SeriesList = { items: Series[]; canSetup: boolean; crmLinked: boolean; incomeAccounts?: IncomeAccountOption[] };
 type TaxSetup = { pack: { categories: TaxChoices["categories"]; treatments: TaxChoices["treatments"] }; profile: { pricesIncludeTax: boolean }; today: string };
 
 async function taxChoices(): Promise<{ choices: TaxChoices; today: string }> {
@@ -94,10 +96,16 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
   const f = list.figures;
   const collect = may(me, "invoices.collect");
   const total = list.counts.draft + list.counts.issued + list.counts.void;
+  const size = [10, 25, 50, 100].includes(Number(one(sp.size))) ? Number(one(sp.size)) : 25;
+  const { rows: pagedItems, page } = slicePage(list.items, pageOf(sp.page), size);
+  const navigation = new URLSearchParams(query);
+  navigation.set("size", String(size));
+  const pager = <Pager total={list.items.length} page={page} size={size} base={"/finance/invoices?" + navigation} noun="invoices" />;
   const href = (s: string) => {
     const next = new URLSearchParams();
     if (s) next.set("status", s);
     if (q) next.set("q", q);
+    if (size !== 25) next.set("size", String(size));
     const text = next.toString();
     return text ? `/finance/invoices?${text}` : "/finance/invoices";
   };
@@ -133,25 +141,46 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
               ? [{ href: "/finance/invoices?attention=1", label: "From deliveries to check", count: list.counts.attention, current: attention }]
               : []),
             { href: "/finance/invoices/receivables", label: "Receivables", current: false },
+            { href: "/finance/credit-notes", label: "Credit notes", current: false },
           ]}
         />
-        <ListToolbar q={q} placeholder="Search customer, number or reference" keep={{ status }} />
+        <ListToolbar q={q} placeholder="Search customer, number or reference" keep={{ status, size: String(size) }}>
+          <form action="/finance/invoices" className="flex items-center gap-2 text-meta text-ink-2">
+            {status && <input suppressHydrationWarning type="hidden" name="status" value={status} />}
+            {q && <input suppressHydrationWarning type="hidden" name="q" value={q} />}
+            {attention && <input suppressHydrationWarning type="hidden" name="attention" value="1" />}
+            <label className="flex items-center gap-2">
+              Rows per page
+              <select suppressHydrationWarning name="size" defaultValue={size} className="h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-ink">
+                {[10, 25, 50, 100].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+            <button suppressHydrationWarning type="submit" className="h-8 rounded-lg border border-rule-strong bg-sheet px-2.5 text-meta font-semibold text-ink hover:border-control">
+              Show
+            </button>
+          </form>
+        </ListToolbar>
         {list.items.length === 0 ? (
           <Empty title={q || status ? "No matching invoices" : "No invoices yet"} icon="lists">
             {!q && !status && may(me, "invoices.create") ? "Make the first one with New invoice." : null}
           </Empty>
         ) : (
-          <ExpandableTable
-            bulk={{ noun: ["draft invoice", "draft invoices"], actions: [{ label: "Delete", icon: <BulkTrash className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone.", run: bulkDeleteInvoices }] }}
-            columns={[
-              { key: "number", label: "Number" },
-              { key: "customer", label: "Customer" },
-              { key: "date", label: "Date" },
-              { key: "due", label: "Due date" },
-              { key: "total", label: "Total", align: "right" },
-              { key: "status", label: "Payment" },
-            ]}
-            rows={list.items.map((i) => {
+          <>
+            <div className="border-b border-rule px-5 pb-3 print:hidden">{pager}</div>
+            <div key={navigation.toString() + page} role="region" aria-label={"Sales invoices, page " + page} tabIndex={0} className="max-h-[60vh] max-w-full overflow-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-hema [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10 [&_thead]:bg-sheet [&_thead]:shadow-[0_1px_0_0_var(--color-rule)] print:max-h-none print:overflow-visible">
+              <ExpandableTable
+                bulk={{ noun: ["draft invoice", "draft invoices"], actions: [{ label: "Delete", icon: <BulkTrash className="size-4" aria-hidden />, doing: "Deleting", done: "deleted", danger: true, confirm: "This can't be undone.", run: bulkDeleteInvoices }] }}
+                columns={[
+                  { key: "number", label: "Number" },
+                  { key: "customer", label: "Customer" },
+                  { key: "date", label: "Date" },
+                  { key: "due", label: "Due date" },
+                  { key: "total", label: "Total", align: "right" },
+                  { key: "status", label: "Payment" },
+                ]}
+                rows={pagedItems.map((i) => {
               const s = standing(i, today);
               const payments = i.payments.filter((p) => !p.removedAt);
               return {
@@ -236,7 +265,10 @@ export async function InvoicesPage({ searchParams }: { searchParams: Search }) {
                   ),
               };
             })}
-          />
+              />
+            </div>
+            <div className="border-t border-rule px-5 pb-3 print:hidden">{pager}</div>
+          </>
         )}
       </ListFrame>
     </>
@@ -251,7 +283,7 @@ export async function NewInvoicePage() {
       <PageHeader title="New invoice" crumbs={[{ href: "/finance/invoices", label: "Sales invoices" }]}>
         Saved as a draft first: its amounts and VAT are worked out, then it&apos;s issued from the invoice&apos;s page.
       </PageHeader>
-      <InvoiceEditor invoice={null} choices={choices} org={me.org} today={today} crmLinked={series.crmLinked} />
+      <InvoiceEditor invoice={null} choices={choices} org={me.org} today={today} crmLinked={series.crmLinked} incomeAccounts={series.incomeAccounts ?? []} />
     </>
   );
 }
@@ -269,7 +301,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
     return (
       <>
         <PageHeader title={`Draft for ${inv.customer.name}`} crumbs={crumbs} />
-        <InvoiceEditor invoice={inv} choices={choices} org={me.org} today={today} crmLinked={series.crmLinked} />
+        <InvoiceEditor invoice={inv} choices={choices} org={me.org} today={today} crmLinked={series.crmLinked} incomeAccounts={series.incomeAccounts ?? []} />
       </>
     );
   }
@@ -430,15 +462,22 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
                 </tr>
               </thead>
               <tbody className="divide-y divide-rule">
-                {c.lines.map((l, i) => (
+                {c.lines.map((l, i) => {
+                  const lineAcctId = inv.lines[i]?.accountId;
+                  const lineAcct = lineAcctId ? inv.lineAccounts?.[lineAcctId] : undefined;
+                  return (
                   <tr key={i}>
-                    <td className="py-1.5 pr-2">{l.description ?? inv.lines[i]?.description ?? ""}</td>
+                    <td className="py-1.5 pr-2">
+                      <div>{l.description ?? inv.lines[i]?.description ?? ""}</div>
+                      {lineAcct && <div className="mt-0.5 text-meta text-ink-3 print:hidden">Income account: {lineAcct.code} {lineAcct.name}</div>}
+                    </td>
                     <td className="px-2 py-1.5 text-right tabular-nums">{inv.lines[i]?.quantity}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums">{fmt.peso(inv.lines[i]?.unitPriceCentavos ?? 0)}</td>
                     <td className="px-2 py-1.5 text-meta text-ink-2">{l.codeName}</td>
                     <td className="py-1.5 pl-2 text-right tabular-nums">{fmt.peso(l.totalCentavos)}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <div className="mt-4 ml-auto max-w-sm space-y-1 text-sm">
@@ -620,51 +659,84 @@ export async function ReceivablesPage() {
           {age.buckets.map((b) => (b.amountCentavos ? <span key={b.key} className={BUCKET_TONES[b.key]} style={{ width: `${(b.amountCentavos / age.totalCentavos) * 100}%` }} /> : null))}
         </div>
       )}
-      <Sheet>
+      <Sheet className="min-w-0 max-w-full">
         {age.customers.length === 0 ? (
           <Empty title="No outstanding receivables" icon="payments">
             Every issued invoice is paid.
           </Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <div role="region" aria-label="Customer receivables aging" tabIndex={0} className="max-h-[62vh] max-w-full overflow-auto overscroll-contain rounded-xl focus-visible:outline-2 focus-visible:outline-hema print:max-h-none print:overflow-visible">
             <table className="w-full min-w-[52rem] text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-sheet shadow-[0_1px_0_0_var(--color-rule)] print:static">
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                  <th className="py-2 pr-3 pl-5 font-semibold">Customer</th>
+                  <th className="py-2.5 pr-3 pl-5 font-semibold">Customer ({age.customers.length})</th>
                   {age.buckets.map((b) => (
-                    <th key={b.key} className="px-3 py-2 text-right font-semibold">
+                    <th key={b.key} className="px-3 py-2.5 text-right font-semibold">
                       {b.label.replace(" days late", "").replace("Not yet due", "Current")}
                     </th>
                   ))}
-                  <th className="py-2 pr-5 pl-3 text-right font-semibold">Balance due</th>
+                  <th className="py-2.5 pr-5 pl-3 text-right font-semibold">Balance due</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-rule">
-                {age.customers.map((c) => (
-                  <tr key={c.customerId ?? c.name} className="align-top">
-                    <td className="py-2.5 pr-3 pl-5">
-                      <p className="font-semibold">{c.name}</p>
-                      <p className="mt-0.5 text-meta text-ink-3">
-                        {c.invoices.map((i, n) => (
-                          <span key={i.id}>
-                            {n > 0 && ", "}
-                            <Link href={`/finance/invoices/${i.id}`} className="font-mono text-hema hover:underline">
-                              {i.number}
-                            </Link>
-                            {i.daysLate > 0 && <span className="text-danger"> {i.daysLate}d overdue</span>}
-                          </span>
-                        ))}
-                      </p>
-                    </td>
-                    {age.buckets.map((b) => (
-                      <td key={b.key} className={`px-3 py-2.5 text-right tabular-nums ${c.buckets[b.key] && b.key !== "current" ? "text-danger" : ""}`}>
-                        {c.buckets[b.key] ? fmt.peso(c.buckets[b.key]) : ""}
+                {age.customers.map((c) => {
+                  const preview = c.invoices.slice(0, 4);
+                  const rest = c.invoices.slice(4);
+                  return (
+                    <tr key={c.customerId ?? c.name} className="align-top hover:bg-bench/30">
+                      <td className="py-3 pr-3 pl-5">
+                        <p className="font-semibold text-ink">{c.name}</p>
+                        <div className="mt-1 text-meta text-ink-3">
+                          {preview.map((i, n) => (
+                            <span key={i.id}>
+                              {n > 0 && ", "}
+                              <Link href={`/finance/invoices/${i.id}`} className="font-mono text-hema hover:underline">
+                                {i.number}
+                              </Link>
+                              {i.daysLate > 0 && <span className="text-danger"> {i.daysLate}d overdue</span>}
+                            </span>
+                          ))}
+                          {rest.length > 0 && (
+                            <details className="mt-1">
+                              <summary className="cursor-pointer text-meta font-semibold text-hema hover:underline">
+                                +{rest.length} more {rest.length === 1 ? "invoice" : "invoices"}
+                              </summary>
+                              <p className="mt-1 leading-relaxed">
+                                {rest.map((i, n) => (
+                                  <span key={i.id}>
+                                    {n > 0 && ", "}
+                                    <Link href={`/finance/invoices/${i.id}`} className="font-mono text-hema hover:underline">
+                                      {i.number}
+                                    </Link>
+                                    {i.daysLate > 0 && <span className="text-danger"> {i.daysLate}d overdue</span>}
+                                  </span>
+                                ))}
+                              </p>
+                            </details>
+                          )}
+                        </div>
                       </td>
-                    ))}
-                    <td className="py-2.5 pr-5 pl-3 text-right font-semibold tabular-nums">{fmt.peso(c.totalCentavos)}</td>
-                  </tr>
-                ))}
+                      {age.buckets.map((b) => (
+                        <td key={b.key} className={`px-3 py-3 text-right tabular-nums ${c.buckets[b.key] && b.key !== "current" ? "text-danger" : ""}`}>
+                          {c.buckets[b.key] ? fmt.peso(c.buckets[b.key]) : ""}
+                        </td>
+                      ))}
+                      <td className="py-3 pr-5 pl-3 text-right font-semibold tabular-nums">{fmt.peso(c.totalCentavos)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
+              <tfoot className="sticky bottom-0 z-10 bg-sheet shadow-[0_-1px_0_0_var(--color-ink)] print:static">
+                <tr className="border-t-2 border-ink font-semibold tabular-nums">
+                  <td className="py-2.5 pr-3 pl-5">Total</td>
+                  {age.buckets.map((b) => (
+                    <td key={b.key} className="px-3 py-2.5 text-right">
+                      {fmt.peso(b.amountCentavos)}
+                    </td>
+                  ))}
+                  <td className="py-2.5 pr-5 pl-3 text-right">{fmt.peso(age.totalCentavos)}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}

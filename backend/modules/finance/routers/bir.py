@@ -18,7 +18,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from modules.finance import bir_reports as bir
+from modules.finance import bir_dat, bir_reports as bir
 from modules.finance.access import permitted
 from modules.finance.deps import DB, SettingsDep
 from modules.finance.routers.funds import today
@@ -62,6 +62,14 @@ def span(start: date | None, end: date | None, settings) -> tuple[date, date]:
 def the_quarter(db, year: int, q: int) -> bir.Period:
     try:
         return bir.quarter(year, q, bir.taxpayer(db)["fiscalMonthEnd"])
+    except ValueError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from None
+
+
+def calendar_quarter(year: int, q: int) -> bir.Period:
+    """Withholding returns (1601-EQ, QAP, 2307, SAWT, 1604-E) follow BIR calendar quarters regardless of fiscal year."""
+    try:
+        return bir.quarter(year, q, 12)
     except ValueError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from None
 
@@ -115,17 +123,33 @@ def book(book: str, _: Viewer, db: DB, settings: SettingsDep, start: date | None
 
 
 @router.get("/statements/income")
-def income(_: Viewer, db: DB, settings: SettingsDep, start: date | None = None, end: date | None = None) -> dict:
+def income(_: Viewer, db: DB, settings: SettingsDep, start: date | None = None, end: date | None = None, format: Literal["json", "csv"] = "json"):
     end = end or today(settings)
     start = start or end.replace(month=1, day=1)
     start, end = span(start, end, settings)
-    return {"title": "Income statement", "taxpayer": bir.taxpayer(db), "period": period_out(start, end), **bir.income_statement(db, start, end)}
+    data = bir.income_statement(db, start, end)
+    if format == "csv":
+        rows = [["Income", r["code"], r["account"], pesos(r["amountCentavos"])] for r in data["income"]]
+        rows += [["Expenses", r["code"], r["account"], pesos(r["amountCentavos"])] for r in data["expenses"]]
+        rows.append(["Total", "", "Total income", pesos(data["totals"]["incomeCentavos"])])
+        rows.append(["Total", "", "Total expenses", pesos(data["totals"]["expensesCentavos"])])
+        rows.append(["Total", "", "Net income" if data["totals"]["netCentavos"] >= 0 else "Net loss", pesos(data["totals"]["netCentavos"])])
+        return as_csv(f"Income statement {start:%Y-%m-%d} to {end:%Y-%m-%d}", ["Section", "Code", "Account", "Amount"], rows)
+    return {"title": "Income statement", "taxpayer": bir.taxpayer(db), "period": period_out(start, end), **data}
 
 
 @router.get("/statements/balance")
-def balance(_: Viewer, db: DB, settings: SettingsDep, as_of: date | None = Query(None, alias="asOf")) -> dict:
+def balance(_: Viewer, db: DB, settings: SettingsDep, as_of: date | None = Query(None, alias="asOf"), format: Literal["json", "csv"] = "json"):
     as_of = as_of or today(settings)
-    return {"title": "Balance sheet", "taxpayer": bir.taxpayer(db), "asOf": as_of.isoformat(), **bir.balance_sheet(db, as_of)}
+    data = bir.balance_sheet(db, as_of)
+    if format == "csv":
+        rows = []
+        for label, key, total_key in (("Assets", "assets", "assetsCentavos"), ("Liabilities", "liabilities", "liabilitiesCentavos"), ("Equity", "equity", "equityCentavos")):
+            rows += [[label, r["code"], r["account"], pesos(r["amountCentavos"])] for r in data[key]]
+            rows.append(["Total", "", f"Total {label.lower()}", pesos(data["totals"][total_key])])
+        rows.append(["Total", "", "Total liabilities and equity", pesos(data["totals"]["liabilitiesCentavos"] + data["totals"]["equityCentavos"])])
+        return as_csv(f"Balance sheet as of {as_of:%Y-%m-%d}", ["Section", "Code", "Account", "Amount"], rows)
+    return {"title": "Balance sheet", "taxpayer": bir.taxpayer(db), "asOf": as_of.isoformat(), **data}
 
 
 def default_quarter(settings) -> tuple[int, int]:
@@ -141,10 +165,10 @@ def vat(_: Viewer, db: DB, settings: SettingsDep, year: int | None = None, quart
 
 
 @router.get("/lists/{which}")
-def summary_list(which: Literal["sls", "slp", "sawt", "qap"], _: Viewer, db: DB, settings: SettingsDep, year: int | None = None, quarter: int | None = None, format: Literal["json", "csv"] = "json"):
+def summary_list(which: Literal["sls", "slp", "sawt", "qap"], _: Viewer, db: DB, settings: SettingsDep, year: int | None = None, quarter: int | None = None, format: Literal["json", "csv", "dat"] = "json"):
     y, q = default_quarter(settings)
     year, quarter = year or y, quarter or q
-    p = the_quarter(db, year, quarter)
+    p = calendar_quarter(year, quarter) if which in ("qap", "sawt") else the_quarter(db, year, quarter)
     who = bir.taxpayer(db)
     if which == "sls":
         data = bir.sls(db, p)
@@ -170,7 +194,31 @@ def summary_list(which: Literal["sls", "slp", "sawt", "qap"], _: Viewer, db: DB,
             return as_csv(f"SAWT {year} Q{quarter}", ["TIN of payor", "Registered name of payor", "ATC", "Amount of income payment", "Rate of tax", "Amount of tax withheld", "Forms 2307"],
                           [[r["tin"] or "", r["payor"], r["atc"] or "", pesos(r["incomePaymentCentavos"]), f"{(r['rateBp'] or 0) / 100:.2f}%", pesos(r["withheldCentavos"]), "; ".join(r["certificates"])] for r in data["rows"]])
         title = "Summary Alphalist of Withholding Taxes (SAWT)"
+    if format == "dat":
+        dat_text, filename = bir_dat.build_list_dat(which, who, p.end, data)
+        return Response(dat_text, media_type="text/plain; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
     return {"list": which, "title": title, "taxpayer": who, "period": period_out(p.start, p.end, p.label), "year": year, "quarter": quarter, **data}
+
+
+@router.get("/returns/income-tax")
+def income_tax(
+    _: Viewer,
+    db: DB,
+    settings: SettingsDep,
+    year: int | None = None,
+    quarter: int | None = None,
+    rate_bp: int = Query(2500, alias="rateBp"),
+    format: Literal["json", "csv"] = "json",
+):
+    if rate_bp not in (2000, 2500):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Corporate income tax rate must be 20% (2000 bp) or 25% (2500 bp).")
+    y, q = default_quarter(settings)
+    year, quarter = year or y, quarter or q
+    p = the_quarter(db, year, quarter)
+    data = bir.income_tax_1702q(db, p, rate_bp)
+    if format == "csv":
+        return as_csv(f"1702Q draft {year} Q{quarter}", ["Item", "Amount"], [[ln["label"], pesos(ln["amountCentavos"])] for ln in data["lines"]])
+    return {"taxpayer": bir.taxpayer(db), "period": period_out(p.start, p.end, p.label), "year": year, "quarter": quarter, **data}
 
 
 
@@ -190,7 +238,7 @@ def withholding_0619e(_: Viewer, db: DB, settings: SettingsDep, year: int | None
 @router.get("/withholding/1601eq")
 def withholding_1601eq(_: Viewer, db: DB, settings: SettingsDep, year: int | None = None, quarter: int | None = None) -> dict:
     y, q = default_quarter(settings)
-    p = the_quarter(db, year or y, quarter or q)
+    p = calendar_quarter(year or y, quarter or q)
     return {"taxpayer": bir.taxpayer(db), "period": period_out(p.start, p.end, p.label), "year": year or y, "quarter": quarter or q, **bir.form_1601eq(db, p)}
 
 
@@ -198,7 +246,7 @@ def withholding_1601eq(_: Viewer, db: DB, settings: SettingsDep, year: int | Non
 def withholding_1604e(_: Viewer, db: DB, settings: SettingsDep, year: int | None = None, format: Literal["json", "csv"] = "json"):
     who = bir.taxpayer(db)
     year = year or today(settings).year - 1
-    data = bir.form_1604e(db, year, who["fiscalMonthEnd"])
+    data = bir.form_1604e(db, year, 12)
     if format == "csv":
         return as_csv(f"1604E alphalist {year}", ["TIN of payee", "Registered name of payee", "ATC", "Nature of income payment", "Amount of income payment", "Rate of tax", "Amount of tax withheld"],
                       [[r["tin"] or "", r["payee"], r["atc"] or "", r["nature"] or "", pesos(r["baseCentavos"]), f"{r['rateBp'] / 100:.2f}%", pesos(r["taxCentavos"])] for r in data["payees"]])
@@ -210,7 +258,7 @@ def withholding_2307(_: Viewer, db: DB, settings: SettingsDep, year: int | None 
     """With a supplier: its certificate for the quarter. Without: the suppliers withheld from, each due one."""
     y, q = default_quarter(settings)
     year, quarter = year or y, quarter or q
-    p = the_quarter(db, year, quarter)
+    p = calendar_quarter(year, quarter)
     out = {"taxpayer": bir.taxpayer(db), "period": period_out(p.start, p.end, p.label), "year": year, "quarter": quarter, "suppliers": bir.withheld_suppliers(db, p)}
     if supplier_id:
         out["certificate"] = bir.form_2307(db, p, supplier_id)
@@ -272,6 +320,6 @@ def withholding_draft_pdf(form: Literal["0619e", "1601eq", "1604e"], user: Viewe
 
 
 @router.get("/filing-guidance")
-def filing_guidance(_: Viewer, form: Literal["2550Q", "2307", "0619E", "1601EQ", "1604E"]) -> dict:
+def filing_guidance(_: Viewer, form: Literal["2550Q", "2307", "0619E", "1601EQ", "1604E", "1702Q"]) -> dict:
     from modules.finance.bir_filing import guidance
     return guidance(form)

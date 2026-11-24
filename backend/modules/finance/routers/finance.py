@@ -409,3 +409,14 @@ router.include_router(imported_expenses_router)
 from modules.finance.overview import router as overview_router  # noqa: E402
 
 router.include_router(overview_router)
+
+# --- Zoho-parity modules (migration 0042): credits, advances, recurring, document scans ---------------
+from modules.finance.routers.credits import router as credits_router  # noqa: E402
+from modules.finance.routers.advances import router as advances_router  # noqa: E402
+from modules.finance.routers.recurring import router as recurring_router  # noqa: E402
+from modules.finance.routers.scans import router as scans_router  # noqa: E402
+
+router.include_router(credits_router)
+router.include_router(advances_router)
+router.include_router(recurring_router)
+router.include_router(scans_router)

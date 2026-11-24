@@ -83,7 +83,8 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
   const out = result?.out ?? null;
   const issues: Any[] = result?.issues ?? [];
   const count = (s: string) => issues.filter((i) => i.sev === s).length;
-  const blocked = !!error || !h || !h.rdo.trim() || !h.fy;
+  const hasErrors = count("error") > 0;
+  const blocked = !!error || !h || !h.rdo.trim() || !h.fy || hasErrors;
   const tins = parsed ? parsed.rows.map((r: Any) => r.tin).concat([parsed.taxpayer.tin]) : [];
 
   return (
@@ -135,7 +136,7 @@ export function AsIsTab({ companies }: { companies: Company[] }) {
                 <Button disabled={blocked} onClick={() => navigator.clipboard.writeText(out.text)}>Copy text</Button>
                 <span className="font-mono text-meta text-ink-3">{out.filename}</span>
               </div>
-              {blocked && <p className="px-5 pb-4 text-meta text-danger">Fill in the RDO code and year-end month under Header details to download.</p>}
+              {blocked && <p className="px-5 pb-4 text-meta text-danger">{hasErrors ? "Fix the flagged problems above before downloading the DAT." : "Fill in the RDO code and year-end month under Header details to download."}</p>}
             </>
           )}
         </Sheet>

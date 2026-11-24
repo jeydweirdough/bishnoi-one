@@ -8,7 +8,7 @@ import { ConfirmButton } from "@/src/modules/finance/platform/ui/confirm";
 import { CellInput, Field, FormError, FormGrid, Input, Select } from "@/src/modules/finance/platform/ui/field";
 import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
-import { postEntry, reverseEntry, saveAccount, savePosting } from "@/src/modules/finance/ledger/actions";
+import { approveAccountsFor2mg, postEntry, reverseEntry, saveAccount, savePosting } from "@/src/modules/finance/ledger/actions";
 import { TYPE_LABELS, type Account, type AccountType, type Posting } from "@/src/modules/finance/ledger/types";
 
 /** Accounts for a picker, grouped by type, active ones only. Called as a function, not used as a component: the
@@ -236,51 +236,204 @@ function nested(of: Account[]): { a: Account; depth: number }[] {
 }
 
 /** The chart of accounts, by type, with adding and changing an account. */
-export function ChartEditor({ accounts, canEdit, importer }: { accounts: Account[]; canEdit: boolean; importer?: React.ReactNode }) {
+export function ChartEditor({ accounts, canEdit, canApprove2mg = false, importer }: { accounts: Account[]; canEdit: boolean; canApprove2mg?: boolean; importer?: React.ReactNode }) {
   const [editing, setEditing] = useState<Account | "new" | null>(null);
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const [scopeBusy, setScopeBusy] = useState(false);
+  const [scopeNote, setScopeNote] = useState<string | null>(null);
+  const [scopeError, setScopeError] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<"" | AccountType>("");
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const names = new Map(accounts.map((a) => [a.id, a]));
+  const pickedIds = Object.keys(picked).filter((id) => picked[id]);
+
+  const qLower = query.trim().toLowerCase();
+  const matchesFilter = (a: Account) => {
+    if (statusFilter === "active" && !a.isActive) return false;
+    if (statusFilter === "inactive" && a.isActive) return false;
+    if (qLower && !a.code.toLowerCase().includes(qLower) && !a.name.toLowerCase().includes(qLower)) return false;
+    return true;
+  };
+  const filteredAll = accounts.filter(matchesFilter);
+  const shownTypes = (Object.keys(TYPE_LABELS) as AccountType[]).filter((t) => !typeFilter || t === typeFilter);
+
+  async function approvePicked() {
+    if (!pickedIds.length || scopeBusy) return;
+    setScopeBusy(true);
+    setScopeError(null);
+    setScopeNote(null);
+    const res = await approveAccountsFor2mg(pickedIds);
+    setScopeBusy(false);
+    if (!res.ok) {
+      setScopeError(res.error);
+      return;
+    }
+    setPicked({});
+    setScopeNote(`Approved ${res.data.approved} account${res.data.approved === 1 ? "" : "s"} for 2MG.`);
+  }
+
   return (
-    <div className="space-y-5">
-      {canEdit &&
-        (editing ? (
-          <AccountForm key={editing === "new" ? "new" : editing.id} account={editing === "new" ? null : editing} accounts={accounts} onDone={() => setEditing(null)} />
-        ) : (
-          <div className="flex flex-wrap items-start gap-2">
+    <div className="space-y-4">
+      {canEdit && editing && (
+        <AccountForm key={editing === "new" ? "new" : editing.id} account={editing === "new" ? null : editing} accounts={accounts} onDone={() => setEditing(null)} />
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav aria-label="Filter by account type" className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setTypeFilter("")}
+            className={`rounded-lg border px-3 py-1.5 text-meta transition-colors ${typeFilter === "" ? "border-ink bg-ink font-semibold text-white" : "border-rule-strong bg-sheet text-ink-2 hover:border-control"}`}
+          >
+            All <span className="ml-1 opacity-75">{filteredAll.length}</span>
+          </button>
+          {(Object.keys(TYPE_LABELS) as AccountType[]).map((t) => {
+            const count = filteredAll.filter((a) => a.type === t).length;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTypeFilter(t)}
+                className={`rounded-lg border px-3 py-1.5 text-meta transition-colors ${typeFilter === t ? "border-ink bg-ink font-semibold text-white" : "border-rule-strong bg-sheet text-ink-2 hover:border-control"}`}
+              >
+                {TYPE_LABELS[t]} <span className="ml-1 opacity-75">{count}</span>
+              </button>
+            );
+          })}
+        </nav>
+        {canEdit && !editing && (
+          <div className="flex flex-wrap items-center gap-2">
+            {importer}
             <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing("new")}>
               Add an account
             </Button>
-            {importer}
           </div>
-        ))}
-      {(Object.keys(TYPE_LABELS) as AccountType[]).map((t) => {
-        const of = accounts.filter((a) => a.type === t);
-        if (!of.length) return null;
-        return (
-          <section key={t}>
-            <h2 className="mb-1 text-caps text-ink-3 uppercase">{TYPE_LABELS[t]}</h2>
-            <ul className="divide-y divide-rule border-y border-rule">
-              {nested(of).map(({ a, depth }) => (
-                <li key={a.id} className={`flex items-center gap-3 py-2 ${a.isActive ? "" : "text-ink-3"}`} style={{ paddingLeft: `${depth * 1.25}rem` }}>
-                  <span className="w-20 shrink-0 font-mono text-meta tabular-nums text-ink-2">{a.code}</span>
-                  {/* Under a parent of another type (Oojeema's chart has some): said, since it can't be shown by place. */}
-                  {a.parentId && names.get(a.parentId)?.type !== a.type && (
-                    <span className="hidden text-meta text-ink-3 sm:inline">under {names.get(a.parentId)?.name} ·</span>
-                  )}
-                  <a href={`/finance/ledger/accounts/${a.id}`} className="min-w-0 flex-1 truncate text-sm font-medium hover:text-hema hover:underline">
-                    {a.name}
-                    {!a.isActive && <span className="ml-2 text-meta font-normal">inactive</span>}
-                  </a>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rule bg-bench/25 px-3.5 py-2.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search account code or name…"
+            aria-label="Search account code or name"
+            className="h-8 w-64 max-w-full rounded-lg border border-rule-strong bg-sheet px-2.5 text-sm"
+          />
+          <label className="flex items-center gap-2 text-meta text-ink-2">
+            Status
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
+              className="h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm text-ink"
+            >
+              <option value="all">All ({accounts.length})</option>
+              <option value="active">Active only ({accounts.filter((a) => a.isActive).length})</option>
+              <option value="inactive">Inactive only ({accounts.filter((a) => !a.isActive).length})</option>
+            </select>
+          </label>
+          {(query || typeFilter || statusFilter !== "all") && (
+            <button
+              type="button"
+              onClick={() => { setQuery(""); setTypeFilter(""); setStatusFilter("all"); }}
+              className="text-meta font-semibold text-hema hover:underline"
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
+        <span className="text-meta text-ink-3 tabular-nums">
+          Showing {filteredAll.filter((a) => !typeFilter || a.type === typeFilter).length} of {accounts.length} accounts
+        </span>
+      </div>
+
+      {canApprove2mg && accounts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded border border-rule bg-bench/30 p-3 text-sm">
+          <span className="font-semibold">{pickedIds.length} selected</span>
+          <Button size="sm" type="button" disabled={scopeBusy} onClick={() => setPicked(Object.fromEntries(accounts.map((a) => [a.id, true])))}>
+            Select all ({accounts.length})
+          </Button>
+          {pickedIds.length > 0 && (
+            <Button size="sm" type="button" disabled={scopeBusy} onClick={() => setPicked({})}>
+              Clear
+            </Button>
+          )}
+          <Button size="sm" type="button" variant="primary" disabled={scopeBusy || pickedIds.length === 0} onClick={() => void approvePicked()}>
+            {scopeBusy ? "Approving…" : "Approve selected for 2MG"}
+          </Button>
+          {scopeNote && <span role="status" className="text-meta text-hema">{scopeNote}</span>}
+          {scopeError && <span role="alert" className="text-meta text-danger">{scopeError}</span>}
+        </div>
+      )}
+
+      <div role="region" aria-label="Chart of accounts table" tabIndex={0} className="max-h-[60vh] max-w-full overflow-auto overscroll-contain rounded-xl border border-rule bg-sheet focus-visible:outline-2 focus-visible:outline-hema print:max-h-none print:overflow-visible">
+        <table className="w-full min-w-[40rem] text-sm">
+          <thead className="sticky top-0 z-10 bg-sheet shadow-[0_1px_0_0_var(--color-rule)] print:static">
+            <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
+              <th className="w-28 py-2.5 pr-3 pl-4 font-semibold">Code</th>
+              <th className="px-3 py-2.5 font-semibold">Account name</th>
+              <th className="w-36 px-3 py-2.5 font-semibold">Category</th>
+              <th className="w-28 px-3 py-2.5 font-semibold">Status</th>
+              {canEdit && <th className="w-16 py-2.5 pr-4 pl-2 text-right font-semibold">Edit</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-rule">
+            {shownTypes.map((t) => {
+              const of = filteredAll.filter((a) => a.type === t);
+              if (!of.length) return null;
+              return nested(of).map(({ a, depth }) => (
+                <tr key={a.id} className={`transition-colors hover:bg-bench/30 ${a.isActive ? "" : "text-ink-3"}`}>
+                  <td className="py-2.5 pr-3 pl-4 font-mono text-meta font-semibold tabular-nums text-ink-2">
+                    <span className="inline-flex items-center gap-2">
+                      {canApprove2mg && (
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${a.code} ${a.name} for 2MG`}
+                          checked={Boolean(picked[a.id])}
+                          disabled={scopeBusy}
+                          onChange={(e) => setPicked((prev) => ({ ...prev, [a.id]: e.target.checked }))}
+                        />
+                      )}
+                      {a.code}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5" style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}>
+                    {a.parentId && names.get(a.parentId)?.type !== a.type && (
+                      <span className="mr-1.5 text-meta text-ink-3">under {names.get(a.parentId)?.name} ·</span>
+                    )}
+                    <a href={`/finance/ledger/accounts/${a.id}`} className="font-medium hover:text-hema hover:underline">
+                      {a.name}
+                    </a>
+                  </td>
+                  <td className="px-3 py-2.5 text-meta text-ink-2">{TYPE_LABELS[t]}</td>
+                  <td className="px-3 py-2.5 text-meta">
+                    {a.isActive ? (
+                      <span className="rounded-full bg-mint-2 px-2 py-0.5 font-medium text-sage-deep">Active</span>
+                    ) : (
+                      <span className="rounded-full bg-bench px-2 py-0.5 text-ink-3">Inactive</span>
+                    )}
+                  </td>
                   {canEdit && (
-                    <Button size="sm" variant="quiet" className="!px-1.5" aria-label={`Edit ${a.name}`} onClick={() => setEditing(a)}>
-                      <Pencil className="size-3.5" aria-hidden />
-                    </Button>
+                    <td className="py-2.5 pr-4 pl-2 text-right">
+                      <Button size="sm" variant="quiet" className="!px-1.5" aria-label={`Edit ${a.name}`} onClick={() => setEditing(a)}>
+                        <Pencil className="size-3.5" aria-hidden />
+                      </Button>
+                    </td>
                   )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+                </tr>
+              ));
+            })}
+            {filteredAll.filter((a) => !typeFilter || a.type === typeFilter).length === 0 && (
+              <tr>
+                <td colSpan={canEdit ? 5 : 4} className="py-8 text-center text-meta text-ink-3">
+                  No accounts match your search or filter.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

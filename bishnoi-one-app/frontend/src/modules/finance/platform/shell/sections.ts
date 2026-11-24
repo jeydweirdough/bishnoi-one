@@ -12,8 +12,14 @@ export const NEEDS: [string, string | string[]][] = [
   ["/finance/import-matching", ["imports.propose", "imports.confirm", "imports.confirm_tax", "imports.run"]],
   ["/finance/funds", "funds.view"],
   ["/finance/invoices", "invoices.view"],
+  ["/finance/credit-notes", "invoices.view"],
   ["/finance/sales-orders", "sales_orders.view"],
   ["/finance/bills", "bills.view"],
+  ["/finance/vendor-credits", "bills.view"],
+  ["/finance/advances", ["bills.view", "vouchers.view", "invoices.view"]],
+  ["/finance/recurring", "bills.view"],
+  ["/finance/scans", "bills.view"],
+  ["/finance/purchase-intakes", "bills.view"],
   ["/finance/suppliers", "suppliers.view"],
   ["/finance/vouchers", "vouchers.view"],
   ["/finance/petty-cash", "petty_cash.view"],
@@ -50,6 +56,11 @@ export type Section = { key: string; label: string; icon: string; tabs: SectionT
 export const SECTIONS: Section[] = [
   { key: "payables", label: "Payables", icon: "orders", tabs: [
     { href: "/finance/bills", label: "Bills" },
+    { href: "/finance/scans", label: "Scan inbox" },
+    { href: "/finance/vendor-credits", label: "Vendor credits" },
+    { href: "/finance/advances", label: "Advances & deposits" },
+    { href: "/finance/recurring", label: "Recurring" },
+    { href: "/finance/purchase-intakes", label: "From Inventory" },
     { href: "/finance/vouchers", label: "Payment vouchers" },
     { href: "/finance/bills/aging", label: "Supplier aging" },
     { href: "/finance/suppliers", label: "Suppliers" },
@@ -63,7 +74,8 @@ export const SECTIONS: Section[] = [
   { key: "sales", label: "Sales", icon: "letters", tabs: [
     { href: "/finance/sales-orders", label: "Sales orders" },
     { href: "/finance/invoices", label: "Finance invoices" },
-    { href: "/finance/invoices/zoho", label: "Zoho invoices" },
+    { href: "/finance/credit-notes", label: "Credit notes" },
+    { href: "/finance/advances", label: "Customer deposits" },
     { href: "/finance/invoices/receivables", label: "Receivables" },
   ] },
   // A cash advance released, its liquidation reviewed, then settled: one page with a tab per stage (screens/funds.tsx).
@@ -71,7 +83,7 @@ export const SECTIONS: Section[] = [
   { key: "prices", label: "Price approvals", icon: "pricing", tabs: [{ href: "/finance/prices", label: "Price approvals" }] },
   { key: "banking", label: "Banking", icon: "money", tabs: [
     { href: "/finance/bank", label: "Bank reconciliation" },
-    { href: "/finance/bank/accounts", label: "Bank accounts and rates" },
+    { href: "/finance/bank/accounts", label: "Bank accounts" },
   ] },
   // Used every day, so its own row; the rest of the books is month-end and setup.
   { key: "journal", label: "Journal entries", icon: "lists", exact: true, tabs: [{ href: "/finance/ledger", label: "Journal entries" }] },
@@ -86,6 +98,7 @@ export const SECTIONS: Section[] = [
   { key: "taxes", label: "Taxes", icon: "money", tabs: [
     { href: "/finance/bir/readiness", label: "BIR readiness" },
     { href: "/finance/bir/vat", label: "VAT return" },
+    { href: "/finance/bir/income-tax", label: "Income tax (1702Q)" },
     { href: "/finance/bir/withholding", label: "Withholding tax" },
     { href: "/finance/bir/lists", label: "Summary lists" },
     { href: "/finance/bir/sales-dat", label: "BIR files (DAT)" },

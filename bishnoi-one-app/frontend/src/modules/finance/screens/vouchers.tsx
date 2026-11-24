@@ -1,6 +1,8 @@
 import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
 import { Plus, Printer } from "lucide-react";
 import Link from "next/link";
+import { Pager } from "@/src/platform/ui/pager";
+import { pageOf, slicePage } from "@/src/platform/ui/paging";
 import { LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
@@ -49,6 +51,11 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
   if (q) query.set("q", q);
   if (one(sp.queue)) query.set("queue", one(sp.queue));
   const list = await load<{ items: (VoucherSummary & { queueNote?: string | null })[]; counts: Record<VoucherStatus, number>; canPrepare: boolean; queueLabel: string | null }>(`/finance/vouchers?${query}`);
+  const size = [10, 25, 50, 100].includes(Number(one(sp.size))) ? Number(one(sp.size)) : 25;
+  const { rows: pagedVouchers, page } = slicePage(list.items, pageOf(sp.page), size);
+  const navigation = new URLSearchParams(query);
+  navigation.set("size", String(size));
+  const pager = <Pager total={list.items.length} page={page} size={size} base={"/finance/vouchers?" + navigation} noun="vouchers" />;
   // Importing Zoho's supplier payments: its own tick, and the testing site only for now (app/routers/imports.py).
   const canImport = (me.permissions?.includes("imports.run") ?? false) && me.dataEnvironment === "local_test";
   return (
@@ -73,7 +80,7 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
       </PageHeader>
       <ReviewExports filters={query.toString()} options={[ ["supplier-payments", "Supplier payments: one row per voucher"], ["payment-allocations", "Supplier payments: allocations to bills"] ]} />
       {list.queueLabel && <p className="mb-3 text-sm text-ink-2">{list.queueLabel} · {list.items.length} matching vouchers · <Link href="/finance/vouchers" className="text-hema hover:underline">Clear filters</Link></p>}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <nav aria-label="Show" className="flex flex-wrap gap-1.5">
           {TABS.map((t) => {
             const n = t.key ? list.counts[t.key as VoucherStatus] : 0;
@@ -90,32 +97,40 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
             );
           })}
         </nav>
-        <form className="flex gap-2">
+        <form action="/finance/vouchers" className="flex flex-wrap items-center gap-2" role="search">
           {query.has("queue") && <input suppressHydrationWarning type="hidden" name="queue" value={query.get("queue")!} />}
           {show && <input suppressHydrationWarning type="hidden" name="show" value={show} />}
-          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Number, supplier, Oojeema PV, check" aria-label="Find a voucher" className="h-8 w-72 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <input suppressHydrationWarning name="q" defaultValue={q} placeholder="Number, supplier, Oojeema PV, check" aria-label="Find a voucher" className="h-8 w-64 rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm" />
+          <label className="flex items-center gap-2 text-meta text-ink-2">
+            Rows per page
+            <select suppressHydrationWarning name="size" defaultValue={size} className="h-8 rounded-lg border border-rule-strong bg-sheet px-2">
+              {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <button suppressHydrationWarning type="submit" className="h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold">Show</button>
         </form>
       </div>
-      <Sheet>
+      <div className="mb-3 print:hidden">{pager}</div>
+      <Sheet className="min-w-0 max-w-full">
         {list.items.length === 0 ? (
           <Empty title={q || show ? "No matching vouchers" : "No payment vouchers yet"} icon="payments">
             {!q && !show && list.canPrepare ? "Prepare the first one with New payment voucher." : null}
           </Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <div key={navigation.toString() + page} role="region" aria-label={"Payment vouchers, page " + page} tabIndex={0} className="max-h-[60vh] max-w-full overflow-auto overscroll-contain rounded-xl focus-visible:outline-2 focus-visible:outline-hema print:max-h-none print:overflow-visible">
             <table className="w-full min-w-[52rem] text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-sheet shadow-[0_1px_0_0_var(--color-rule)] print:static">
                 <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                  <th className="py-2 pr-3 pl-5 font-semibold">Voucher</th>
-                  <th className="px-3 py-2 font-semibold">Supplier</th>
-                  <th className="px-3 py-2 font-semibold">How</th>
-                  <th className="px-3 py-2 font-semibold">Prepared by</th>
-                  <th className="px-3 py-2 text-right font-semibold">Amount</th>
-                  <th className="py-2 pr-5 pl-3 font-semibold">Status</th>
+                  <th className="py-2.5 pr-3 pl-5 font-semibold">Voucher</th>
+                  <th className="px-3 py-2.5 font-semibold">Supplier</th>
+                  <th className="px-3 py-2.5 font-semibold">How</th>
+                  <th className="px-3 py-2.5 font-semibold">Prepared by</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Amount</th>
+                  <th className="py-2.5 pr-5 pl-3 font-semibold">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-rule">
-                {list.items.map((v) => (
+                {pagedVouchers.map((v) => (
                   <tr key={v.id} className="relative hover:bg-bench/40">
                     <td className="py-2.5 pr-3 pl-5 font-mono text-meta">
                       <Link href={`/finance/vouchers/${v.id}`} className="font-semibold text-hema after:absolute after:inset-0 hover:underline">
@@ -146,6 +161,7 @@ export async function VouchersPage({ searchParams }: { searchParams: Search }) {
           </div>
         )}
       </Sheet>
+      <div className="print:hidden">{pager}</div>
     </>
   );
 }

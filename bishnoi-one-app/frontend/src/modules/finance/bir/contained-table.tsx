@@ -8,7 +8,7 @@ export function ContainedTable({ head, children, foot, wide = "min-w-[48rem]", g
   head: { label: string; right?: boolean }[]; children: ReactNode; foot?: ReactNode; wide?: string; grouped?: boolean;
 }) {
   const all: ReactNode[] = grouped && Array.isArray(children)
-    ? children.map((group, i) => <Fragment key={Children.toArray(group).map(row => typeof row === "object" && row && "key" in row ? row.key : i).join("|")}>{group}</Fragment>)
+    ? children.map((group, i) => <Fragment key={`${i}:${Children.toArray(group).map(row => typeof row === "object" && row && "key" in row ? row.key : i).join("|")}`}>{group}</Fragment>)
     : Children.toArray(children);
   const [size, setSize] = useState(25);
   const key = all.map(row => typeof row === "object" && row && "key" in row ? row.key : "").join("|");

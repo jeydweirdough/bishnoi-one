@@ -66,6 +66,14 @@ export async function importSuppliers(rows: SupplierRow[]): Promise<Result<{ add
   });
 }
 
+export async function approveSuppliersFor2mg(supplierIds: string[], reason?: string): Promise<Result<{ approved: number }>> {
+  return attempt(async () => {
+    const done = await api.post<{ approved: number }>("/finance/suppliers/company-scope/approve", { supplierIds, ...(reason ? { reason } : {}) });
+    refresh();
+    return done;
+  });
+}
+
 /** Switching a supplier off (not offered on new bills) or back on: its own tick, suppliers.deactivate. */
 export async function switchSupplier(id: string, isActive: boolean): Promise<Result<Supplier>> {
   return attempt(async () => {

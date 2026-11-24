@@ -1,6 +1,7 @@
 import { Welcome } from "@/src/platform/ui/welcome";
 import { redirect } from "next/navigation";
 import { greeting } from "@/src/modules/finance/platform/lib/format";
+import { sectionsFor } from "@/src/modules/finance/platform/shell/sections";
 import { PageHeader } from "@/src/modules/finance/platform/ui/sheet";
 import { getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { EditOverviewButton, OverviewBody, OverviewProvider } from "@/src/modules/finance/overview/overview";
@@ -20,6 +21,8 @@ export default async function FinanceHome() {
     if (me.permissions?.includes("sales_orders.view") && me.permissions?.includes("sales_orders.create")) redirect("/finance/sales-orders");
     if (me.permissions?.includes("invoices.view")) redirect("/finance/invoices");
     if (me.permissions?.includes("sales_orders.view")) redirect("/finance/sales-orders");
+    const firstAllowed = sectionsFor(me).flatMap((s) => s.tabs)[0]?.href;
+    if (firstAllowed && firstAllowed !== "/finance") redirect(firstAllowed);
   }
   const overview = await load<OverviewData>("/finance/overview?period=month");
   return (

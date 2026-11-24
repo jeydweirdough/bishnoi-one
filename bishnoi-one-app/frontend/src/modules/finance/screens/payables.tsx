@@ -112,9 +112,12 @@ export async function BillsPage({ searchParams }: { searchParams: Search }) {
             <>
               {canImport && <ZohoImport kind="bills" />}
               {list.canCreate && (
-                <LinkButton href="/finance/bills/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
-                  New bill
-                </LinkButton>
+                <>
+                  <LinkButton href="/finance/scans">Scan receipt</LinkButton>
+                  <LinkButton href="/finance/bills/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>
+                    New bill
+                  </LinkButton>
+                </>
               )}
             </>
           )
@@ -499,7 +502,7 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
       Review Local/Foreign and usual withholding directly here. Edit one supplier or select several; review and save on this page.
     </PageHeader>
     {list.canAdd && <div className="mb-3"><SupplierImport /></div>}
-    <SupplierReview initial={list} initialQuery={q ?? ""} org={me.org} />
+    <SupplierReview initial={list} initialQuery={q ?? ""} org={me.org} canApprove2mg={may(me, "suppliers.edit")} />
   </>;
 }
 

@@ -242,22 +242,28 @@ def voucher_choices(user: permitted("vouchers.view"), db: DB, settings: Settings
     """Suppliers with bills left to pay; for one supplier, those bills with what's paid, what
     other open vouchers set aside and what's left; the accounts a voucher pays from."""
     open_bills = db.scalars(select(Bill).where(Bill.status == "recorded", Bill.paid_centavos < Bill.payable_centavos)).all()
-    held = set_aside(db, [b.id for b in open_bills], exclude_voucher=voucher)
+    from modules.finance.settlements import bill_settled_map
+
+    bill_ids = [b.id for b in open_bills]
+    held = set_aside(db, bill_ids, exclude_voucher=voucher)
+    credited = bill_settled_map(db, bill_ids)
     per_supplier: dict[str, int] = {}
     for b in open_bills:
         if company_scope.scope_for(db, 'supplier', b.supplier_id) != '2mg':
             continue
-        left = b.payable_centavos - b.paid_centavos - held.get(b.id, 0)
+        left = b.payable_centavos - b.paid_centavos - held.get(b.id, 0) - credited.get(b.id, 0)
         if left > 0:
             per_supplier[b.supplier_id] = per_supplier.get(b.supplier_id, 0) + left
     suppliers = db.scalars(select(Supplier).where(Supplier.id.in_(list(per_supplier))).order_by(func.lower(Supplier.name))).all()
     bills = []
     if supplier:
         for b in sorted((b for b in open_bills if b.supplier_id == supplier), key=lambda x: (x.due_date, x.no or 0)):
+            taken = held.get(b.id, 0) + credited.get(b.id, 0)
             bills.append({
                 "id": b.id, "no": b.no, "billNumber": b.bill_number, "billDate": b.bill_date.isoformat(), "dueDate": b.due_date.isoformat(),
                 "payableCentavos": b.payable_centavos, "paidCentavos": b.paid_centavos, "setAsideCentavos": held.get(b.id, 0),
-                "availableCentavos": max(b.payable_centavos - b.paid_centavos - held.get(b.id, 0), 0), "documentMissing": not b.files,
+                "creditAppliedCentavos": credited.get(b.id, 0),
+                "availableCentavos": max(b.payable_centavos - b.paid_centavos - taken, 0), "documentMissing": not b.files,
             })
     picked = db.get(Supplier, supplier) if supplier else None
     return {
@@ -297,8 +303,11 @@ def check_amounts(db: DB, v: PaymentVoucher, pairs: list[tuple[Bill, int]]) -> N
     """Each bill recorded, the supplier's, once, and no more than what's left of it after what
     it's been paid and what other open vouchers set aside (so nothing is paid twice).
     The bills are locked first, so two vouchers made at once for one bill can't both fit."""
+    from modules.finance.settlements import bill_settled_map
+
     locked(db, Bill, [b.id for b, _ in pairs])
     held = set_aside(db, [b.id for b, _ in pairs], exclude_voucher=v.id)
+    credited = bill_settled_map(db, [b.id for b, _ in pairs])
     seen = set()
     for i, (b, amount) in enumerate(pairs):
         if b.supplier_id != v.supplier_id or b.status != "recorded":
@@ -306,9 +315,14 @@ def check_amounts(db: DB, v: PaymentVoucher, pairs: list[tuple[Bill, int]]) -> N
         if b.id in seen:
             raise line_error(i, "billId", "This bill is on the voucher twice.")
         seen.add(b.id)
-        left = b.payable_centavos - b.paid_centavos - held.get(b.id, 0)
+        left = b.payable_centavos - b.paid_centavos - held.get(b.id, 0) - credited.get(b.id, 0)
         if amount > left:
-            others = f" ({peso(held[b.id])} is set aside in another voucher)" if held.get(b.id) else ""
+            notes = []
+            if held.get(b.id):
+                notes.append(f"{peso(held[b.id])} is set aside in another voucher")
+            if credited.get(b.id):
+                notes.append(f"{peso(credited[b.id])} is settled by credits/advances")
+            others = f" ({'; '.join(notes)})" if notes else ""
             raise line_error(i, "amountCentavos", f"Bill {b.no} has {peso(max(left, 0))} left to pay{others}.")
 
 

@@ -132,3 +132,17 @@ def test_purchases_and_tax_withheld_from_suppliers_come_from_the_finance_bills(c
     assert cert["certificate"]["rows"][0]["months"] == [1_000_000, 0, 0] and cert["certificate"]["payee"]["tin"] == "123-456-789"
     vat = {line["key"]: line for line in client.get(f"/finance/bir/returns/vat?{q}", headers=ana).json()["lines"]}
     assert vat["input"]["amountCentavos"] == 120_000
+
+
+def test_quarterly_income_tax_1702q_draft(client, ana, ben):  # noqa: F811 (fixtures)
+    ready(client, ana)
+    paid_with_withholding(client, ben)  # 200,000 net sales, 4,000 SAWT CWT
+    r25 = client.get(f"/finance/bir/returns/income-tax?year={YEAR}&quarter={QUARTER}", headers=ben)
+    assert r25.status_code == 200, r25.text
+    t25 = r25.json()["totals"]
+    assert (t25["grossSalesCentavos"], t25["taxableIncomeCentavos"], t25["rcitCentavos"], t25["cwtCreditsCentavos"], t25["netPayableCentavos"]) == (200_000, 200_000, 50_000, 4_000, 46_000)
+    r20 = client.get(f"/finance/bir/returns/income-tax?year={YEAR}&quarter={QUARTER}&rateBp=2000", headers=ben).json()["totals"]
+    assert (r20["rcitCentavos"], r20["netPayableCentavos"]) == (40_000, 36_000)
+    csv = client.get(f"/finance/bir/returns/income-tax?year={YEAR}&quarter={QUARTER}&format=csv", headers=ben)
+    assert csv.status_code == 200 and "1702Q" in csv.headers["content-disposition"] and "500.00" in csv.text
+    assert client.get("/finance/bir/returns/income-tax?rateBp=1500", headers=ben).status_code == 422

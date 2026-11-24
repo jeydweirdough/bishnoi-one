@@ -104,10 +104,16 @@ def files_out(files) -> list[dict]:
 
 
 def owed_by_supplier(db: DB) -> dict[str, int]:
-    """What's owed each supplier: their recorded bills, less what released vouchers have paid."""
-    return dict(db.execute(
-        select(Bill.supplier_id, func.sum(Bill.payable_centavos - Bill.paid_centavos)).where(Bill.status == "recorded").group_by(Bill.supplier_id)
-    ).all())
+    """What's owed each supplier: their recorded bills, less what released vouchers and credits/advances have settled."""
+    from modules.finance.settlements import bill_settled_map
+
+    bills = list(db.scalars(select(Bill).where(Bill.status == "recorded")))
+    settled = bill_settled_map(db, [b.id for b in bills])
+    out: dict[str, int] = {}
+    for b in bills:
+        left = max(b.payable_centavos - b.paid_centavos - settled.get(b.id, 0), 0)
+        out[b.supplier_id] = out.get(b.supplier_id, 0) + left
+    return out
 
 
 def set_aside(db: DB, bill_ids, exclude_voucher: str | None = None) -> dict[str, int]:
@@ -375,6 +381,20 @@ def run_supplier_import(user: permitted("suppliers.add"), db: DB, body: Supplier
         raise
     return {"added": added, "counts": checked["counts"]} if body.mode == "directory" else {"added": added}
 
+class SupplierScopeApproveIn(Api):
+    supplier_ids: list[str] = Field(min_length=1, max_length=500)
+    reason: str | None = Field(None, max_length=200)
+
+
+@router.post("/suppliers/company-scope/approve")
+def approve_suppliers_for_2mg(user: permitted("suppliers.edit"), db: DB, body: SupplierScopeApproveIn) -> dict:
+    approved = company_scope.approve_for_2mg(db, "supplier", body.supplier_ids, reviewed_by=user.full_name, reason=(body.reason or "").strip() or None)
+    if approved:
+        audit(db, user, "suppliers.scope_approved", target=f"{approved} suppliers", target_type="supplier")
+    db.commit()
+    return {"approved": approved}
+
+
 def found_supplier(db: DB, supplier_id: str) -> Supplier:
     s = db.get(Supplier, supplier_id)
     if s is None:
@@ -585,9 +605,8 @@ def bill_state(b: Bill) -> str:
     return b.stage or "draft"
 
 
-def bill_summary(b: Bill, held: int = 0) -> dict:
-    """`held`: what open payment vouchers set aside of it. Paid and left are always shown, not
-    behind a click (you, 2026-10-23: part-payments must be seen)."""
+def bill_summary(b: Bill, held: int = 0, credited: int = 0) -> dict:
+    """`held`: what open payment vouchers set aside of it. `credited`: applied vendor credits & advances."""
     state = payment_state(b)
     where = bill_state(b)
     return {
@@ -595,7 +614,8 @@ def bill_summary(b: Bill, held: int = 0) -> dict:
         "supplier": {"id": b.supplier.id, "name": b.supplier.name},
         "billNumber": b.bill_number, "billDate": b.bill_date.isoformat(), "dueDate": b.due_date.isoformat(),
         "totalCentavos": b.total_centavos, "payableCentavos": b.payable_centavos, "withheldCentavos": b.withheld_centavos,
-        "paidCentavos": b.paid_centavos, "leftCentavos": max(b.payable_centavos - b.paid_centavos, 0) if b.status == "recorded" else 0,
+        "paidCentavos": b.paid_centavos, "creditAppliedCentavos": credited,
+        "leftCentavos": max(b.payable_centavos - b.paid_centavos - credited, 0) if b.status == "recorded" else 0,
         "setAsideCentavos": held, "paymentState": state, "paymentLabel": PAYMENT_LABELS[state],
         "documentMissing": not b.files, "createdBy": b.created_by,
     }
@@ -653,9 +673,12 @@ def bill_out(db: DB, b: Bill, user=None) -> dict:
         except HTTPException as held:
             company_hold=str(held.detail)
             flags.update({key:False for key in ('canEdit','canSubmit','canApprove','canCheck','canPay')})
+    from modules.finance.settlements import bill_settled
+
     lines = worked[0] if worked else b.lines
     totals = worked[1:] if worked else (b.net_centavos, b.vat_centavos, b.withheld_centavos, b.total_centavos, b.payable_centavos)
-    return bill_summary(b, set_aside(db, [b.id]).get(b.id, 0)) | flags | {"companyHold": company_hold,"purchaseEvidence":purchase_evidence,
+    credited = bill_settled(db, b.id) if b.status == "recorded" else 0
+    return bill_summary(b, set_aside(db, [b.id]).get(b.id, 0), credited) | flags | {"companyHold": company_hold,"purchaseEvidence":purchase_evidence,
         "supplier": supplier_out(db, b.supplier), "taxReviewed": b.tax_reviewed,
         "zohoSync": delivery_summary(db,'bill',b.id),
         "poNumber": b.po_number, "drNumber": b.dr_number, "checkedPo": b.checked_po, "checkedDr": b.checked_dr,
@@ -756,8 +779,11 @@ def list_bills(
     counts = dict(db.execute(select(states.c.state, func.count()).group_by(states.c.state)).all())
     without = db.scalar(select(func.count()).select_from(Bill).where(Bill.status != "void", ~select(BillFile.id).where(BillFile.bill_id == Bill.id).exists())) or 0
     can = access_of(user).can
+    from modules.finance.settlements import bill_settled_map
+
+    credited = bill_settled_map(db, [b.id for b in items])
     return {
-        "items": [bill_summary(b, held.get(b.id, 0)) | {"queueNote": event_note(b, today(settings), bool(queue and queue.startswith("sent_"))) if queue else None} for b in items],
+        "items": [bill_summary(b, held.get(b.id, 0), credited.get(b.id, 0)) | {"queueNote": event_note(b, today(settings), bool(queue and queue.startswith("sent_"))) if queue else None} for b in items],
         "counts": {k: counts.get(k, 0) for k in STATE_LABELS} | {"missing": without},
         "canCreate": can("bills.create"),
         "queueLabel": BILL_QUEUES[queue][0] if queue else None,

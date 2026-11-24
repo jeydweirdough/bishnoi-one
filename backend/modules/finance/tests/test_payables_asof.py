@@ -88,3 +88,31 @@ def test_a_bill_voided_today_was_owed_before(client, app, ana, team):  # noqa: F
 def test_a_future_day_is_refused(client, ana):  # noqa: F811
     r = client.get("/finance/payables/aging", params={"asOf": (TODAY + timedelta(days=1)).isoformat()}, headers=ana)
     assert r.status_code == 422
+
+
+def test_opening_bill_without_entry_id_is_included_and_unreversed_void_excluded(client, app, ana, team):  # noqa: F811
+    from datetime import datetime, timezone
+    from modules.finance.models import Bill
+
+    s = supplier(client, team["aubrey"], name="Opening vendor", tin="987654321")
+    with app.state.sessions() as db:
+        opening = Bill(
+            no=99001, status="recorded", supplier_id=s["id"], bill_number="OPEN-001",
+            bill_date=date.fromisoformat(ago(120)), due_date=date.fromisoformat(ago(90)),
+            amounts_include_vat=True, lines=[{"accountId": posting_settings(db).payables_account_id, "amountCentavos": 250_000, "vat": "none"}],
+            net_centavos=250_000, vat_centavos=0, withheld_centavos=0, total_centavos=250_000, payable_centavos=250_000,
+            entry_id=None, created_by="Import",
+        )
+        cancelled = Bill(
+            no=99002, status="void", supplier_id=s["id"], bill_number="CANC-001",
+            bill_date=date.fromisoformat(ago(30)), due_date=date.fromisoformat(ago(1)),
+            amounts_include_vat=True, lines=[{"accountId": posting_settings(db).payables_account_id, "amountCentavos": 500_000, "vat": "none"}],
+            net_centavos=500_000, vat_centavos=0, withheld_centavos=0, total_centavos=500_000, payable_centavos=500_000,
+            entry_id=None, voided_at=datetime.now(timezone.utc), void_reason="Cancelled at source", created_by="Import",
+        )
+        db.add_all([opening, cancelled])
+        db.commit()
+    aging = client.get("/finance/payables/aging", headers=ana).json()
+    assert aging["totals"]["owedCentavos"] == 250_000
+    assert aging["billCount"] == 1
+

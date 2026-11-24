@@ -31,6 +31,11 @@ GUIDANCE = {
   'online':'Use the applicable official annual-return channel and retain filing acknowledgement.',
   'attachments':'The annual alphalist requires the applicable electronic format and validation; the PDF working table is not that file.',
   'source':'https://bir-cdn.bir.gov.ph/local/pdf/1604E%20Jan%202018%20ENCS%20Final2.pdf'},
+ '1702Q': {
+  'kind':'return','paper':'Quarterly corporate income tax working draft built from the General Ledger and SAWT; confirm non-deductible expenses and prior credits with Compliance.',
+  'online':'Enter and validate 1702Q figures in eBIRForms/eFPS; retain its filing confirmation separately.',
+  'attachments':'SAWT (Summary Alphalist of Withholding Taxes) and Forms 2307 support the CWT credits claimed.',
+  'source':'https://bir-cdn.bir.gov.ph/local/pdf/1702Q%20Jan%202018%20ENCS%20v3.pdf'},
 }
 
 def guidance(form:str)->dict:

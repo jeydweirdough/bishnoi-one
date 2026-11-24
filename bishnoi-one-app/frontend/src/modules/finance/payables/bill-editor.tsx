@@ -1,9 +1,9 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Search, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { preparePurchase } from "./purchase-actions";
 import type { PurchaseSource } from "./purchase-types";
 import { toast } from "sonner";
@@ -18,6 +18,123 @@ import type { Bill, BillChoices, PurchaseType, Supplier, VatKind } from "@/src/m
 
 // withholding: a code, "none:<reason>" or "unconfirmed" (bill-tax.ts); note: why, when the reason is "other".
 type Line = { key: number; accountId: string; description: string; amount: string; vat: VatKind | ""; withholding: string; note: string; purchaseType: PurchaseType };
+
+type PickerOption = { id: string; label: string; sub?: string; group?: string };
+
+function SearchablePicker({
+  id,
+  ariaLabel,
+  ariaInvalid,
+  value,
+  options,
+  placeholder,
+  disabled,
+  onChange,
+}: {
+  id?: string;
+  ariaLabel?: string;
+  ariaInvalid?: boolean;
+  value: string;
+  options: PickerOption[];
+  placeholder: string;
+  disabled?: boolean;
+  onChange: (id: string) => void;
+}) {
+  const autoId = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selected = useMemo(() => options.find((o) => o.id === value), [options, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options.slice(0, 80);
+    return options.filter((o) => o.label.toLowerCase().includes(q) || (o.sub && o.sub.toLowerCase().includes(q))).slice(0, 80);
+  }, [options, query]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        id={id ?? autoId}
+        type="button"
+        disabled={disabled}
+        aria-label={ariaLabel}
+        aria-invalid={ariaInvalid}
+        aria-expanded={open}
+        onClick={() => {
+          if (!disabled) {
+            setQuery("");
+            setOpen((was) => !was);
+          }
+        }}
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-[3px] border border-rule-strong bg-sheet px-2.5 text-left text-sm text-ink hover:border-control disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-danger"
+      >
+        <span className={selected ? "truncate font-medium text-ink" : "truncate text-ink-3"}>
+          {selected ? `${selected.label}${selected.sub ? ` · ${selected.sub}` : ""}` : placeholder}
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-ink-3" aria-hidden />
+      </button>
+      {open && (
+        <div className="absolute left-0 z-30 mt-1 w-full min-w-[18rem] rounded-[3px] border border-rule-strong bg-sheet shadow-lg">
+          <div className="flex items-center gap-1.5 border-b border-rule px-2.5 py-1.5">
+            <Search className="size-3.5 shrink-0 text-ink-3" aria-hidden />
+            <input
+              type="text"
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setOpen(false);
+                else if (e.key === "Enter" && filtered.length === 1) {
+                  e.preventDefault();
+                  onChange(filtered[0].id);
+                  setOpen(false);
+                }
+              }}
+              placeholder="Type name, TIN or code…"
+              className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-3"
+            />
+            {query && (
+              <button type="button" onClick={() => setQuery("")} className="text-ink-3 hover:text-ink" aria-label="Clear filter">
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+          <ul className="max-h-60 overflow-y-auto py-1 text-sm">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-meta text-ink-3">No matching items.</li>
+            ) : (
+              filtered.map((o) => (
+                <li key={o.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(o.id);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left hover:bg-hema-tint ${o.id === value ? "bg-hema-tint/70 font-semibold" : ""}`}
+                  >
+                    <span className="truncate">{o.label}</span>
+                    {o.sub && <span className="shrink-0 text-meta text-ink-3">{o.sub}</span>}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const addDays = (day: string, n: number) => {
   const d = new Date(`${day}T00:00:00Z`);
@@ -76,7 +193,14 @@ export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null
   const [error, setError] = useState<string | null>(bill?.problem ?? null);
   const [pending, start] = useTransition();
   const set = (patch: Partial<typeof v>) => { if ("includeVat" in patch || "billDate" in patch) setTaxReviewed(false); setV({ ...v, ...patch }); };
-  const setLine = (key: number, patch: Partial<Line>) => { setSourceReviewed(false);setTaxReviewed(false); setLines(lines.map((l) => (l.key === key ? { ...l, ...patch } : l))); };
+  const setLine = (key: number, patch: Partial<Line>) => {
+    setSourceReviewed(false);
+    // Keep taxReviewed intact when editing only description or expense account; reset if VAT/WHT/amount changes.
+    if ("amount" in patch || "vat" in patch || "withholding" in patch || "note" in patch || "purchaseType" in patch) {
+      setTaxReviewed(false);
+    }
+    setLines(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  };
 
   function pickSupplier(id: string) {
     setTaxReviewed(false); setSaveDefaults(false); setDefaultVat(""); setDefaultWithholding("");
@@ -168,6 +292,18 @@ export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null
   }
 
   const accountsBy = (type: "expense" | "asset") => choices.accounts.filter((a) => a.type === type);
+  const supplierOptions = useMemo<PickerOption[]>(
+    () => choices.suppliers.map((s) => ({ id: s.id, label: s.name, sub: s.tin ?? undefined })),
+    [choices.suppliers],
+  );
+  const accountOptions = useMemo<PickerOption[]>(
+    () => [
+      ...accountsBy("expense").map((a) => ({ id: a.id, label: `${a.code} · ${a.name}`, sub: "Expense" })),
+      ...accountsBy("asset").map((a) => ({ id: a.id, label: `${a.code} · ${a.name}`, sub: "Asset" })),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [choices.accounts],
+  );
 
   return (
     <form onSubmit={submit} noValidate className="space-y-5">
@@ -191,15 +327,16 @@ export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null
             }
           >
             {(p) => (
-              <Select {...p} value={supplierId} disabled={sourceLocked} onChange={(e) => pickSupplier(e.target.value)}>
-                <option value="">Pick a supplier…</option>
-                {choices.suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                    {s.tin ? ` · ${s.tin}` : ""}
-                  </option>
-                ))}
-              </Select>
+              <SearchablePicker
+                id={p.id}
+                ariaLabel="Supplier"
+                ariaInvalid={p["aria-invalid"] ? true : undefined}
+                value={supplierId}
+                disabled={sourceLocked}
+                options={supplierOptions}
+                placeholder="Search or pick a supplier…"
+                onChange={(id) => pickSupplier(id)}
+              />
             )}
           </Field>
           <Field label="Their invoice number" error={fields.billNumber}>
@@ -268,26 +405,14 @@ export function BillEditor({ bill, choices, org, purchase }: { bill: Bill | null
               {lines.map((l, i) => (
                 <tr key={l.key} className="align-top">
                   <td className="py-1.5 pr-2">
-                    <select suppressHydrationWarning
-                      aria-label={`Line ${i + 1}: account`}
-                      aria-invalid={fields[`lines.${i}.accountId`] ? true : undefined}
+                    <SearchablePicker
+                      ariaLabel={`Line ${i + 1}: account`}
+                      ariaInvalid={fields[`lines.${i}.accountId`] ? true : undefined}
                       value={l.accountId}
-                      onChange={(e) => setLine(l.key, { accountId: e.target.value })}
-                      className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm aria-[invalid=true]:border-danger"
-                    >
-                      <option value="">Pick an account…</option>
-                      {(["expense", "asset"] as const).map((t) =>
-                        accountsBy(t).length ? (
-                          <optgroup key={t} label={t === "expense" ? "Expenses" : "Assets"}>
-                            {accountsBy(t).map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.code} · {a.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ) : null,
-                      )}
-                    </select>
+                      options={accountOptions}
+                      placeholder="Search or pick an account…"
+                      onChange={(id) => setLine(l.key, { accountId: id })}
+                    />
                     {fields[`lines.${i}.accountId`] && <p className="mt-0.5 text-meta text-danger">{fields[`lines.${i}.accountId`]}</p>}
                   </td>
                   <td className="px-2 py-1.5">

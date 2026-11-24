@@ -66,7 +66,7 @@ export async function ClosingPage() {
     load<{ items: Bank[] }>("/finance/bank-accounts").then((r) => r.items.filter((b) => b.isActive)),
   ]);
   const last = closing.years[0];
-  const statement = await load<Statement>(`/finance/equity/statement?yearEnd=${last.yearEnd}`);
+  const statement = last ? await load<Statement>(`/finance/equity/statement?yearEnd=${last.yearEnd}`) : null;
   const manage = may(me, "accounts.manage");
   return (
     <>
@@ -76,17 +76,23 @@ export async function ClosingPage() {
       <div className="grid gap-5 lg:grid-cols-2">
         <Sheet className="px-5 py-4">
           <SectionTitle icon="money">Statement of changes in equity</SectionTitle>
-          <p className="mb-2 text-meta text-ink-3">Fiscal year {fmt.dateLabel(statement.start)} to {fmt.dateLabel(statement.end)}{statement.closed ? " (closed)" : ""}</p>
-          <table className="w-full text-sm">
-            <tbody>
-              {statement.rows.map((r, i) => (
-                <tr key={r.label} className={i === statement.rows.length - 1 ? "border-t-2 border-rule-strong font-semibold" : "border-b border-rule"}>
-                  <td className="py-1.5">{r.label}</td>
-                  <td className="py-1.5 text-right tabular-nums">{fmt.peso(r.amountCentavos)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {statement ? (
+            <>
+              <p className="mb-2 text-meta text-ink-3">Fiscal year {fmt.dateLabel(statement.start)} to {fmt.dateLabel(statement.end)}{statement.closed ? " (closed)" : ""}</p>
+              <table className="w-full text-sm">
+                <tbody>
+                  {statement.rows.map((r, i) => (
+                    <tr key={r.label} className={i === statement.rows.length - 1 ? "border-t-2 border-rule-strong font-semibold" : "border-b border-rule"}>
+                      <td className="py-1.5">{r.label}</td>
+                      <td className="py-1.5 text-right tabular-nums">{fmt.peso(r.amountCentavos)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <p className="text-meta text-ink-3">No completed fiscal year yet.</p>
+          )}
         </Sheet>
         <Sheet className="px-5 py-4">
           <SectionTitle icon="money">Capital and drawings</SectionTitle>

@@ -121,6 +121,82 @@ def add_account(user: permitted("accounts.manage"), db: DB, body: AccountIn) -> 
     return account_out(a)
 
 
+def _deactivation_blockers(db: DB, account_id: str) -> list[str]:
+    from modules.finance.models import BankAccount, ExpenseCategory, FixedAsset, ImportMatch, ImportRule, LedgerSettings, Supplier
+
+    reasons: list[str] = []
+    settings_row = db.get(LedgerSettings, 1)
+    if settings_row is not None and any(
+        getattr(settings_row, c.name) == account_id
+        for c in LedgerSettings.__table__.columns
+        if c.name.endswith("_account_id")
+    ):
+        reasons.append("default posting accounts")
+    if db.scalar(select(BankAccount.id).where(BankAccount.account_id == account_id, BankAccount.is_active.is_(True)).limit(1)):
+        reasons.append("an active bank account")
+    if db.scalar(select(ExpenseCategory.id).where(ExpenseCategory.account_id == account_id, ExpenseCategory.is_active.is_(True)).limit(1)):
+        reasons.append("an active expense category")
+    if db.scalar(select(Supplier.id).where(Supplier.payables_account_id == account_id, Supplier.is_active.is_(True)).limit(1)):
+        reasons.append("an active supplier")
+    if db.scalar(select(FixedAsset.id).where(
+        FixedAsset.status == "active",
+        or_(FixedAsset.asset_account_id == account_id, FixedAsset.accumulated_account_id == account_id, FixedAsset.expense_account_id == account_id),
+    ).limit(1)):
+        reasons.append("an active fixed asset")
+    if db.scalar(select(ImportMatch.id).where(ImportMatch.account_id == account_id).limit(1)):
+        reasons.append("an import match")
+    if db.scalar(select(ImportRule.id).where(ImportRule.account_id == account_id).limit(1)):
+        reasons.append("an import rule")
+    if db.scalar(select(JournalLine.id).join(JournalEntry).where(JournalLine.account_id == account_id, JournalEntry.status == "waiting").limit(1)):
+        reasons.append("a journal entry waiting for approval")
+    return reasons
+
+
+class ScopeApproveIn(Api):
+    account_ids: list[str] = Field(min_length=1, max_length=500)
+    reason: str | None = Field(None, max_length=200)
+
+
+@router.post("/accounts/company-scope/approve")
+def approve_accounts_for_2mg(user: permitted("accounts.manage"), db: DB, body: ScopeApproveIn) -> dict:
+    approved = company_scope.approve_for_2mg(db, "account", body.account_ids, reviewed_by=user.full_name, reason=(body.reason or "").strip() or None)
+    if approved:
+        audit(db, user, "accounts.scope_approved", target=f"{approved} accounts", target_type="account")
+    db.commit()
+    return {"approved": approved}
+
+
+class OojeemaMigrationIn(Api):
+    active_coa_csv: str
+    inactive_coa_csv: str = ""
+    dec_tb_csv: str
+    q1_tb_csv: str | None = None
+    opening_date: date = date(2025, 12, 31)
+    deactivate_inactive: bool = True
+
+
+@router.post("/opening/oojeema")
+def run_oojeema_coa_and_opening(user: permitted("accounts.manage"), db: DB, body: OojeemaMigrationIn) -> dict:
+    from modules.finance.oojeema_migration import import_oojeema_coa_and_opening
+
+    try:
+        result = import_oojeema_coa_and_opening(
+            db,
+            active_coa_csv=body.active_coa_csv,
+            inactive_coa_csv=body.inactive_coa_csv,
+            dec_tb_csv=body.dec_tb_csv,
+            q1_tb_csv=body.q1_tb_csv,
+            opening_date=body.opening_date,
+            reviewed_by=user.full_name,
+            deactivate_inactive=body.deactivate_inactive,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc))
+    audit(db, user, "oojeema.opening_imported", target=f"{result['accountsTotal']} accounts", target_type="account")
+    db.commit()
+    return result
+
+
 @router.put("/accounts/{account_id}")
 def change_account(user: permitted("accounts.manage"), db: DB, account_id: str, body: AccountIn) -> dict:
     company_scope.require_ids(db, 'account', [account_id])
@@ -131,6 +207,10 @@ def change_account(user: permitted("accounts.manage"), db: DB, account_id: str, 
         raise field_error("code", "This account code is already in use.")
     if body.type != a.type and db.scalar(select(JournalLine.id).where(JournalLine.account_id == a.id).limit(1)):
         raise field_error("type", "This account has journal entries, so its type cannot change. Create a new account instead.")
+    if a.is_active and not body.is_active:
+        blockers = _deactivation_blockers(db, a.id)
+        if blockers:
+            raise field_error("isActive", f"This account is still linked to {', '.join(blockers)}. Reassign or finish those before switching it off.")
     check_parent(db, a.id, body.parent_id)
     changes = [k for k, v in body.model_dump().items() if getattr(a, k) != v]
     for k, v in body.model_dump().items():

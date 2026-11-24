@@ -20,7 +20,7 @@ export function FinancePrintFrame({ org, company, children }: { org: Org | null;
   const context = useRef<HTMLParagraphElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const documentPage = /\/(vouchers|petty-cash)\/[^/]+\/print$|\/ledger\/voucher\//.test(path) || /\/funds\/[^/]+\/report$/.test(path);
-  const existingPrintAction = documentPage || /^\/finance\/invoices\/[^/]+$/.test(path);
+  const existingPrintAction = documentPage || /^\/finance\/invoices\/(?!receivables$)[^/]+$/.test(path);
   const wide = /\/bir(?:\/|$)|\/bills\/aging|\/ledger\/(accounts|trial-balance)|\/invoices\/receivables/.test(path)
     || /^\/finance\/(bills|suppliers|vouchers|petty-cash|ledger|invoices|bank|funds)$/.test(path);
   const printable = /^\/finance\/(bills|suppliers|vouchers|petty-cash|ledger|invoices|bank|funds|bir)(\/|$)/.test(path)

@@ -81,6 +81,20 @@ export type VatReturn = {
   notes: string[];
 };
 
+export type IncomeTaxReturn = {
+  taxpayer: Taxpayer;
+  period: PeriodOut;
+  year: number;
+  quarter: number;
+  form: "1702Q";
+  title: string;
+  rateBp: number;
+  mcitRateBp: number;
+  lines: { key: string; label: string; amountCentavos: number }[];
+  totals: Record<string, number>;
+  notes: string[];
+};
+
 export type SummaryList = {
   list: "sls" | "slp" | "sawt" | "qap"; title: string; taxpayer: Taxpayer; period: PeriodOut; year: number; quarter: number; missingTin: number;
   rows: Record<string, string | number | null | string[]>[];
