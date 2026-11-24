@@ -47,7 +47,7 @@ def _fit(c,text,x,top,width,size=10):
 
 def _header(c,draft,page):
     who=draft["taxpayer"]
-    rdo=str(who.get("rdoCode") or "").upper()
+    rdo=re.sub(r"^0(\d{2}[0-9A-Z])$",r"\1",str(who.get("rdoCode") or "").strip().upper())
     if rdo and not re.fullmatch(r"\d{2}[0-9A-Z]",rdo):raise ValueError("RDO does not fit its three printed cells.")
     tin_digits=re.sub(r"\D","",who.get("tin") or "")
     if tin_digits and len(tin_digits)!=9:raise ValueError("TIN requires nine main digits and a separate branch code.")
@@ -55,27 +55,30 @@ def _header(c,draft,page):
         c.setFillColor(colors.black);c.setFont("Courier-Bold",9)
         for i,char in enumerate(value):c.drawCentredString(first+14.25*i,PAGE_HEIGHT-top-7,char)
     if page==0:
-        boxed(f"{who.get('fiscalMonthEnd',12):02}{draft['year']}",312.5,112)
-        boxed(draft["period"]["start"][5:7]+draft["period"]["start"][8:10]+draft["period"]["start"][:4],70.5,141)
-        boxed(draft["period"]["end"][5:7]+draft["period"]["end"][8:10]+draft["period"]["end"][:4],211.5,141)
+        ym=f"{who.get('fiscalMonthEnd',12):02}{draft['year']}"
+        c.setFillColor(colors.black);c.setFont("Courier-Bold",9)
+        for i,ch in enumerate(ym):c.drawCentredString(309.5+14.35*i,PAGE_HEIGHT-118,ch)
+        s_mdy=draft["period"]["start"][5:7]+draft["period"]["start"][8:10]+draft["period"]["start"][:4]
+        e_mdy=draft["period"]["end"][5:7]+draft["period"]["end"][8:10]+draft["period"]["end"][:4]
+        for i,ch in enumerate(s_mdy):c.drawCentredString(68.0+14.0*i,PAGE_HEIGHT-147,ch)
+        for i,ch in enumerate(e_mdy):c.drawCentredString(209.0+14.0*i,PAGE_HEIGHT-147,ch)
         c.setFont("Helvetica-Bold",10)
         c.drawString(78 if who.get("fiscalMonthEnd",12)==12 else 145,PAGE_HEIGHT-121,"X")
         c.drawString((439,477,520,561)[draft["quarter"]-1],PAGE_HEIGHT-121,"X")
         _fit(c,who.get("registeredName"),25,200,562)
         _fit(c,who.get("address"),25,229,562,9)
-        boxed(str(who.get("rdoCode") or "").upper(),554.5,173)
+        boxed(rdo,554.5,172)
         tin=re.sub(r"\D","",who.get("tin") or "")
         if len(tin)==9:
             for i,ch in enumerate(tin):
                 group,offset=divmod(i,3)
-                c.setFont("Courier-Bold",9);c.drawCentredString((240.5,297.7,354.9)[group]+offset*14.15,PAGE_HEIGHT-180,ch)
+                c.setFont("Courier-Bold",9);c.drawCentredString((240.5,297.7,354.9)[group]+offset*14.15,PAGE_HEIGHT-179,ch)
     else:
         _fit(c,who.get("registeredName"),225,91,360)
         tin=re.sub(r"\D","",who.get("tin") or "")
         if len(tin)==9:
             for i,ch in enumerate(tin):
-                group,offset=divmod(i,3)
-                c.setFont("Courier-Bold",9);c.drawCentredString(29+group*43+offset*14.25,PAGE_HEIGHT-101,ch)
+                c.setFont("Courier-Bold",9);c.drawCentredString(27.0+i*13.3,PAGE_HEIGHT-101,ch)
     # The official background preprints branch 00000; never print the wrong branch.
     if who.get("branchCode","00000")!="00000":
         raise ValueError("Non-zero branch needs a reviewed branch-cell layout before printing this draft.")

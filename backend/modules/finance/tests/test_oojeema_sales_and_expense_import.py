@@ -631,7 +631,11 @@ def test_oojeema_can_match_non_cash_accounts_without_importing_a_false_deposit(c
         expense = Account(code="TEST-PEN", name="Penalties Expense", type="expense", is_active=True)
         liability = Account(code="TEST-LIAB", name="Synthetic settlement liability", type="liability", is_active=True)
         inactive = Account(code="TEST-OFF", name="Inactive settlement", type="expense", is_active=False)
-        db.add_all([expense, liability, inactive]); db.commit()
+        db.add_all([expense, liability, inactive]); db.flush()
+        from modules.finance.models import CompanyScopeReview
+        for a in (expense,liability,inactive):
+            db.add(CompanyScopeReview(subject_kind='account',subject_id=a.id,scope='2mg',reviewed_by='Fixture review',evidence={'fixture':'explicit fictional company review'}))
+        db.commit()
         expense_id, liability_id, inactive_id = expense.id, liability.id, inactive.id
     files = journal(sale(), receipts=[receipt(account="Penalties Expense")])
     load(client, t["cristal"], files)
@@ -651,6 +655,9 @@ def test_oojeema_can_match_non_cash_accounts_without_importing_a_false_deposit(c
         inv = db.scalar(select(Invoice).where(Invoice.number == "SI0001"))
         assert inv.paid_centavos == 0
         assert not db.scalar(select(func.count()).select_from(JournalEntry).join(JournalEntry.lines).where(JournalEntry.lines.property.mapper.class_.account_id == expense_id))
+        db.get(CompanyScopeReview,('account',expense_id)).scope='legacy';db.commit()
+    refused=client.put(f"/finance/imports/matching/{m['id']}",json={'accountId':expense_id},headers=t['cristal'])
+    assert refused.status_code==422 and '2MG' in refused.text
 
 
 def test_supplier_payment_matching_still_refuses_non_cash_accounts(client, ana, app):

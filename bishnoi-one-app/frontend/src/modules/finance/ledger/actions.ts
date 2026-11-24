@@ -34,6 +34,14 @@ export async function importAccounts(accounts: ImportAccount[]): Promise<Result<
   });
 }
 
+export async function approveAccountsFor2mg(accountIds: string[], reason?: string): Promise<Result<{ approved: number }>> {
+  return attempt(async () => {
+    const done = await api.post<{ approved: number }>("/finance/ledger/accounts/company-scope/approve", { accountIds, ...(reason ? { reason } : {}) });
+    refresh();
+    return done;
+  });
+}
+
 export type EntryInput = {
   date: string;
   memo: string;

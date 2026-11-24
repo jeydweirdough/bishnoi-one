@@ -14,7 +14,7 @@ from .test_dashboard import VIEW, person
 from .test_ledger import balances
 from .test_payables import account
 from .test_concurrent_saves import app  # noqa: F401 (the SQLite / PostgreSQL fixture)
-from .test_tax_api import ana, ben, client  # noqa: F401 (fixtures)
+from .test_tax_api import ana, ben, client, review_fixture_accounts  # noqa: F401 (fixtures)
 
 RECEIPT = {"name": "receipt.pdf", "contentType": "application/pdf", "data": base64.b64encode(b"%PDF-1.4 store receipt").decode()}
 MAKER = VIEW + ["petty_cash.view", "petty_cash.create"]
@@ -30,13 +30,15 @@ def fund(app) -> str:
         f = Account(code="1110-T", name="Petty Cash Fund - Finance", type="asset", parent_id=cash.id)
         db.add(f)
         db.commit()
-        return f.id
+        fund_id = f.id
+    review_fixture_accounts(app)
+    return fund_id
 
 
 def line(client, who, **extra) -> dict:
     return {"spentOn": "2026-10-05", "store": "Corner Hardware", "storeTin": "123-456-789-00000", "receiptNumber": "OR 1001",
             "accountId": account(client, who, "6500"), "description": "Cleaning materials", "purchaseType": "other_goods",
-            "vat": "vat", "withholding": None, "amountCentavos": 112_000} | extra
+            "vat": "vat", "withholding": None, "noWithholdingReason": "not_covered", "amountCentavos": 112_000} | extra
 
 
 def voucher(client, who, fund_id, number="2MG PCV 01682", lines=None) -> dict:

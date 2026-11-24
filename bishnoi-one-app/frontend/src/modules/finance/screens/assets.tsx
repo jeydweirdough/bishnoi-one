@@ -70,8 +70,9 @@ export async function BudgetsPage({ searchParams }: { searchParams: Promise<Reco
   // This fiscal year and the next, besides the ones that ended.
   const ended = closing.years.map((y) => y.yearEnd);
   const next = (d: string) => `${Number(d.slice(0, 4)) + 1}${d.slice(4)}`;
-  const years = [next(next(ended[0])), next(ended[0]), ...ended.slice(0, 2)];
-  const chosen = one((await searchParams).year) || years[1];
+  const fallbackYear = `${new Date().getFullYear()}-12-31`;
+  const years = ended.length > 0 ? [next(next(ended[0])), next(ended[0]), ...ended.slice(0, 2)] : [next(fallbackYear), fallbackYear];
+  const chosen = one((await searchParams).year) || years[1] || years[0];
   const [{ items }, { items: accounts }] = await Promise.all([
     load<{ items: BudgetRow[] }>(`/finance/budgets?year_end=${chosen}`),
     load<{ items: Acc[] }>("/finance/ledger/accounts"),

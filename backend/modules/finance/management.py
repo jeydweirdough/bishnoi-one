@@ -80,7 +80,7 @@ def cost_of_sales(db: Session, first: date, last: date) -> int:
 
     cogs = posting(db).cogs_account_id
     if cogs:
-        debit, credit = bir.balances(db, start=first, end=last).get(cogs, (0, 0))
+        debit, credit = bir.balances(db, start=first, end=last, exclude_closing=True).get(cogs, (0, 0))
         return debit - credit
     total = db.scalar(select(func.coalesce(func.sum(Invoice.cost_centavos), 0)).where(Invoice.status == "issued", Invoice.invoice_date >= first, Invoice.invoice_date <= last))
     return int(total or 0)
@@ -234,7 +234,7 @@ class Figures:
 
 def tagged(db: Session, first: date, last: date) -> dict:
     """Expenses in the period by their tags on the chart of accounts (step 17)."""
-    moves = bir.balances(db, start=first, end=last)
+    moves = bir.balances(db, start=first, end=last, exclude_closing=True)
     out = {"addbacks": 0, "fixed": 0, "variable": 0, "sales_marketing": 0, "any_behaviour": False, "any_marketing": False}
     for a in db.scalars(select(Account).where(Account.type == "expense")):
         d, c = moves.get(a.id, (0, 0))

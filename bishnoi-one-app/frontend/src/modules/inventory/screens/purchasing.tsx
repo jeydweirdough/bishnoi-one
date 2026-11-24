@@ -13,6 +13,7 @@ import { Trash2 as BulkTrash } from "lucide-react";
 import { bulkDeletePurchaseOrders, deletePurchaseOrder, purchaseOrderStep } from "@/src/modules/inventory/actions/inventory";
 import { PurchaseOrderForm } from "@/src/modules/inventory/components/document-forms";
 import { PrintLink } from "@/src/modules/inventory/components/print-button";
+import { ReceiptFinancePanel } from "@/src/modules/inventory/components/receipt-finance";
 import { ReceiveForm } from "@/src/modules/inventory/components/receive-form";
 import { RecordTools } from "@/src/modules/inventory/components/record-tools";
 import { POStamp } from "@/src/modules/inventory/components/stamps";
@@ -340,7 +341,7 @@ function ReceiptsTable({ receipts, at, count, peso }: { receipts: ReceiptBrief[]
     <Table head={["Receipt", "Received date", "Vendor", "Warehouse", "Order", " Units", " Value", <span key="a" className="sr-only">Actions</span>]} min="52rem">
       {receipts.map((r) => (
         <tr key={r.id} className="relative hover:bg-bench/40">
-          <Td><RowLink href={`/inventory/receipts/${r.id}`} sub={r.deliveryRef ?? undefined}>{r.number}</RowLink></Td>
+          <Td><RowLink href={`/inventory/receipts/${r.id}`} sub={r.deliveryRef ?? undefined}>{r.number}</RowLink>{r.financeState&&r.financeState!=="not_sent"&&<span className="block text-meta">Finance: {r.financeState==='sending'?'waiting for acknowledgement':r.financeState.replaceAll('_',' ')}</span>}</Td>
           <Td className="whitespace-nowrap">{at(r.receivedAt)}<span className="block text-meta text-ink-3">{r.receivedBy?.name}</span></Td>
           <Td>{r.supplier?.name ?? "—"}</Td>
           <Td>{r.warehouse.code} · {r.location.code}</Td>
@@ -444,6 +445,7 @@ export async function ReceiptPage({ params }: { params: Params<{ id: string }> }
         {r.deliveryRef && <> · delivery {r.deliveryRef}</>}
       </PageHeader>
       <DocumentHeaderStrip header={r.header} source={r.order && <Link href={`/inventory/purchase-orders/${r.order.id}`} className="hover:underline">{r.order.number}</Link>} />
+      <ReceiptFinancePanel id={r.id} status={r.financeHandoff}/>
       {/* Receive → check → store (step 14a): waiting on hold until its quality check. */}
       {r.qualityCheck && (
         <p className={`mb-4 rounded-lg px-4 py-2 text-sm text-ink ${r.qualityCheck.status === "waiting" ? "bg-promo-tint" : "bg-hema-tint"}`}>

@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from modules.finance.access import access_of
+from modules.finance import company_scope
 from modules.finance.api import Api
 from modules.finance.audit import audit
 from modules.finance.deps import DB, CurrentUser, SettingsDep
@@ -148,7 +149,7 @@ def list_matches(user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
         "choices": {
             "lineAccounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in lines],
             "moneyAccounts": [{"id": a.id, "code": a.code, "name": a.name} for a in paying_accounts(db)],
-            "receiptAccounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in db.scalars(select(Account).where(Account.is_active).order_by(Account.code))],
+            "receiptAccounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in db.scalars(select(Account).where(Account.is_active, company_scope.usable_clause('account', Account.id)).order_by(Account.code))],
             "purchaseTypes": [{"key": k, "label": v} for k, v in PURCHASE_TYPES.items()],
             "vatKinds": [{"key": k, "label": v} for k, v in VAT_KINDS.items()],
             "companies": [{"key": k, "label": v} for k, v in zi.COMPANIES.items()],
@@ -203,6 +204,8 @@ def propose(user: CurrentUser, db: DB, match_id: str, body: Proposal) -> dict:
     sure = access_of(user).can(zi.CONFIRMS[m.section])
     if not sure:
         need(user, "imports.propose")
+    if body.account_id and m.section in ('account','money') and not body.per_record:
+        company_scope.require_ids(db, 'account', [body.account_id], status_code=422)
     if m.section == "company":
         if not body.company:
             raise HTTPException(422, "Choose the company.")
@@ -252,6 +255,8 @@ def confirm(user: CurrentUser, db: DB, match_id: str) -> dict:
         raise HTTPException(409, "This match isn't waiting for confirmation. Reload to see where it stands.")
     if m.proposed_by_id == user.id:
         raise HTTPException(403, "You proposed this match, so someone else confirms it.")
+    if m.account_id:
+        company_scope.require_ids(db, 'account', [m.account_id])
     if m.account_id and db.get(Account, m.account_id) is None:
         raise HTTPException(409, "The proposed account no longer exists. Propose again.")
     m.status, m.confirmed_by, m.confirmed_by_id, m.confirmed_at = "confirmed", user.full_name[:120], user.id, datetime.now(UTC)
@@ -274,6 +279,8 @@ def save_rule(user: CurrentUser, db: DB, match_id: str, body: RuleIn) -> dict:
     """Saved by someone who may confirm the section: final at once; otherwise it waits (as for labels).
     Saving again for the same supplier or line replaces the earlier choice."""
     m = found(db, match_id)
+    if body.account_id:
+        company_scope.require_ids(db, 'account', [body.account_id], status_code=422)
     if m.section not in ("account", "tax"):
         raise HTTPException(422, "Rules and line choices are for accounts on bill and expense lines and for tax labels.")
     sure = access_of(user).can(zi.CONFIRMS[m.section])
@@ -328,6 +335,8 @@ def confirm_rule(user: CurrentUser, db: DB, rule_id: str) -> dict:
         raise HTTPException(409, "This choice isn't waiting for confirmation. Reload to see where it stands.")
     if r.proposed_by_id == user.id:
         raise HTTPException(403, "You proposed this choice, so someone else confirms it.")
+    if r.account_id:
+        company_scope.require_ids(db, 'account', [r.account_id])
     r.status, r.confirmed_by, r.confirmed_by_id, r.confirmed_at = "confirmed", user.full_name[:120], user.id, datetime.now(UTC)
     audit(db, user, "imports.rule_confirmed", target=f"{r.match.source_label or '(blank)'}: {r.supplier}"[:200], target_type="import_rule", target_id=r.id)
     db.commit()

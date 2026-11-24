@@ -73,7 +73,7 @@ def _fit(c,text,x,baseline,width,size=9):
     c.setFont('Helvetica',size);c.drawString(x,HEIGHT-baseline,text)
 
 def _nature(c,text,x,baseline,width):
-    text=str(text or '').upper()
+    text=str(text or '').replace('\u20b1','PHP ').upper()
     if stringWidth(text,'Helvetica',7)<=width:
         _fit(c,text,x,baseline,width,7);return
     lines=[];line=''
@@ -102,8 +102,8 @@ def render(draft: dict) -> bytes:
     if list(page.mediabox)!=[0,0,612,936]:raise ValueError('Unexpected certificate page geometry.')
     buf=BytesIO();c=canvas.Canvas(buf,pagesize=(612,936),invariant=1)
     for key,centres in [('start',FROM_X),('end',TO_X)]:
-        d=date.fromisoformat(draft['period'][key]);_boxes(c,d.strftime('%m%d%Y'),centres,118)
-    for party,tin_y,name_y,address_y in [(draft['certificate']['payee'],150,175,204),(draft['taxpayer'],265,290,319)]:
+        d=date.fromisoformat(draft['period'][key]);_boxes(c,d.strftime('%m%d%Y'),centres,116.2)
+    for party,tin_y,name_y,address_y in [(draft['certificate']['payee'],148.2,175,204),(draft['taxpayer'],263.2,290,319)]:
         _boxes(c,re.sub(r'\D','',party.get('tin') or ''),TIN_X,tin_y)
         _boxes(c,party.get('branchCode') or '',BRANCH_X,tin_y)
         _fit(c,party.get('registeredName') or party.get('name'),37,name_y,552)

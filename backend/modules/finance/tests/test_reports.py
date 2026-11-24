@@ -107,18 +107,27 @@ def test_an_invoice_books_its_cost_of_goods_sold_from_inventory(client, ana, mon
 
     lines = [{"ref": "AMX-500", "description": "Amoxicillin 500 mg", "quantity": 2, "unitPriceCentavos": 112000},
              {"ref": "NOPE-1", "description": "Not in Inventory", "quantity": 1, "unitPriceCentavos": 11200}]
-    inv = client.post(f"/finance/invoices/{draft(client, ana, lines=lines)['id']}/issue", json={}, headers=ana).json()
+    pending = draft(client, ana, lines=lines)
+    refused = client.post(f"/finance/invoices/{pending['id']}/issue", json={}, headers=ana)
+    assert refused.status_code == 409
+    still = client.get(f"/finance/invoices/{pending['id']}", headers=ana).json()
+    assert still['status'] == 'draft' and still['number'] is None
     assert asked == [["AMX-500", "NOPE-1"]]
+    monkeypatch.setattr(inventory, "unit_costs", lambda settings, skus: {"AMX-500": 70000, "NOPE-1": 1000})
+    response = client.post(f"/finance/invoices/{pending['id']}/issue", json={}, headers=ana)
+    assert response.status_code == 200, response.text
+    inv = response.json()
+    assert inv["number"] == "SI-000101"
     books = balances(client, ana)
-    assert (books["5000"], books["1400"]) == (140000, -140000)  # 2 × 700.00, out of the stock
+    assert (books["5000"], books["1400"]) == (141000, -141000)  # 2 × 700.00, out of the stock
 
     by_product = {r["name"]: r for r in client.get("/finance/reports/gross-margin-by-product", headers=ana).json()["rows"]}
     assert (by_product["AMX-500"]["revenue"], by_product["AMX-500"]["cost"], by_product["AMX-500"]["profit"]) == (200000, 140000, 60000)
-    assert by_product["NOPE-1"]["cost"] == 0
+    assert by_product["NOPE-1"]["cost"] == 1000
     by_customer = client.get("/finance/reports/gross-margin-by-customer", headers=ana).json()
-    assert by_customer["rows"][0]["cost"] == 140000 and by_customer["summary"][-1]["value"] == 1  # one invoice with a line of unknown cost
+    assert by_customer["rows"][0]["cost"] == 141000 and by_customer["summary"][-1]["value"] == 0  # one invoice with a line of unknown cost
     key = {f["label"]: f["value"] for f in client.get("/finance/reports/key-figures", headers=ana).json()["summary"]}
-    assert key["Gross profit"] == 210000 - 140000
+    assert key["Gross profit"] == 210000 - 141000
 
     # A void takes the sale and its cost off together.
     client.post(f"/finance/invoices/{inv['id']}/void", json={"reason": "Wrong customer"}, headers=ana)

@@ -7,7 +7,7 @@ from sqlalchemy import select,func,text
 from modules.finance.config import Settings,DATA_DIR
 from modules.finance.db import make_engine,make_sessions
 from modules.finance.migrate import upgrade
-from modules.finance.models import Account,Bill,Invoice,InvoicePayment,PaymentVoucher,Supplier,VoucherLine,JournalLine,utcnow
+from modules.finance.models import Account,Bill,Invoice,InvoicePayment,PaymentVoucher,Supplier,VoucherLine,JournalLine,CompanyScopeReview,utcnow
 from modules.finance.ledger import post,Leg
 from modules.finance.tax import rates
 from modules.finance.import_review import ReviewError
@@ -42,6 +42,12 @@ def rehearsal(review,source_db,actor):
                     db.add(Account(id=mapping[a.id],code=a.code,name=a.name,type=a.type,parent_id=mapping.get(a.parent_id),is_active=a.is_active))
                     known.add(mapping[a.id]);pending.remove(a)
                 db.flush()
+            # Carry only existing company evidence into the isolated rehearsal.
+            # Matching an imported label does not certify an unreviewed account.
+            for review_row in source_db.scalars(select(CompanyScopeReview).where(CompanyScopeReview.subject_kind=='account')):
+                if review_row.subject_id in mapping:
+                    db.merge(CompanyScopeReview(subject_kind='account',subject_id=mapping[review_row.subject_id],
+                        scope=review_row.scope,evidence=review_row.evidence,reviewed_by=review_row.reviewed_by,reviewed_at=review_row.reviewed_at))
             db.commit()
         selected={g['id']:mapping.get(g['accountId']) for g in review['accountGroups']}
         groups={g['id']:g for g in review['accountGroups']};documents={d['id']:d for d in review['documents']}

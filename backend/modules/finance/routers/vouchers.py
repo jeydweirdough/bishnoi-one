@@ -24,6 +24,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import Field
 from sqlalchemy import func, or_, select
 
+from modules.finance import company_scope
 from modules.finance.access import access_of, permitted
 from modules.finance.audit import audit
 from modules.finance.deps import DB, CurrentUser, SettingsDep
@@ -90,8 +91,8 @@ def paying_accounts(db: DB) -> list[Account]:
     defaults = {x for x in (s.cash_account_id, s.bank_account_id, s.ewallet_account_id, s.check_account_id) if x}
     ids = money_account_ids(db)
     if not ids - defaults:
-        return list(db.scalars(select(Account).where(Account.type == "asset", Account.is_active).order_by(Account.code)))
-    return list(db.scalars(select(Account).where(Account.id.in_(ids), Account.is_active).order_by(Account.code)))
+        return list(db.scalars(select(Account).where(Account.type == "asset", Account.is_active, company_scope.usable_clause("account", Account.id)).order_by(Account.code)))
+    return list(db.scalars(select(Account).where(Account.id.in_(ids), Account.is_active, company_scope.usable_clause("account", Account.id)).order_by(Account.code)))
 
 
 def bill_payables(db: DB, b: Bill) -> Account | None:
@@ -241,20 +242,28 @@ def voucher_choices(user: permitted("vouchers.view"), db: DB, settings: Settings
     """Suppliers with bills left to pay; for one supplier, those bills with what's paid, what
     other open vouchers set aside and what's left; the accounts a voucher pays from."""
     open_bills = db.scalars(select(Bill).where(Bill.status == "recorded", Bill.paid_centavos < Bill.payable_centavos)).all()
-    held = set_aside(db, [b.id for b in open_bills], exclude_voucher=voucher)
+    from modules.finance.settlements import bill_settled_map
+
+    bill_ids = [b.id for b in open_bills]
+    held = set_aside(db, bill_ids, exclude_voucher=voucher)
+    credited = bill_settled_map(db, bill_ids)
     per_supplier: dict[str, int] = {}
     for b in open_bills:
-        left = b.payable_centavos - b.paid_centavos - held.get(b.id, 0)
+        if company_scope.scope_for(db, 'supplier', b.supplier_id) != '2mg':
+            continue
+        left = b.payable_centavos - b.paid_centavos - held.get(b.id, 0) - credited.get(b.id, 0)
         if left > 0:
             per_supplier[b.supplier_id] = per_supplier.get(b.supplier_id, 0) + left
     suppliers = db.scalars(select(Supplier).where(Supplier.id.in_(list(per_supplier))).order_by(func.lower(Supplier.name))).all()
     bills = []
     if supplier:
         for b in sorted((b for b in open_bills if b.supplier_id == supplier), key=lambda x: (x.due_date, x.no or 0)):
+            taken = held.get(b.id, 0) + credited.get(b.id, 0)
             bills.append({
                 "id": b.id, "no": b.no, "billNumber": b.bill_number, "billDate": b.bill_date.isoformat(), "dueDate": b.due_date.isoformat(),
                 "payableCentavos": b.payable_centavos, "paidCentavos": b.paid_centavos, "setAsideCentavos": held.get(b.id, 0),
-                "availableCentavos": max(b.payable_centavos - b.paid_centavos - held.get(b.id, 0), 0), "documentMissing": not b.files,
+                "creditAppliedCentavos": credited.get(b.id, 0),
+                "availableCentavos": max(b.payable_centavos - b.paid_centavos - taken, 0), "documentMissing": not b.files,
             })
     picked = db.get(Supplier, supplier) if supplier else None
     return {
@@ -294,8 +303,11 @@ def check_amounts(db: DB, v: PaymentVoucher, pairs: list[tuple[Bill, int]]) -> N
     """Each bill recorded, the supplier's, once, and no more than what's left of it after what
     it's been paid and what other open vouchers set aside (so nothing is paid twice).
     The bills are locked first, so two vouchers made at once for one bill can't both fit."""
+    from modules.finance.settlements import bill_settled_map
+
     locked(db, Bill, [b.id for b, _ in pairs])
     held = set_aside(db, [b.id for b, _ in pairs], exclude_voucher=v.id)
+    credited = bill_settled_map(db, [b.id for b, _ in pairs])
     seen = set()
     for i, (b, amount) in enumerate(pairs):
         if b.supplier_id != v.supplier_id or b.status != "recorded":
@@ -303,13 +315,19 @@ def check_amounts(db: DB, v: PaymentVoucher, pairs: list[tuple[Bill, int]]) -> N
         if b.id in seen:
             raise line_error(i, "billId", "This bill is on the voucher twice.")
         seen.add(b.id)
-        left = b.payable_centavos - b.paid_centavos - held.get(b.id, 0)
+        left = b.payable_centavos - b.paid_centavos - held.get(b.id, 0) - credited.get(b.id, 0)
         if amount > left:
-            others = f" ({peso(held[b.id])} is set aside in another voucher)" if held.get(b.id) else ""
+            notes = []
+            if held.get(b.id):
+                notes.append(f"{peso(held[b.id])} is set aside in another voucher")
+            if credited.get(b.id):
+                notes.append(f"{peso(credited[b.id])} is settled by credits/advances")
+            others = f" ({'; '.join(notes)})" if notes else ""
             raise line_error(i, "amountCentavos", f"Bill {b.no} has {peso(max(left, 0))} left to pay{others}.")
 
 
 def apply(db: DB, v: PaymentVoucher, body: VoucherIn) -> None:
+    company_scope.require_ids(db, 'supplier', [body.supplier_id], status_code=422)
     supplier = db.get(Supplier, body.supplier_id)
     if supplier is None:
         raise field_error("supplierId", "Pick a supplier.")
@@ -360,6 +378,9 @@ def change_voucher(user: permitted("vouchers.prepare"), db: DB, voucher_id: str,
 def submit(user: permitted("vouchers.prepare"), db: DB, voucher_id: str) -> dict:
     v = found(db, voucher_id)
     expect(v, "draft", "returned")
+    company_scope.require_ids(db, 'supplier', [v.supplier_id])
+    for ln in v.lines:
+        company_scope.require_bill(db, ln.bill)
     if not v.lines:
         raise HTTPException(status.HTTP_409_CONFLICT, "Add the bills it pays first.")
     if not v.paid_from_id:
@@ -422,6 +443,9 @@ def release(user: permitted("vouchers.release"), db: DB, settings: SettingsDep, 
     locked(db, PaymentVoucher, [v.id])
     locked(db, Bill, [ln.bill_id for ln in v.lines])
     expect(v, "to_release")
+    company_scope.require_ids(db, 'supplier', [v.supplier_id])
+    for ln in v.lines:
+        company_scope.require_bill(db, ln.bill)
     if body.paid_on > today(settings):
         raise field_error("paidOn", "The payment date can't be in the future.")
     if v.method == "check" and not (body.check_number or "").strip():

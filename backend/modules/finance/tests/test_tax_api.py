@@ -23,6 +23,7 @@ def app(tmp_path):
         integration_keys=[f"crm:{CRM_KEY}"],
     )
     app = create_app(settings)
+    review_fixture_accounts(app)
     with app.state.sessions() as db:
         db.add(User(email="ana@example.com", full_name="Ana Reyes", password_hash=hash_password(PASSWORD), role="admin"))
         db.add(User(email="ben@example.com", full_name="Ben Cruz", password_hash=hash_password(PASSWORD)))
@@ -133,3 +134,12 @@ def test_other_apps_ask_with_their_key(client):
     assert r.status_code == 200 and r.json()["totalDueCentavos"] == 11200
     setup = client.get("/integration/tax/setup", headers={"X-Bishnoi-Key": CRM_KEY}).json()
     assert {c["key"] for c in setup["pack"]["categories"]} == {"standard", "zero_rated", "exempt"} and setup["canEdit"] is False
+
+
+def review_fixture_accounts(app):
+    from sqlalchemy import select
+    from modules.finance.models import Account, CompanyScopeReview
+    with app.state.sessions() as db:
+        for a in db.scalars(select(Account)):
+            db.merge(CompanyScopeReview(subject_kind='account', subject_id=a.id, scope='2mg', evidence={'source':'fictional test chart'}, reviewed_by='TEST'))
+        db.commit()

@@ -32,6 +32,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 
 from modules.finance.config import API_DIR
+from modules.finance.legacy_history import reconcile
 
 log = logging.getLogger("finance.migrate")
 
@@ -77,6 +78,7 @@ def upgrade(engine: Engine) -> None:
         # The schema changes must run on the very transaction holding the lock.
         config = _config(engine)
         config.attributes["connection"] = lock
+        reconcile(lock)
         command.upgrade(config, "head")
 
 
@@ -91,6 +93,8 @@ def _upgrade(engine: Engine) -> None:
     file = _sqlite_file(engine)
     # A brand new database has nothing to lose, so nothing to copy.
     if file is None or not file.exists() or not tables:
+        with engine.begin() as connection:
+            reconcile(connection)
         command.upgrade(config, "head")
         return
     engine.dispose()  # this process's connections go before the copy and before any put-back
@@ -99,6 +103,8 @@ def _upgrade(engine: Engine) -> None:
     _check_backup(backup, tables, current)
     log.warning("database backed up to %s before migrating %s -> %s", backup, current, head)
     try:
+        with engine.begin() as connection:
+            reconcile(connection)
         command.upgrade(config, "head")
     except Exception:
         engine.dispose()

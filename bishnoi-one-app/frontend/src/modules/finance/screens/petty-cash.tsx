@@ -7,6 +7,7 @@ import { FigureStrip, ListFrame, ListToolbar, StatusPill, UnderlineTabs, type Pi
 import { ExpandableTable } from "@/src/platform/ui/expandable-table";
 import { LinkButton } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/finance/platform/ui/sheet";
+import { OverBudgetNotice } from "@/src/modules/finance/budgets/over-budget";
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
 import { makeFormat, type Format } from "@/src/modules/finance/platform/lib/format";
 import { PrintButton } from "@/src/modules/finance/invoices/steps";
@@ -149,14 +150,30 @@ export async function PettyCashPage({ searchParams }: { searchParams: Search }) 
       ) : null}
       <ListFrame>
         {list.funds.length > 0 ? (
-          <FigureStrip
-            figures={list.funds.map((f) => ({
-              // With its code: two funds can share a name (the chart has two "Petty Cash Fund - Finance"), and the
-              // shared strip keys each figure by its label.
-              label: `${f.code} ${f.name}${f.active ? "" : " (switched off)"} · in the books`,
-              value: fmt.peso(f.balanceCentavos),
-            }))}
-          />
+          <>
+            <FigureStrip
+              figures={list.funds.map((f) => ({
+                // With its code: two funds can share a name (the chart has two "Petty Cash Fund - Finance"), and the
+                // shared strip keys each figure by its label.
+                label: `${f.code} ${f.name}${f.active ? "" : " (switched off)"} · in the books`,
+                value: fmt.peso(f.balanceCentavos),
+              }))}
+            />
+            {list.counts.all === 0 && list.funds.some((f) => f.balanceCentavos !== 0) && (
+              <div className="border-b border-rule bg-bench/30 px-5 py-3 text-meta text-ink-2">
+                <span className="font-semibold text-ink">Why does a fund show a balance when there are no vouchers below?</span>{" "}
+                Fund balances read the General Ledger directly. In Oojeema, petty cash spendings were posted as General Ledger Journal Vouchers (<span className="font-mono">JV</span>) rather than Petty Cash Vouchers—and a negative balance means disbursements were recorded in the ledger before the replenishment transfer was booked.{" "}
+                {list.funds.filter((f) => f.balanceCentavos !== 0).map((f, idx) => (
+                  <span key={f.id}>
+                    {idx > 0 && " · "}
+                    <Link href={`/finance/ledger/accounts/${f.id}`} className="font-semibold text-hema hover:underline">
+                      View {f.code} ledger entries ({fmt.peso(f.balanceCentavos)}) →
+                    </Link>
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <p className="border-b border-rule px-5 py-3 text-sm text-ink-2">
             No petty cash fund yet: vouchers are paid from an account under Cash named Petty Cash.{" "}
@@ -184,11 +201,12 @@ export async function PettyCashPage({ searchParams }: { searchParams: Search }) 
             </Empty>
           ) : (
             <Empty title={tab.empty} icon="lists">
-              {show === "draft" && list.may.create ? "Enter one with New petty cash voucher." : null}
+              {show === "draft" && list.may.create ? "Enter one with New petty cash voucher." : "Historical Oojeema petty cash JVs are in the General Ledger link above; new petty cash vouchers entered in Bishnoi One will appear here."}
             </Empty>
           )
         ) : (
-          <ExpandableTable
+          <div role="region" aria-label="Petty cash vouchers" tabIndex={0} className="max-h-[60vh] max-w-full overflow-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-hema [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10 [&_thead]:bg-sheet [&_thead]:shadow-[0_1px_0_0_var(--color-rule)]">
+            <ExpandableTable
             minWidth="56rem"
             columns={[
               { key: "number", label: "Voucher" },
@@ -237,7 +255,8 @@ export async function PettyCashPage({ searchParams }: { searchParams: Search }) 
                 />
               ),
             }))}
-          />
+            />
+          </div>
         )}
       </ListFrame>
       {list.limited && <p className="mt-2 px-1 text-meta text-ink-3">Showing the newest 200. Search to narrow the list.</p>}
@@ -332,7 +351,8 @@ function Totals({ v, fmt }: { v: PettyCashVoucher; fmt: Format }) {
   );
 }
 
-const withheldLabel = (l: PettyCashVoucher["lines"][number]) => (l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%` : "None");
+const withheldLabel = (l: PettyCashVoucher["lines"][number]) => (l.withholding ? `${l.withholding} · ${(l.withholdingRateBp ?? 0) / 100}%`
+  : l.noWithholdingLabel ? `None · ${l.noWithholdingLabel.toLowerCase()}${l.noWithholdingNote ? `: ${l.noWithholdingNote}` : ""}` : "None · no reason given");
 
 export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await getCompanyMe();
@@ -372,6 +392,8 @@ export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: s
           <span className="font-semibold">Returned for correction</span> by {lastReturn.who}: {lastReturn.text}
         </p>
       )}
+
+      <OverBudgetNotice rows={v.overBudget ?? []} fmt={fmt} className="mb-5 print:hidden" />
 
       <Sheet className="mb-5 px-5 py-4 print:hidden">
         <SectionTitle icon="approvals">Next step</SectionTitle>
@@ -431,7 +453,7 @@ export async function PettyCashVoucherPage({ params }: { params: Promise<{ id: s
                     ["Description", l.description],
                     ["Purchase type", l.purchaseTypeLabel],
                     ["VAT", `${l.vatLabel} · ${fmt.peso(l.vatCentavos)}`],
-                    ["Tax withheld", l.withholding ? `${withheldLabel(l)} · ${fmt.peso(l.withheldCentavos)}` : "None"],
+                    ["Tax withheld", l.withholding ? `${withheldLabel(l)} · ${fmt.peso(l.withheldCentavos)}` : withheldLabel(l)],
                     ["Before VAT", fmt.peso(l.netCentavos)],
                   ]}
                 />

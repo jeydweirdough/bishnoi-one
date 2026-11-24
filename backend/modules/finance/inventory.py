@@ -1,6 +1,6 @@
 """Bishnoi One Inventory, as Finance uses it: what each product costs, so an invoice books its cost
 of goods sold (decided 2026-10-28, feature plan step 3). Read with the key Inventory gave Finance,
-at Finance's company (CRM_COMPANY). Nothing breaks without it: the invoice is issued with no cost.
+at Finance's company (CRM_COMPANY). Coded product invoices are held until their costs and posting accounts are available.
 """
 
 import json
@@ -28,4 +28,4 @@ def unit_costs(settings: Settings, skus: list[str]) -> dict[str, int] | None:
             items = json.loads(response.read()).get("items", {})
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
         return None
-    return {sku.upper(): int(v.get("unitCost") or 0) for sku, v in items.items()}
+    return {sku.upper(): v["unitCost"] for sku, v in items.items() if isinstance(v, dict) and type(v.get("unitCost")) is int and v["unitCost"] >= 0}

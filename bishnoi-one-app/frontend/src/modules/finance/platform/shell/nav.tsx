@@ -33,8 +33,13 @@ function missingOf(unset: Unset, keys: string[]): Missing {
 const NEEDS: [string, string | string[]][] = [
   ["/finance/funds", "funds.view"],
   ["/finance/invoices", "invoices.view"],
+  ["/finance/credit-notes", "invoices.view"],
   ["/finance/sales-orders", "sales_orders.view"],
   ["/finance/bills", "bills.view"],
+  ["/finance/vendor-credits", "bills.view"],
+  ["/finance/advances", ["bills.view", "vouchers.view", "invoices.view"]],
+  ["/finance/recurring", "bills.view"],
+  ["/finance/scans", "bills.view"],
   ["/finance/suppliers", "suppliers.view"],
   ["/finance/vouchers", "vouchers.view"],
   ["/finance/petty-cash", "petty_cash.view"],
@@ -64,6 +69,10 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
   const processes: Process[] = [
     { label: "Payables", icon: "orders", steps: keep([
       { href: "/finance/bills", label: "Bills", icon: "orders", exact: true },
+      { href: "/finance/scans", label: "Scan inbox", icon: "orders" },
+      { href: "/finance/vendor-credits", label: "Vendor credits", icon: "orders" },
+      { href: "/finance/advances", label: "Advances & deposits", icon: "money" },
+      { href: "/finance/recurring", label: "Recurring", icon: "lists" },
       { href: "/finance/bills/aging", label: "Supplier aging", icon: "reports" },
       { href: "/finance/vouchers", label: "Payment vouchers", icon: "payments" },
       { href: "/finance/suppliers", label: "Suppliers", icon: "people" },
@@ -80,6 +89,8 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       steps: keep([
         { href: "/finance/sales-orders", label: "Sales orders", icon: "orders" },
         { href: "/finance/invoices", label: "Finance invoices", icon: "letters", exact: true },
+        { href: "/finance/credit-notes", label: "Credit notes", icon: "letters" },
+        { href: "/finance/advances", label: "Customer deposits", icon: "money" },
         { href: "/finance/invoices/receivables", label: "Receivables", icon: "money" },
       ]),
     },
@@ -116,6 +127,7 @@ function menu(me: Me, waiting: Waiting, unset: Unset): { home: Step | null; proc
       icon: "money",
       steps: keep([
         { href: "/finance/bir/vat", label: "VAT return", icon: "money" },
+        { href: "/finance/bir/income-tax", label: "Income tax (1702Q)", icon: "money" },
         { href: "/finance/bir/withholding", label: "Withholding tax", icon: "letters" },
         { href: "/finance/bir/lists", label: "Summary lists", icon: "lists" },
         { href: "/finance/bir/sales-dat", label: "BIR files (DAT)", icon: "letters" },

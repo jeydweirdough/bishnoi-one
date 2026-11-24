@@ -1,10 +1,27 @@
 "use server";
 
 import { refresh } from "next/cache";
-import { api, enc } from "@/src/modules/finance/platform/lib/api";
+import { api, enc, ApiError } from "@/src/modules/finance/platform/lib/api";
 import { attempt, type Result } from "@/src/modules/finance/platform/lib/result";
 import type { SupplierRow } from "@/src/modules/finance/payables/csv";
 import type { Bill, BillLineInput, Supplier, SupplierContact, SupplierImportCheck } from "@/src/modules/finance/payables/types";
+import type { SupplierReviewChange, SupplierReviewList, SupplierReviewRow } from "./supplier-review-types";
+
+export async function loadSupplierReview(query: string): Promise<Result<SupplierReviewList>> {
+  return attempt(() => api.get<SupplierReviewList>(`/finance/suppliers/review?${query}`));
+}
+
+export async function saveSupplierReview(changes: SupplierReviewChange[]): Promise<Result<{ changed: number; items: SupplierReviewRow[] }> & { uncertain?: boolean }> {
+  try {
+    const data = await api.post<{ changed: number; items: SupplierReviewRow[] }>("/finance/suppliers/review", { changes });
+    return { ok: true, data };
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status >= 500) {
+      return { ok: false, uncertain: true, error: "We could not confirm whether the changes were saved. Reload saved values before making another change." };
+    }
+    return attempt(async () => { throw error; });
+  }
+}
 
 // Suppliers and bills. The API works each bill out, posts it once it's approved (and checked), and
 // checks the person's role for every step (app/routers/payables.py).
@@ -24,6 +41,8 @@ export type SupplierInput = {
   address: string | null;
   vatRegistered: boolean;
   withholding: string | null;
+  origin?: "local" | "foreign";
+  vatVariesByItem?: boolean;
   termsDays: number;
   email: string | null;
   phone: string | null;
@@ -42,6 +61,14 @@ export async function checkSupplierImport(rows: SupplierRow[]): Promise<Result<S
 export async function importSuppliers(rows: SupplierRow[]): Promise<Result<{ added: number }>> {
   return attempt(async () => {
     const done = await api.post<{ added: number }>("/finance/suppliers/import", { rows, confirmed: true });
+    refresh();
+    return done;
+  });
+}
+
+export async function approveSuppliersFor2mg(supplierIds: string[], reason?: string): Promise<Result<{ approved: number }>> {
+  return attempt(async () => {
+    const done = await api.post<{ approved: number }>("/finance/suppliers/company-scope/approve", { supplierIds, ...(reason ? { reason } : {}) });
     refresh();
     return done;
   });
@@ -89,6 +116,7 @@ export async function saveSupplier(id: string | null, input: SupplierInput): Pro
 }
 
 export type BillInput = {
+  currency?:string;rate?:number|null;
   taxReviewed: boolean;
   saveSupplierDefaults?: boolean;
   supplierVatRegistered?: boolean | null;

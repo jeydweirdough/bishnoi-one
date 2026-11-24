@@ -193,6 +193,10 @@ export async function receiveDelivery(input: Json): Promise<Result<Numbered & { 
   return send("post", "/inventory/receipts", input);
 }
 
+export async function sendReceiptToFinance(id:string) {
+  return send<import("@/src/modules/inventory/components/receipt-finance").ReceiptFinance>("post",`/inventory/receipts/${enc(id)}/finance-handoff`,{});
+}
+
 // --- orders -----------------------------------------------------------------------------
 
 export async function saveOrder(id: string | null, input: Json): Promise<Result<Id>> {

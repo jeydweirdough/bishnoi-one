@@ -23,7 +23,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 import httpx
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import JSON, DateTime, Integer, String, event, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -65,7 +65,12 @@ def _consignment_billed(db, data: dict, slug: str) -> None:
     from_settlement(db, data, slug)
 
 
-HANDLERS: dict[str, Callable] = {"delivery.done": _delivery_done, "consignment.billed": _consignment_billed}
+def _purchase_received(db, data: dict, slug: str) -> None:
+    from modules.finance.purchase_intake import receive
+    receive(db, data, slug)
+
+
+HANDLERS: dict[str, Callable] = {"delivery.done": _delivery_done, "consignment.billed": _consignment_billed, "purchase.receipt_submitted": _purchase_received}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])
@@ -175,6 +180,10 @@ def take_event(body: NoteIn, request: Request) -> Response:
     item = claims.get("event") if claims else None
     if not isinstance(item, dict) or not item.get("id") or not item.get("kind"):
         raise _nowhere()
+    if claims.get('slug') != '2mg':
+        raise HTTPException(409, 'Finance accepts events for 2MG only. No Finance record was created.')
+    if item["kind"] == "purchase.receipt_submitted" and item.get("source") != "inventory":
+        raise HTTPException(409, "Purchase receipt evidence must come from Inventory.")
     remember_company(request.app.state.settings, claims["slug"])
     with sessions_for(request, claims["slug"])() as db:
         if db.get(InboxEvent, str(item["id"])) is None:

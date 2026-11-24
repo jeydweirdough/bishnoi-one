@@ -94,6 +94,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(bank_router.router)
     app.include_router(prices.router)
     app.include_router(unset.router)
+    from modules.finance.purchase_intake import router as purchase_router
+    app.include_router(purchase_router)
     app.include_router(integration.funds_router)
     app.include_router(integration.customers_router)
     app.include_router(integration.sales_router)

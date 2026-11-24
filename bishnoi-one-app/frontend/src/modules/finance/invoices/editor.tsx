@@ -10,17 +10,17 @@ import { makeFormat } from "@/src/modules/finance/platform/lib/format";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
 import { formatTin } from "@/src/modules/finance/lib/tin";
 import { findCustomers, saveInvoice } from "@/src/modules/finance/invoices/actions";
-import type { Customer, Invoice, TaxChoices } from "@/src/modules/finance/invoices/types";
+import type { Customer, IncomeAccountOption, Invoice, TaxChoices } from "@/src/modules/finance/invoices/types";
 
-type Line = { key: number; description: string; ref: string; quantity: string; price: string; discount: string; category: string; relief: boolean };
-const blank = (key: number): Line => ({ key, description: "", ref: "", quantity: "1", price: "", discount: "", category: "standard", relief: false });
+type Line = { key: number; description: string; ref: string; quantity: string; price: string; discount: string; category: string; relief: boolean; accountId: string };
+const blank = (key: number): Line => ({ key, description: "", ref: "", quantity: "1", price: "", discount: "", category: "standard", relief: false, accountId: "" });
 
 /**
  * A draft invoice: who it's billed to, what they bought, and the terms. The
  * amounts and tax are worked out by the API when it's saved, and shown on the
  * invoice's page, where it's issued.
  */
-export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { invoice: Invoice | null; choices: TaxChoices; org: Org; today: string; crmLinked: boolean }) {
+export function InvoiceEditor({ invoice, choices, org, today, crmLinked, incomeAccounts = [] }: { invoice: Invoice | null; choices: TaxChoices; org: Org; today: string; crmLinked: boolean; incomeAccounts?: IncomeAccountOption[] }) {
   const fmt = makeFormat(org);
   const router = useRouter();
   const money = (minor: number) => (minor ? String(minor / 10 ** (org.minorUnits ?? 2)) : "");
@@ -51,6 +51,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
           discount: money(l.discountCentavos),
           category: l.category,
           relief: l.reliefEligible,
+          accountId: l.accountId ?? "",
         }))
       : [blank(0)],
   );
@@ -131,6 +132,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
           discountCentavos: fmt.toCentavos(l.discount) ?? 0,
           category: l.category,
           reliefEligible: l.relief,
+          accountId: l.accountId || null,
         })),
       });
       if (!result.ok) {
@@ -261,6 +263,7 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
                 <th className="w-32 px-2 py-1.5 text-right font-semibold">Unit price</th>
                 <th className="w-28 px-2 py-1.5 text-right font-semibold">Discount</th>
                 <th className="w-40 px-2 py-1.5 font-semibold">VAT</th>
+                {incomeAccounts.length > 0 && <th className="w-52 px-2 py-1.5 font-semibold">Income account</th>}
                 <th className="w-8" />
               </tr>
             </thead>
@@ -309,6 +312,26 @@ export function InvoiceEditor({ invoice, choices, org, today, crmLinked }: { inv
                       ))}
                     </Select>
                   </td>
+                  {incomeAccounts.length > 0 && (
+                    <td className="px-2 py-1.5">
+                      <select
+                        suppressHydrationWarning
+                        aria-label={`Line ${i + 1}: income account`}
+                        aria-invalid={fields[`lines.${i}.accountId`] ? true : undefined}
+                        value={l.accountId}
+                        onChange={(e) => set(l.key, { accountId: e.target.value })}
+                        className="h-8 w-full rounded-[3px] border border-rule-strong bg-sheet px-2 text-sm"
+                      >
+                        <option value="">Default sales account</option>
+                        {incomeAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.code} {a.name}{a.isDefault ? " (default)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {fields[`lines.${i}.accountId`] && <p className="mt-0.5 text-meta text-danger">{fields[`lines.${i}.accountId`]}</p>}
+                    </td>
+                  )}
                   <td className="py-1.5 pl-1">
                     {lines.length > 1 && (
                       <button suppressHydrationWarning type="button" aria-label={`Remove line ${i + 1}`} onClick={() => setLines(lines.filter((x) => x.key !== l.key))} className="inline-flex size-8 items-center justify-center rounded-lg text-ink-3 hover:bg-danger/10 hover:text-danger">

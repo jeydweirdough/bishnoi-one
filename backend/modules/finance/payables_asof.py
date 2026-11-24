@@ -17,12 +17,13 @@ current one, since bills and payments can't be dated in the future.
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
-from modules.finance.models import Bill, JournalEntry, PaymentVoucher, VoucherLine
+from modules.finance.models import Bill, JournalEntry, PaymentVoucher, VendorCredit, VendorCreditAllocation, VoucherLine
+from modules.finance.settlements import bill_settled_map
 
 
 @dataclass(frozen=True)
@@ -40,25 +41,67 @@ def _reversed_on():
 
 def owed_on(db: Session, on: date) -> list[OwedBill]:
     voucher_reversed, bill_reversed = aliased(_reversed_on()), aliased(_reversed_on())
+    voucher_active = or_(
+        PaymentVoucher.status == "released",
+        and_(PaymentVoucher.status == "void", voucher_reversed.c.on > on),
+    )
     paid = (
         select(VoucherLine.bill_id, func.sum(VoucherLine.amount_centavos).label("paid"))
         .join(PaymentVoucher, PaymentVoucher.id == VoucherLine.voucher_id)
         .outerjoin(voucher_reversed, voucher_reversed.c.entry_id == PaymentVoucher.entry_id)
-        .where(PaymentVoucher.status.in_(("released", "void")), PaymentVoucher.entry_id.is_not(None), PaymentVoucher.paid_on <= on,
-               or_(voucher_reversed.c.on.is_(None), voucher_reversed.c.on > on))
+        .where(voucher_active, PaymentVoucher.entry_id.is_not(None), PaymentVoucher.paid_on <= on)
         .group_by(VoucherLine.bill_id)
         .subquery()
     )
     paid_then = func.coalesce(paid.c.paid, 0)
+    # Pre-2026 opening AP bills have no individual entry_id (their balance sits in the Dec 31 opening JE),
+    # while a voided bill with no reversal entry (cancelled at source) must not stay owed forever.
+    bill_active = or_(
+        Bill.status == "recorded",
+        and_(Bill.status == "void", bill_reversed.c.on > on),
+    )
     rows = db.execute(
         select(Bill, paid_then)
         .outerjoin(paid, paid.c.bill_id == Bill.id)
         .outerjoin(bill_reversed, bill_reversed.c.entry_id == Bill.entry_id)
-        .where(Bill.status.in_(("recorded", "void")), Bill.entry_id.is_not(None), Bill.bill_date <= on,
-               or_(bill_reversed.c.on.is_(None), bill_reversed.c.on > on), paid_then < Bill.payable_centavos)
+        .where(bill_active, Bill.bill_date <= on, paid_then < Bill.payable_centavos)
     ).all()
-    return [OwedBill(b, int(p), b.payable_centavos - int(p)) for b, p in rows]
+    after = datetime.combine(on + timedelta(days=1), time.min, UTC)
+    settled_map = bill_settled_map(db, [b.id for b, _ in rows], on=on, after=after)
+    out: list[OwedBill] = []
+    for b, p in rows:
+        settled = int(p) + settled_map.get(b.id, 0)
+        if settled < b.payable_centavos:
+            out.append(OwedBill(b, settled, b.payable_centavos - settled))
+    return out
+
+
+def _unapplied_vendor_credits_on(db: Session, on: date) -> int:
+    vc_reversed = aliased(_reversed_on())
+    active_vc = or_(VendorCredit.status == "recorded", and_(VendorCredit.status == "void", vc_reversed.c.on > on))
+    vcs = list(
+        db.scalars(
+            select(VendorCredit)
+            .outerjoin(vc_reversed, vc_reversed.c.entry_id == VendorCredit.entry_id)
+            .where(active_vc, VendorCredit.credit_date <= on)
+        )
+    )
+    if not vcs:
+        return 0
+    after = datetime.combine(on + timedelta(days=1), time.min, UTC)
+    allocs = dict(
+        db.execute(
+            select(VendorCreditAllocation.vendor_credit_id, func.sum(VendorCreditAllocation.amount_centavos))
+            .where(
+                VendorCreditAllocation.vendor_credit_id.in_([v.id for v in vcs]),
+                VendorCreditAllocation.applied_on <= on,
+                or_(VendorCreditAllocation.removed_at.is_(None), VendorCreditAllocation.removed_at >= after),
+            )
+            .group_by(VendorCreditAllocation.vendor_credit_id)
+        ).all()
+    )
+    return sum(max(0, v.credit_centavos - int(allocs.get(v.id, 0) or 0)) for v in vcs)
 
 
 def total_owed_on(db: Session, on: date) -> int:
-    return sum(o.owed_centavos for o in owed_on(db, on))
+    return sum(o.owed_centavos for o in owed_on(db, on)) - _unapplied_vendor_credits_on(db, on)

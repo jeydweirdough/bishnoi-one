@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from modules.inventory.models import Stock
 from modules.inventory.recycle_bin import Kind
+from modules.inventory.purchase_handoff import protect
 
 P = "nbin_"
 
@@ -60,8 +61,8 @@ posted_doc = {"extra": movements_of, "on_delete": off, "on_restore": back, "tabl
 
 KINDS: list[Kind] = [
     # Records
-    Kind("purchase-orders", "Purchase orders", P + "purchase_orders", "number", owns=(P + "purchase_order_lines",), search=("number",), sub="status"),
-    Kind("receipts", "Receipts", P + "receipts", "number", owns=(P + "receipt_lines", P + "quality_checks", P + "quality_check_lines"), search=("number", "delivery_ref"),
+    Kind("purchase-orders", "Purchase orders", P + "purchase_orders", "number", guard=lambda db,row:protect(db,"purchase_order",row["id"]), owns=(P + "purchase_order_lines",), search=("number",), sub="status"),
+    Kind("receipts", "Receipts", P + "receipts", "number", guard=lambda db,row:protect(db,"receipt",row["id"]), owns=(P + "receipt_lines", P + "quality_checks", P + "quality_check_lines"), search=("number", "delivery_ref"),
          posted=lambda r: True, **posted_doc),
     Kind("sales-orders", "Sales orders", P + "sales_orders", "number", owns=(P + "sales_order_lines",), search=("number", "customer_name"), sub="customer_name",
          guard=lambda db, r: _invoiced_order(db, r["id"])),
@@ -79,7 +80,7 @@ KINDS: list[Kind] = [
     Kind("products", "Products", P + "products", "name", group="Set-up",
          owns=(P + "product_images", P + "product_documents", P + "product_packagings", P + "supplier_products", P + "stock", P + "batches", P + "serials"),
          search=("name", "sku"), sub="sku"),
-    Kind("vendors", "Vendors", P + "suppliers", "name", group="Set-up", owns=(P + "supplier_products",), search=("name", "code"), sub="code"),
+    Kind("vendors", "Vendors", P + "suppliers", "name", group="Set-up", guard=lambda db,row:protect(db,"supplier",row["id"]), owns=(P + "supplier_products",), search=("name", "code"), sub="code"),
     Kind("warehouses", "Warehouses", P + "warehouses", "name", group="Set-up", owns=(P + "locations", P + "count_schedules"), search=("name", "code"), sub="code"),
     Kind("locations", "Locations", P + "locations", "name", group="Set-up", search=("name", "code"), sub="code"),
     Kind("categories", "Categories", P + "categories", "name", group="Set-up", search=("name",)),
