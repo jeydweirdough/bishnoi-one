@@ -158,6 +158,10 @@ export async function finishQualityCheck(id: string, input: Json): Promise<Resul
 export async function locateWarehouse(id: string): Promise<Result<Id & { latitude: number; longitude: number }>> {
   return send("post", `/inventory/warehouses/${enc(id)}/locate`);
 }
+/** Every vendor to Finance, whose supplier list is this one (2026-11-24). */
+export async function sendVendorsToFinance(): Promise<Result<{ sent: number }>> {
+  return send<{ sent: number }>("post", "/inventory/suppliers/send-to-finance", {});
+}
 export async function deleteWarehouse(id: string): Promise<Result<null>> {
   return send<null>("del", `/inventory/warehouses/${enc(id)}`);
 }

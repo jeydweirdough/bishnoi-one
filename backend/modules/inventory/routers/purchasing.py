@@ -179,8 +179,27 @@ def list_suppliers(
     return {"items": rows, "total": total(db, query)} if limit is not None else rows
 
 
+def vendor_saved(db, request: Request, s: Supplier) -> None:
+    """Finance's supplier follows this vendor (owner, 2026-11-24: one vendor list, never typed twice)."""
+    business_events.emit(db, getattr(request.state, "company", None), "vendor.saved", {
+        "id": s.id, "code": s.code, "name": s.name, "tin": s.tin, "email": s.email, "phone": s.phone, "address": s.address,
+        "contactPerson": s.contact_person, "paymentTerms": s.payment_terms, "vatStatus": s.vat_status, "currency": s.currency,
+        "isActive": s.is_active})
+
+
+@router.post("/suppliers/send-to-finance")
+def send_vendors_to_finance(_: allowed("suppliers.edit"), me: CurrentUser, db: DB, request: Request) -> dict:
+    """Every vendor, so Finance's supplier list is this one (the first time, or to catch up)."""
+    vendors = db.scalars(select(Supplier).order_by(Supplier.code)).all()
+    for s in vendors:
+        vendor_saved(db, request, s)
+    audit(db, me, "supplier.sent_to_finance", target=f"{len(vendors)} vendors", target_type="supplier")
+    db.commit()
+    return {"sent": len(vendors)}
+
+
 @router.post("/suppliers", status_code=status.HTTP_201_CREATED)
-def create_supplier(_: allowed("suppliers.create"), me: CurrentUser, db: DB, body: SupplierIn) -> dict:
+def create_supplier(_: allowed("suppliers.create"), me: CurrentUser, db: DB, body: SupplierIn, request: Request) -> dict:
     if supplier_code_taken(db, body.code):
         raise field_error("code", "Another supplier has that code.")
     data = body.model_dump(exclude_none=True)
@@ -189,6 +208,7 @@ def create_supplier(_: allowed("suppliers.create"), me: CurrentUser, db: DB, bod
     db.add(supplier)
     db.flush()
     audit(db, me, "supplier.created", target=supplier.name, target_type="supplier", target_id=supplier.id)
+    vendor_saved(db, request, supplier)
     db.commit()
     return {"id": supplier.id}
 
@@ -212,7 +232,7 @@ def read_supplier(_: allowed("suppliers.view"), db: DB, supplier_id: str) -> dic
 
 
 @router.patch("/suppliers/{supplier_id}")
-def update_supplier(_: allowed("suppliers.edit"), me: CurrentUser, db: DB, supplier_id: str, body: SupplierPatch) -> dict:
+def update_supplier(_: allowed("suppliers.edit"), me: CurrentUser, db: DB, supplier_id: str, body: SupplierPatch, request: Request) -> dict:
     s = found(db, Supplier, supplier_id, "supplier")
     wanted = changed(body)
     for key in ("code", "name", "is_active", "vat_status", "currency"):
@@ -229,6 +249,7 @@ def update_supplier(_: allowed("suppliers.edit"), me: CurrentUser, db: DB, suppl
         setattr(s, k, wanted[k])
     if fields:
         audit(db, me, "supplier.updated", target=s.name, target_type="supplier", target_id=s.id, fields=fields)
+        vendor_saved(db, request, s)
         db.commit()
     return {"id": s.id}
 

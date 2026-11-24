@@ -70,7 +70,13 @@ def _purchase_received(db, data: dict, slug: str) -> None:
     receive(db, data, slug)
 
 
-HANDLERS: dict[str, Callable] = {"delivery.done": _delivery_done, "consignment.billed": _consignment_billed, "purchase.receipt_submitted": _purchase_received}
+def _vendor_saved(db, data: dict, slug: str) -> None:
+    from modules.finance.vendors import saved
+    saved(db, data, slug)
+
+
+HANDLERS: dict[str, Callable] = {"delivery.done": _delivery_done, "consignment.billed": _consignment_billed, "purchase.receipt_submitted": _purchase_received,
+                                 "vendor.saved": _vendor_saved}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])
