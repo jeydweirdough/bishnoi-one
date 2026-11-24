@@ -244,7 +244,7 @@ def close_year(user: permitted("accounts.manage"), db: DB, settings: SettingsDep
     if retained is None or (drawings is not None and capital is None):
         raise HTTPException(status.HTTP_409_CONFLICT, "Set the retained earnings, capital and drawings accounts under Accounting, Default accounts.")
     start, end = fiscal_year(db, body.year_end)
-    moves = balances(db, start=start, end=end)
+    moves = balances(db, start=start, end=end, exclude_closing=True)
     accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_(list(moves))))}
     legs, net = [], 0
     for aid, (d, c) in moves.items():

@@ -9,7 +9,8 @@ export async function GET(request: Request) {
   if (target.origin !== "http://report.local" || !target.pathname.startsWith("/finance/bir/")) {
     return new Response("That isn't a BIR report.", { status: 400, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
-  target.searchParams.set("format", "csv");
+  const requestedFormat = target.searchParams.get("format");
+  target.searchParams.set("format", requestedFormat === "dat" ? "dat" : "csv");
   try {
     const file = await fetchFile(`${target.pathname}${target.search}`);
     return new Response(file.body, {

@@ -16,6 +16,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy import func, select
 
+from modules.finance import company_scope
 from modules.finance.audit import audit
 from modules.finance.import_review import ISSUES, ReviewError, connect, norm, parse
 from modules.finance.ledger import Leg, post
@@ -295,7 +296,7 @@ def links_by_source(db, kind: str, source: str = SOURCE) -> dict:
 
 def supplier_index(db) -> dict:
     out = defaultdict(list)
-    for s in db.scalars(select(Supplier)):
+    for s in db.scalars(select(Supplier).where(company_scope.usable_clause("supplier", Supplier.id))):
         out[norm(s.name)].append(s)
     return out
 
@@ -304,7 +305,7 @@ def posting_accounts(db) -> dict:
     """Accounts a bill line may use: the same rule as a bill entered in Finance (routers/payables.py
     apply_bill), any active expense or asset account. Parent accounts included: Oojeema's chart posts
     to some of them (e.g. Merchandise Inventory, Furniture and Fixtures). Corrected 2026-10-29."""
-    return {a.id: a for a in db.scalars(select(Account)) if a.is_active and a.type in ("expense", "asset")}
+    return {a.id: a for a in db.scalars(select(Account).where(company_scope.usable_clause("account", Account.id))) if a.is_active and a.type in ("expense", "asset")}
 
 
 def closed_on(s, on: str) -> str | None:
@@ -399,6 +400,9 @@ def plan_bills(db, docs: list[dict], settings) -> list[dict]:
                 reasons.append("The Input VAT default account isn't set (Accounting → Default accounts).")
             if not s.payables_account_id and not (supplier.payables_account_id):
                 reasons.append("No accounts payable account is set (Default accounts, or the supplier's own).")
+            controls = [(s.input_tax_account_id, w.vat), (supplier.payables_account_id or s.payables_account_id, w.payable)]
+            if any(amount and company_scope.scope_for(db, 'account', id) != '2mg' for id, amount in controls):
+                reasons.append('A posting default is not verified for 2MG. Review Default accounts before importing.')
             row["bill"] = {"supplier": supplier, "lines": lines, "include": inclusive == "true", "due": due, "worked": w}
             row["choices"] = [[ln["accountId"], ln["purchaseType"], ln["vat"]] for ln in lines]
         if reasons:
@@ -470,6 +474,8 @@ def plan_payments(db, docs: list[dict], settings) -> list[dict]:
             if any(amount <= 0 for _, amount in pairs):
                 reasons.append('Every source allocation must have a positive amount.')
             for b, amount in payment_totals(pairs):
+                if company_scope.scope_for(db, 'supplier', b.supplier_id) != '2mg' or any(company_scope.scope_for(db, 'account', ln.get('accountId')) != '2mg' for ln in b.lines or []):
+                    reasons.append('A bill supplier or line account is not verified for 2MG. Review company use before importing payment.')
                 if b.status != "recorded":
                     reasons.append(f"Bill {b.no} isn't recorded (it may have been voided).")
                 elif amount <= 0 or amount > b.payable_centavos - b.paid_centavos - held.get(b.id, 0):
@@ -551,6 +557,7 @@ def import_bills(db, settings, user, files: list[dict], plan_key: str) -> dict:
                  notes=f"Imported from a Zoho Books export (Zoho bill ID {row['sourceId']}). Approved in Zoho; no approval took place in Finance."[:500],
                  lines=plan["lines"], tax_reviewed=True)
         b.supplier = plan["supplier"]
+        company_scope.require_bill(db, b)
         db.add(b); db.flush()
         legs, payables = bill_posting(db, b, w)
         e = post(db, b.bill_date, f"Bill from {b.supplier.name}, invoice {b.bill_number} (imported from Zoho)", legs, who,
@@ -594,6 +601,8 @@ def import_payments(db, settings, user, files: list[dict], plan_key: str) -> dic
             record(db, run, "vendor_payment", row)
             continue
         plan = row["voucher"]
+        for b, _ in plan['pairs']:
+            company_scope.require_bill(db, b)
         # Read again under the lock: a voucher released meanwhile in Finance may have paid the bill.
         reserved = set_aside(db, [b.id for b, _ in plan['pairs']])
         if any(a <= 0 for _, a in plan['pairs']) or any(a > b.payable_centavos - b.paid_centavos - reserved.get(b.id, 0) or b.status != "recorded" for b, a in payment_totals(plan["pairs"])):

@@ -321,6 +321,7 @@ export type Backorder = {
 };
 
 export type ReceiptBrief = {
+  financeState?:string;
   id: string;
   /** One document header (step 8). */
   header: DocumentHeader;
@@ -343,6 +344,7 @@ export type POExtras = {
 };
 
 export type Receipt = ReceiptBrief & {
+  financeHandoff:import("@/src/modules/inventory/components/receipt-finance").ReceiptFinance;
   notes: string | null;
   /** Its quality check, when its warehouse checks what it receives (step 14a). */
   qualityCheck?: { id: string; number: string; status: "waiting" | "done" } | null;

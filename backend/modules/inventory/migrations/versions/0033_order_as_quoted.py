@@ -13,15 +13,16 @@ sales order made directly is priced the same way). Added in place; no rows chang
     nbin_sales_orders.terms                   the quote's terms
     nbin_sales_order_lines.promo_name, promo_discount, extra_discount, discount_kind, discount_value, bundle_name
 
-Revision ID: 0032
-Revises: 0031
+Revision ID: 0033
+Revises: 0032 (0032_receipt_finance; this was 0032 too until the 2026-11-24 merge, so a database
+that already has these columns skips them)
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0032"
-down_revision = "0031"
+revision = "0033"
+down_revision = "0032"
 branch_labels = None
 depends_on = None
 
@@ -51,10 +52,12 @@ LINES = (
 
 
 def upgrade() -> None:
-    for column in ORDERS:
-        op.add_column("nbin_sales_orders", column)
-    for column in LINES:
-        op.add_column("nbin_sales_order_lines", column)
+    have = sa.inspect(op.get_bind())
+    for table, columns in (("nbin_sales_orders", ORDERS), ("nbin_sales_order_lines", LINES)):
+        present = {c["name"] for c in have.get_columns(table)}
+        for column in columns:
+            if column.name not in present:
+                op.add_column(table, column)
 
 
 def downgrade() -> None:

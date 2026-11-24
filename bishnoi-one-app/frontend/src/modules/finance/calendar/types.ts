@@ -79,5 +79,5 @@ export const PAGES: [string, string][] = [
   ["/invoices/receivables", "Receivables"],
   ["/bills", "Bills"],
   ["/vouchers", "Payment vouchers"],
-  ["/tax", "Tax"],
+  ["/bir/readiness", "BIR readiness"],
 ];

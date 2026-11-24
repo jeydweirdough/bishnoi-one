@@ -1,5 +1,7 @@
 "use client";
 
+import { comparisonCentavos, companySettingsValid } from "./source-safety";
+
 import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/src/modules/finance/platform/ui/button";
 import { Field, FormGrid, Input, Select } from "@/src/modules/finance/platform/ui/field";
@@ -8,7 +10,7 @@ import { Drop } from "@/src/modules/finance/bir/sales-dat/drop";
 import { csvName, saveBlob, saveText } from "@/src/modules/finance/bir/sales-dat/download";
 import { Fold, Table, pl } from "@/src/modules/finance/bir/sales-dat/parts";
 import {
-  ADJ_CLASS, C, CONFIRMED_BY, OTHERWISE, ROLE_LABEL, RULES, buildXlsx, datToSalesReliefCSV, defaultMonth, emptyLoaded, explainGap, fmt,
+  ADJ_CLASS, CONFIRMED_BY, OTHERWISE, ROLE_LABEL, RULES, buildXlsx, datToSalesReliefCSV, defaultMonth, emptyLoaded, explainGap, fmt,
   glCovers, monthLabel, monthName, months, nameChanges, prepareMonth, readFiles, reconSheets, statusOf, tin9, tinMap, tinsFor, withDefaultRoles, zipStore,
   type Company, type Loaded, type Role,
 } from "@/src/modules/finance/bir/sales-dat/index";
@@ -62,8 +64,10 @@ export function PrepareTab({ companies }: { companies: Company[] }) {
   /* An Oojeema DAT's own header wins over the company's settings, as in the converter; anything typed here wins over both. */
   const rdo = rdoInput ?? (L.dat?.header?.rdo || company?.rdo || "");
   const fy = fyInput ?? String(L.dat?.header?.fy || company?.yearEndMonth || "");
-  const settingsMissing = !rdo.trim() || !fy;
-  const typedIr = irInput.trim() ? C(irInput.trim()) : null;
+  const settingsMissing = !companySettingsValid(rdo, fy);
+  let typedIr: number | null = null, irError: string | null = null;
+  try { if (irInput.trim()) typedIr = comparisonCentavos(irInput.trim()); }
+  catch (e) { irError = (e as Error).message; }
 
   const options = useMemo(() => ({ roles, rdo, fyMonth: fy, perCustomer, adjClass }), [roles, rdo, fy, perCustomer, adjClass]);
   const o: Any = useMemo(() => (month != null ? prepareMonth(L, month, { ...options, typedIr }) : null), [L, month, options, typedIr]);
@@ -73,9 +77,10 @@ export function PrepareTab({ companies }: { companies: Company[] }) {
   const ks = months(L);
   const anything = ks.length > 0 || !!L.gl || !!L.is || !!L.dat;
   const out = o?.fixOut;
-  const canDownload = !!out && !settingsMissing;
+  const canDownload = !!out && !settingsMissing && !error && !irError;
 
   function downloadZip() {
+    if (error || irError) return;
     const files: { name: string; data: string }[] = [], warn: string[] = [];
     ks.forEach((k) => {
       const m = prepareMonth(L, k, options);
@@ -123,7 +128,7 @@ export function PrepareTab({ companies }: { companies: Company[] }) {
               <MonthButton key={k} k={k} status={statuses[k]} current={k === month} onClick={() => (setMonth(k), setIrInput(""))} />
             ))}
             {ks.length > 1 && (
-              <Button size="sm" onClick={downloadZip} disabled={settingsMissing} className="self-center">
+              <Button size="sm" onClick={downloadZip} disabled={settingsMissing || !!error || !!irError} className="self-center">
                 Download all months (.zip)
               </Button>
             )}
@@ -195,6 +200,7 @@ export function PrepareTab({ companies }: { companies: Company[] }) {
                 <Field label="IR (sales per the Income Statement)" hint={irInput ? "Typed by hand. Clear it to use the Income Statement again." : o.irNote || "Add the Income Statement Monthly, or type the figure."} className="max-w-xs">
                   {(p) => <Input {...p} value={irInput} placeholder={o.irC != null && !irInput ? fmt(o.irC) : "from the Income Statement"} onChange={(e) => setIrInput(e.target.value)} className="font-mono" />}
                 </Field>
+                {irError && <p role="alert" className="text-sm text-danger">{irError}</p>}
                 <GlRoles L={L} roles={roles} onChange={(n, r) => setRoles((x) => ({ ...x, [n]: r }))} />
               </div>
             </Fold>

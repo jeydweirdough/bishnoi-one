@@ -14,6 +14,6 @@ export function ReviewExports({ filters, options, dates = true }: {
       {dates && <><label className="grid gap-1 text-meta">Export from<input suppressHydrationWarning type="date" name="start" className={control} /></label><label className="grid gap-1 text-meta">Export to<input suppressHydrationWarning type="date" name="end" className={control} /></label></>}
       <button suppressHydrationWarning className={control + " font-semibold"} type="submit">Download CSV</button>
     </form>
-    <p className="mt-2 text-meta text-ink-3">Uses the current search and status filters, including all matching records beyond the visible page. {dates && "Dates filter this download only; blank dates include all matching dates. Payments use their payment date."} Amounts are numeric; record totals and line details are separate files.</p>
+    <p className="mt-2 text-meta text-ink-3">All matching records, including other pages. {dates && "Export dates affect this file only. Payments use their payment date."} Record totals and line details are separate files.</p>
   </details>;
 }

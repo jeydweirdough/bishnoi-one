@@ -3,7 +3,8 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import type { Org } from "@/src/modules/finance/platform/lib/types";
-import { FinancePrintButton, prepareFinancePrint } from "./print-action";
+import { prepareFinancePrint } from "./print-action";
+import { FinancePagePrintContext } from "./page-actions";
 import { attachmentsReady, clearPrintAttachments } from "./attachments";
 import "./print.css";
 
@@ -19,7 +20,7 @@ export function FinancePrintFrame({ org, company, children }: { org: Org | null;
   const context = useRef<HTMLParagraphElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const documentPage = /\/(vouchers|petty-cash)\/[^/]+\/print$|\/ledger\/voucher\//.test(path) || /\/funds\/[^/]+\/report$/.test(path);
-  const existingPrintAction = documentPage || /^\/finance\/invoices\/[^/]+$/.test(path);
+  const existingPrintAction = documentPage || /^\/finance\/invoices\/(?!receivables$)[^/]+$/.test(path);
   const wide = /\/bir(?:\/|$)|\/bills\/aging|\/ledger\/(accounts|trial-balance)|\/invoices\/receivables/.test(path)
     || /^\/finance\/(bills|suppliers|vouchers|petty-cash|ledger|invoices|bank|funds)$/.test(path);
   const printable = /^\/finance\/(bills|suppliers|vouchers|petty-cash|ledger|invoices|bank|funds|bir)(\/|$)/.test(path)
@@ -58,10 +59,8 @@ export function FinancePrintFrame({ org, company, children }: { org: Org | null;
     return () => { window.removeEventListener("beforeprint", prepare); window.removeEventListener("keydown", shortcut); if (element) clearPrintAttachments(element); };
   }, [org?.locale, org?.timezone, path]);
 
-  return <div ref={root} className="finance-print-scope" data-print-layout={wide ? "landscape" : "portrait"} data-print-supported={String(printable)}>
-    {printable && !existingPrintAction && <div className="finance-print-toolbar print:hidden">
-      <FinancePrintButton label="Print / Save as PDF" />
-    </div>}
+  return <FinancePagePrintContext.Provider value={printable && !existingPrintAction}>
+    <div ref={root} className="finance-print-scope" data-print-layout={wide ? "landscape" : "portrait"} data-print-supported={String(printable)}>
     <div className="finance-print-banner" aria-hidden="true">
       <div className="finance-print-company">
         {company?.slug === "2mg" && <div className="finance-print-company-logo">
@@ -85,5 +84,6 @@ export function FinancePrintFrame({ org, company, children }: { org: Org | null;
     <footer className="finance-print-footer" aria-hidden="true">
       <span>Bishnoi One · Finance document</span><span ref={timestamp}>Print copy</span>
     </footer>
-  </div>;
+    </div>
+  </FinancePagePrintContext.Provider>;
 }

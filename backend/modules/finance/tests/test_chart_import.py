@@ -40,7 +40,8 @@ def test_the_chosen_rows_are_added_with_their_parents_all_or_none(client, ana, b
     assert client.post("/finance/ledger/accounts/import", json={"accounts": chosen}, headers=ben).status_code == 403  # the chart is the setup's
     done = client.post("/finance/ledger/accounts/import", json={"accounts": chosen}, headers=ana)
     assert done.status_code == 201 and done.json() == {"added": 3, "withParent": 1}
-    chart = {a["code"]: a for a in client.get("/finance/ledger/accounts", headers=ana).json()["items"]}
+    assert "6915-001" not in {a["code"] for a in client.get("/finance/ledger/accounts", headers=ana).json()["items"]}
+    chart = {a["code"]: a for a in client.get("/finance/ledger/accounts?company_use=all", headers=ana).json()["items"]}
     assert chart["6915-001"]["parentId"] == chart["6915-000"]["id"] and chart["2334-000"]["parentId"] is None
     # A code already used refuses the lot.
     again = client.post("/finance/ledger/accounts/import", json={"accounts": [{"code": "7002-000", "name": "Packaging Charges", "type": "income"}, chosen[0]]}, headers=ana)

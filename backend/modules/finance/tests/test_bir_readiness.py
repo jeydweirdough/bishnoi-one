@@ -11,7 +11,7 @@ from modules.finance.models import Account
 from .test_invoices import issued, ready
 from .test_payables_asof import ago, posted_bill
 from .test_concurrent_saves import app  # noqa: F401 (the SQLite / PostgreSQL fixture)
-from .test_tax_api import ana, client  # noqa: F401 (fixtures)
+from .test_tax_api import ana, ben, client  # noqa: F401 (fixtures)
 from .test_vouchers import prepare, step, team  # noqa: F401 (fixtures)
 
 TODAY = date.today()
@@ -74,3 +74,67 @@ def test_a_bill_voided_in_a_later_period_shows_as_a_difference(client, ana, team
 def test_an_end_before_the_start_is_refused(client, ana):  # noqa: F811
     r = client.get("/finance/bir/readiness", params={"start": TODAY.isoformat(), "end": (TODAY - timedelta(days=1)).isoformat()}, headers=ana)
     assert r.status_code == 422
+
+
+def test_secondary_trade_receivable_and_oojeema_closing_are_tracked(client, app, ana):  # noqa: F811
+    from modules.finance import company_scope
+
+    ready(client, ana)
+    with app.state.sessions() as db:
+        s = posting_settings(db)
+        ar2 = Account(code="0002-000", name="Accounts Receivable", type="asset", is_active=True)
+        vat = db.get(Account, s.output_tax_account_id)
+        db.add(ar2)
+        db.flush()
+        company_scope.approve_for_2mg(db, "account", [ar2.id], reviewed_by="Test")
+        post(db, date.fromisoformat(ago(10)), "Opening secondary AR", [Leg(ar2, debit=50_000), Leg(vat, credit=50_000)], "Import", source="opening")
+        post(db, TODAY, "Oojeema 2550-Q closing", [Leg(vat, debit=30_000), Leg(ar2, credit=30_000)], "Import", reference="JV-CLS", source="oojeema_gl")
+        db.commit()
+    checks = readiness(client, ana, ago(30), TODAY.isoformat())
+    # Both receivables accounts (1100 and 0002-000) combine cleanly in the receivables check.
+    ar = checks["receivables"]
+    assert any(a["code"] == "0002-000" for a in ar["accounts"])
+    assert ar["booksCentavos"] == 20_000
+    # Quarter-end VAT closing shows separately in beforeClosingCentavos so Output VAT isn't masked.
+    ov = checks["output_vat"]
+    assert ov["booksCentavos"] == 20_000 and ov["closingCentavos"] == -30_000 and ov["beforeClosingCentavos"] == 50_000
+    assert any(o["source"] == "oojeema_closing" for o in ov["otherSources"])
+
+
+def test_tamp_audit_flags_unwithheld_local_supplier_and_skips_foreign(client, ana, ben):  # noqa: F811 (fixtures)
+    from .test_payables import account, cleared, supplier
+
+    ready(client, ana)
+    local_unwithheld = supplier(client, ben, name="Local Utility Exempt", tin="111-222-333")
+    local_wc850 = supplier(client, ben, name="Pharma Partner", tin="222-333-444", withholding="WC850")
+    foreign_sup = supplier(client, ben, name="Global Pharma Ltd.", tin="", withholding=None)
+    exp = account(client, ben, "6100")
+
+    def post_one(sup_id, number, withholding, no_reason):
+        r = client.post(
+            "/finance/bills",
+            json={
+                "supplierId": sup_id,
+                "billNumber": number,
+                "billDate": TODAY.isoformat(),
+                "amountsIncludeVat": True,
+                "taxReviewed": True,
+                "lines": [{"accountId": exp, "amountCentavos": 1_120_000, "vat": "vat", "withholding": withholding, "noWithholdingReason": no_reason, "purchaseType": "services"}],
+            },
+            headers=ben,
+        )
+        assert r.status_code == 201, r.text
+        return cleared(client, ana, ben, r.json())
+
+    post_one(local_unwithheld["id"], "SI-UNW-1", None, "exempt_charge")
+    post_one(local_wc850["id"], "SI-WC850-1", "WC850", None)
+    post_one(foreign_sup["id"], "SI-FOR-1", None, None)
+
+    res = client.get(f"/finance/bir/readiness?start={ago(30)}&end={TODAY.isoformat()}", headers=ana)
+    assert res.status_code == 200, res.text
+    tamp = res.json()["tampAudit"]
+    assert tamp["status"] == "review"
+    assert tamp["unwithheldCount"] == 1
+    assert tamp["unwithheldTotalCentavos"] == 1_000_000
+    assert [s["name"] for s in tamp["suppliers"]] == ["Local Utility Exempt"]
+

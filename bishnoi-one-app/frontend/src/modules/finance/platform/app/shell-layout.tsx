@@ -1,7 +1,7 @@
 import { AppShell } from "@/src/platform/shell/app-shell";
 import { myModules } from "@/src/one/mine";
 import { cookies } from "next/headers";
-import { Suspense, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Notices } from "@/src/platform/app/notices";
 import { OneActions } from "@/src/one/one-actions";
 import { ModuleActions } from "@/src/platform/shell/module-actions";

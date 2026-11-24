@@ -23,7 +23,7 @@ from pydantic import Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from modules.finance import business_events
+from modules.finance import business_events, company_scope
 from modules.finance.access import access_of, permitted, settings_permitted
 from modules.finance.audit import audit
 from modules.finance.crm import CrmUnavailable, find_customers, read_customer
@@ -32,7 +32,7 @@ from modules.finance.funds import RELEASE_METHODS as METHODS
 from modules.finance.ledger import Leg, account, money_account, post
 from modules.finance.ledger import settings as posting_settings
 from modules.finance.locks import locked
-from modules.finance.models import BankAccount, ImportLink, ImportRecord, ImportRun, Invoice, InvoicePayment, InvoiceSeries, JournalEntry
+from modules.finance.models import Account, BankAccount, ImportLink, ImportRecord, ImportRun, Invoice, InvoicePayment, InvoiceSeries, JournalEntry
 from modules.finance.routers.funds import today
 from modules.finance.routers.tax import (
     Api,
@@ -84,11 +84,21 @@ def usable_series(db: Session) -> list[InvoiceSeries]:
     return [s for s in rows if s.left]
 
 
+def income_accounts_out(db: Session) -> list[dict]:
+    """Active income accounts this company may post invoice lines to (e.g. 4100-000 default sales, 7002-000 packaging charges)."""
+    default_id = posting_settings(db).sales_account_id
+    q = select(Account).where(Account.type == "income", Account.is_active)
+    if company_scope.configured(db, "account"):
+        q = q.where(company_scope.usable_clause("account", Account.id))
+    rows = db.scalars(q.order_by(Account.code)).all()
+    return [{"id": a.id, "code": a.code, "name": a.name, "isDefault": a.id == default_id} for a in rows]
+
+
 @router.get("/series")
 def list_series(user: permitted("invoices.view"), db: DB, settings: SettingsDep) -> dict:
     rows = db.scalars(select(InvoiceSeries).order_by(InvoiceSeries.is_active.desc(), InvoiceSeries.created_at)).all()
     # crmLinked: whether the invoice form can find customers in the CRM.
-    return {"items": [series_out(s) for s in rows], "canSetup": access_of(user).can("invoices.setup"), "crmLinked": settings.crm_linked}
+    return {"items": [series_out(s) for s in rows], "canSetup": access_of(user).can("invoices.setup"), "crmLinked": settings.crm_linked, "incomeAccounts": income_accounts_out(db)}
 
 
 @router.post("/series", status_code=status.HTTP_201_CREATED)
@@ -154,6 +164,11 @@ def customers(_: permitted("invoices.create"), settings: SettingsDep, q: str | N
 # --- invoices ----------------------------------------------------------------------------------
 
 
+class InvoiceLineBody(LineBody):
+    # Optional per-line revenue account (omitted -> LedgerSettings.sales_account_id); kept out of tax.py's SaleBody.
+    account_id: str | None = Field(None, max_length=36)
+
+
 class InvoiceIn(Api):
     customer_id: str | None = Field(None, max_length=36)
     customer_name: str = Field(min_length=1, max_length=200)
@@ -173,7 +188,7 @@ class InvoiceIn(Api):
     reference: str | None = Field(None, max_length=80)
     notes: str | None = Field(None, max_length=500)
     prices_include_tax: bool | None = None
-    lines: list[LineBody] = Field(min_length=1, max_length=500)
+    lines: list[InvoiceLineBody] = Field(min_length=1, max_length=500)
 
 
 def sale_of(inv: Invoice) -> SaleBody:
@@ -182,7 +197,7 @@ def sale_of(inv: Invoice) -> SaleBody:
         on=inv.invoice_date,
         prices_include_tax=inv.prices_include_tax,
         buyer=BuyerBody(name=inv.customer_name, tin=inv.customer_tin, address=inv.customer_address, id_number=inv.buyer_id_number),
-        lines=[LineBody(**line) for line in inv.lines],
+        lines=[LineBody(**{k: v for k, v in line.items() if k != "accountId"}) for line in inv.lines],
     )
 
 
@@ -222,7 +237,7 @@ PROBLEM_PLACES = {
     ("buyer", "address"): ("Address", "customerAddress"),
     ("treatment",): ("Buyer type", "treatment"),
 }
-LINE_PARTS = {"category": "VAT", "quantity": "quantity", "unitPriceCentavos": "unit price", "discountCentavos": "discount"}
+LINE_PARTS = {"category": "VAT", "quantity": "quantity", "unitPriceCentavos": "unit price", "discountCentavos": "discount", "accountId": "income account"}
 
 
 def readable(detail) -> tuple[str, dict[str, str]]:
@@ -250,17 +265,27 @@ def cost_lines(db: Session, settings, inv: Invoice) -> tuple[list | None, int]:
     """Each line's cost per unit from Inventory (by its item code), and the invoice's total cost."""
     from modules.finance.inventory import unit_costs
 
-    if not (posting_settings(db).cogs_account_id and posting_settings(db).inventory_account_id):
-        return None, 0
     lines = inv.lines or []
-    costs = unit_costs(settings, [str(l.get("ref") or "") for l in lines])
+    refs = [str(l.get("ref") or "").strip().upper() for l in lines]
+    if not any(refs):
+        return None, 0  # No item identity: not an asserted zero-cost product.
+    ledger = posting_settings(db)
+    if not (ledger.cogs_account_id and ledger.inventory_account_id):
+        raise HTTPException(409, "Set the inventory and cost-of-goods accounts before issuing an invoice with product codes.")
+    costs = unit_costs(settings, refs)
     if costs is None:
-        return None, 0
-    per_unit = [costs.get(str(l.get("ref") or "").strip().upper()) for l in lines]
-    return per_unit, sum((c or 0) * int(l.get("quantity") or 0) for c, l in zip(per_unit, lines))
+        raise HTTPException(409, "Inventory costs are unavailable. No invoice was issued; retry after the source is available.")
+    per_unit = [costs.get(ref) if ref else None for ref in refs]
+    if any(ref and (cost is None or not isinstance(cost, int) or cost < 0) for ref, cost in zip(refs, per_unit)):
+        raise HTTPException(409, "A product code has no valid Inventory cost. Confirm the product and cost before issuing.")
+    return per_unit, sum(cost * int(line.get("quantity") or 0) for cost, line in zip(per_unit, lines) if cost is not None)
 
 
-def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True, linked: dict | None = None) -> dict:
+
+def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True, linked: dict | None = None, settled_credits: int | None = None) -> dict:
+    from modules.finance.settlements import invoice_settled
+
+    credits = settled_credits if settled_credits is not None else (invoice_settled(db, inv.id) if inv.status == "issued" else 0)
     due = inv.invoice_date + timedelta(days=inv.terms_days)
     out = {
         "id": inv.id, "status": inv.status, "number": inv.number,
@@ -272,7 +297,8 @@ def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True, linke
         "date": inv.invoice_date.isoformat(), "termsDays": inv.terms_days, "dueDate": due.isoformat(),
         "reference": inv.reference, "notes": inv.notes, "pricesIncludeTax": inv.prices_include_tax,
         "totalCentavos": inv.total_centavos, "taxCentavos": inv.tax_centavos, "paidCentavos": inv.paid_centavos,
-        "balanceCentavos": inv.total_centavos - inv.paid_centavos if inv.status == "issued" else 0,
+        "creditAppliedCentavos": credits,
+        "balanceCentavos": max(0, inv.total_centavos - inv.paid_centavos - credits) if inv.status == "issued" else 0,
         "createdBy": inv.created_by, "createdAt": iso(inv.created_at),
         "issuedBy": inv.issued_by, "issuedAt": iso(inv.issued_at),
         "voidedBy": inv.voided_by, "voidedAt": iso(inv.voided_at), "voidReason": inv.void_reason,
@@ -289,6 +315,9 @@ def invoice_out(db: Session, inv: Invoice, settings, *, full: bool = True, linke
     out["payments"] = [payment_out(p) for p in inv.payments]
     if full:
         out["lines"] = inv.lines
+        acct_ids = {ln.get("accountId") for ln in (inv.lines or []) if ln.get("accountId")}
+        found_accts = {a.id: {"id": a.id, "code": a.code, "name": a.name} for a in db.scalars(select(Account).where(Account.id.in_(acct_ids)))} if acct_ids else {}
+        out["lineAccounts"] = found_accts
         out["entryId"] = inv.entry_id
         out["methods"] = [{"key": k, "label": v} for k, v in METHODS.items()]
         # A draft is worked out afresh each time it's read; an issued one is as it was issued.
@@ -321,12 +350,35 @@ def must_be_draft(inv: Invoice) -> None:
         raise HTTPException(status.HTTP_409_CONFLICT, "An issued invoice isn't changed: void it and make a new one.")
 
 
-def fill(inv: Invoice, body: InvoiceIn, settings) -> None:
+def _validate_line_accounts(db: Session, line_ids: list[str | None]) -> None:
+    wanted = [aid for aid in line_ids if aid]
+    if not wanted:
+        return
+    found = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_(set(wanted))))}
+    for i, aid in enumerate(line_ids):
+        if not aid:
+            continue
+        acc = found.get(aid)
+        if acc is None:
+            raise field_error(f"lines.{i}.accountId", "Pick a valid income account.")
+        if acc.type != "income":
+            raise field_error(f"lines.{i}.accountId", f"{acc.code} {acc.name} isn't an income account.")
+        if not acc.is_active:
+            raise field_error(f"lines.{i}.accountId", f"{acc.code} {acc.name} is inactive.")
+    if company_scope.configured(db, "account"):
+        company_scope.require_ids(db, "account", wanted)
+
+
+def fill(db: Session, inv: Invoice, body: InvoiceIn, settings) -> None:
     if body.invoice_date > today(settings):
         raise field_error("invoiceDate", "An invoice can't be dated in the future.")
+    _validate_line_accounts(db, [line.account_id for line in body.lines])
     for k, v in body.model_dump(exclude={"lines"}).items():
         setattr(inv, k, v)
-    inv.lines = [line.model_dump(mode="json", by_alias=True) for line in body.lines]
+    inv.lines = [
+        {k: v for k, v in line.model_dump(mode="json", by_alias=True).items() if k != "accountId" or v is not None}
+        for line in body.lines
+    ]
 
 
 @router.get("")
@@ -387,7 +439,7 @@ def month_figures(db: Session, settings) -> dict:
 @router.post("", status_code=status.HTTP_201_CREATED)
 def add_invoice(user: permitted("invoices.create"), db: DB, settings: SettingsDep, body: InvoiceIn) -> dict:
     inv = Invoice(created_by=user.full_name, lines=[])
-    fill(inv, body, settings)
+    fill(db, inv, body, settings)
     db.add(inv)
     db.flush()
     audit(db, user, "invoice.drafted", target=inv.customer_name, target_type="invoice", target_id=inv.id)
@@ -404,7 +456,7 @@ def read_invoice(_: permitted("invoices.view"), db: DB, settings: SettingsDep, i
 def change_invoice(user: permitted("invoices.create"), db: DB, settings: SettingsDep, invoice_id: str, body: InvoiceIn) -> dict:
     inv = found(db, invoice_id)
     must_be_draft(inv)
-    fill(inv, body, settings)
+    fill(db, inv, body, settings)
     audit(db, user, "invoice.updated", target=inv.customer_name, target_type="invoice", target_id=inv.id)
     db.commit()
     return invoice_out(db, inv, settings)
@@ -446,6 +498,9 @@ def issue_now(db: Session, settings, inv: Invoice, actor, actor_name: str, serie
     computed = work_out(db, settings, sale_of(inv))
     if computed["warnings"]:
         raise HTTPException(status.HTTP_409_CONFLICT, " ".join(computed["warnings"]) + " Go to Tax, Registration, then issue it.")
+    # Validate costs and per-line income accounts before taking a number or changing draft state.
+    _validate_line_accounts(db, [line.get("accountId") for line in (inv.lines or [])])
+    known_costs, total_cost = cost_lines(db, settings, inv)
     # The series, locked while its number is taken, so two invoices issued at once never share one.
     options = usable_series(db)
     s = next((x for x in options if x.id == series_id), None) if series_id else (options[0] if options else None)
@@ -464,14 +519,27 @@ def issue_now(db: Session, settings, inv: Invoice, actor, actor_name: str, serie
     ledger = posting_settings(db)
     old = db.get(Invoice, inv.replaces_id) if inv.replaces_id else None
     replacing = f", replacing {old.number}" if old else ""
+    by_sales_account: dict[str, int] = {}
+    worked_lines = computed.get("lines") or []
+    for raw, done in zip(inv.lines or [], worked_lines):
+        net_line = int(done["totalCentavos"]) - int(done["taxCentavos"])
+        acct_id = raw.get("accountId") or ledger.sales_account_id
+        by_sales_account[acct_id] = by_sales_account.get(acct_id, 0) + net_line
+    if not by_sales_account:
+        by_sales_account[ledger.sales_account_id] = inv.total_centavos - inv.tax_centavos
+    sales_legs = [
+        Leg(account(db, acct_id), credit=amt)
+        for acct_id, amt in by_sales_account.items()
+        if amt
+    ] or [Leg(account(db, ledger.sales_account_id), credit=inv.total_centavos - inv.tax_centavos)]
     legs = [
         Leg(account(db, ledger.receivables_account_id), debit=inv.total_centavos),
-        Leg(account(db, ledger.sales_account_id), credit=inv.total_centavos - inv.tax_centavos),
+        *sales_legs,
         Leg(account(db, ledger.output_tax_account_id), credit=inv.tax_centavos),
     ]
     # The cost of goods sold, from Inventory by each line's item code, in the same entry: a void
     # reverses the sale and its cost together (decided 2026-10-28). Not linked, or no codes: no cost.
-    inv.line_costs, inv.cost_centavos = cost_lines(db, settings, inv)
+    inv.line_costs, inv.cost_centavos = known_costs, total_cost
     if inv.cost_centavos and ledger.cogs_account_id and ledger.inventory_account_id:
         legs += [
             Leg(account(db, ledger.cogs_account_id), debit=inv.cost_centavos, description="Cost of goods sold"),
@@ -619,10 +687,13 @@ def record_payment(user: permitted("invoices.collect"), db: DB, settings: Settin
         raise field_error("paidOn", "A payment can't be dated in the future.")
     if body.paid_on < inv.invoice_date:
         raise field_error("paidOn", "A payment can't come before the invoice.")
-    owed = inv.total_centavos - inv.paid_centavos
+    from modules.finance.settlements import invoice_settled
+
+    credits = invoice_settled(db, inv.id)
+    owed = max(0, inv.total_centavos - inv.paid_centavos - credits)
     settled = body.amount_centavos + body.cwt_centavos
     if settled > owed:
-        raise field_error("amountCentavos", f"That's more than is owed on this invoice ({owed / 100:,.2f}), withholding included.")
+        raise field_error("amountCentavos", f"That's more than is owed on this invoice ({owed / 100:,.2f}), withholding and applied credits included.")
     atc = (body.cwt_atc or "").strip().upper() or None
     if body.cwt_centavos and not atc:
         raise field_error("cwtAtc", "Give the ATC the customer's Form 2307 shows (e.g. WC158).")
@@ -658,7 +729,7 @@ def record_payment(user: permitted("invoices.collect"), db: DB, settings: Settin
             "invoiceId": inv.id, "number": inv.number, "customerId": inv.customer_id, "paidOn": body.paid_on.isoformat(),
             "amountCentavos": settled, "paidCentavos": inv.paid_centavos, "totalCentavos": inv.total_centavos})
     # Paid in full (step 13): the sales order's chain is closed, and the CRM hears it.
-    if inv.paid_centavos >= inv.total_centavos and not from_export(inv):
+    if inv.paid_centavos + credits >= inv.total_centavos and not from_export(inv):
         business_events.emit(db, None, "invoice.paid", {
             "id": inv.id, "number": inv.number, "customerId": inv.customer_id, "deliveryId": inv.delivery_id, "salesOrderId": inv.sales_order_id,
             "paidAt": datetime.now(UTC).isoformat(), "totalCentavos": inv.total_centavos})

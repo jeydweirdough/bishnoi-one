@@ -10,13 +10,15 @@ number and the usual approval.
 
 from datetime import timedelta
 
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from modules.finance import company_scope
 from modules.finance.audit import audit
 from modules.finance.ledger import settings as posting_settings
 from modules.finance.models import Bill, Supplier
-from modules.finance.payables import work_out
+from modules.finance.payables import origin_by_name, work_out
 
 ACTOR = "Bishnoi One"
 
@@ -33,7 +35,7 @@ def vendor_for(db: Session, data: dict) -> Supplier:
     found = db.scalar(select(Supplier).where(func.lower(Supplier.name) == name.lower()))
     if found is not None:
         return found
-    s = Supplier(name=name, tin=f"{tin[:3]}-{tin[3:6]}-{tin[6:9]}" if len(tin) >= 9 else None, email=v.get("email"), created_by=ACTOR,
+    s = Supplier(name=name, origin=origin_by_name(name), tin=f"{tin[:3]}-{tin[3:6]}-{tin[6:9]}" if len(tin) >= 9 else None, email=v.get("email"), created_by=ACTOR,
                  notes=f"Added from Inventory's consignment settlement {data.get('number')} (vendor {v.get('code')}).")
     db.add(s)
     db.flush()
@@ -45,14 +47,18 @@ def from_settlement(db: Session, data: dict, slug: str | None) -> Bill | None:
     from modules.finance.business_events import _state
     from modules.finance.routers.funds import today
 
+    if slug != '2mg':
+        raise HTTPException(409, 'Only a verified 2MG company event may prepare a Finance bill.')
     number = str(data.get("number") or "")[:60]
     if not number or not data.get("lines"):
         return None
     if db.scalar(select(Bill).where(Bill.bill_number == number, Bill.status != "void")) is not None:
         return None  # heard before
     vendor = vendor_for(db, data)
+    company_scope.require_ids(db, 'supplier', [vendor.id])
     ledger = posting_settings(db)
     account = ledger.cogs_account_id or ledger.inventory_account_id
+    company_scope.require_ids(db, 'account', [account])
     lines = [{"accountId": account, "description": f"Consignment sold: {line['name']} ({line['sku']}) × {line['quantity']}"[:200],
               "amountCentavos": int(line["total"]), "vat": "vat" if vendor.vat_registered else "none", "withholding": vendor.withholding}
              for line in data["lines"] if int(line.get("total") or 0) > 0]

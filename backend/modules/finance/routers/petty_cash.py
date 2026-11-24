@@ -25,6 +25,8 @@ from typing import Literal
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from modules.finance import budget_watch
+from modules.finance import company_scope
 from modules.finance.access import access_of, permitted
 from modules.finance.audit import audit
 from modules.finance.deps import DB, CurrentUser, SettingsDep
@@ -33,7 +35,7 @@ from modules.finance.ledger import settings as posting_settings
 from modules.finance.models import Account, JournalEntry, JournalLine, PettyCashEvent, PettyCashLine, PettyCashVoucher, StoredFile
 from modules.finance.money_accounts import money_account_ids
 from modules.finance.notify import done, holders, tell
-from modules.finance.payables import PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, withholding_out, work_out
+from modules.finance.payables import NO_WITHHOLDING, PURCHASE_TYPES, VAT_KINDS, WITHHOLDING, no_withholding_out, withholding_decision, withholding_out, work_out
 from modules.finance.routers.funds import today
 from modules.finance.routers.payables import FileIn, peso, store_file
 from modules.finance.routers.tax import Api, field_error, split_tin
@@ -87,7 +89,7 @@ def may(user, v: PettyCashVoucher) -> dict:
     mine = user.id in preparers(v)
     return {
         "canEdit": open_ and can("petty_cash.create"),
-        "canSubmit": open_ and can("petty_cash.create") and bool(v.lines) and all(ln.file_ref for ln in v.lines),
+        "canSubmit": open_ and can("petty_cash.create") and bool(v.lines) and all(ln.file_ref and (ln.withholding or ln.no_withholding_reason) for ln in v.lines),
         "canCheck": v.status == "to_check" and can("petty_cash.check") and not mine,
         "canReturn": v.status == "to_check" and can("petty_cash.check") and not mine,
         "canVoid": v.status == "posted" and can("petty_cash.void"),
@@ -114,6 +116,14 @@ def line_dict(ln: PettyCashLine) -> dict:
             "purchaseType": ln.purchase_type, "description": ln.description}
 
 
+def spent(v: PettyCashVoucher) -> dict[str, int]:
+    """What the voucher's lines put on each account, before VAT (as last worked out on save)."""
+    out: dict[str, int] = {}
+    for ln in v.lines:
+        out[ln.account_id] = out.get(ln.account_id, 0) + (ln.net_centavos or 0)
+    return out
+
+
 def voucher_out(db: DB, v: PettyCashVoucher, user=None) -> dict:
     # Totals are worked out whenever the voucher is saved, and again when it's submitted and posted.
     return summary(v) | (may(user, v) if user is not None else {}) | {
@@ -124,12 +134,16 @@ def voucher_out(db: DB, v: PettyCashVoucher, user=None) -> dict:
             "description": ln.description, "purchaseType": ln.purchase_type, "purchaseTypeLabel": PURCHASE_TYPES[ln.purchase_type],
             "vat": ln.vat, "vatLabel": VAT_KINDS[ln.vat], "withholding": ln.withholding,
             "withholdingRateBp": WITHHOLDING[ln.withholding][1] if ln.withholding in WITHHOLDING else None,
+            "noWithholdingReason": ln.no_withholding_reason, "noWithholdingNote": ln.no_withholding_note,
+            "noWithholdingLabel": NO_WITHHOLDING.get(ln.no_withholding_reason or ""),
             "amountCentavos": ln.amount_centavos, "netCentavos": ln.net_centavos, "vatCentavos": ln.vat_centavos, "withheldCentavos": ln.withheld_centavos,
             "file": {"name": ln.file_name, "contentType": ln.file_type, "size": ln.file_size, "uploadedBy": ln.file_by,
                      "uploadedAt": ln.file_at.isoformat() if ln.file_at else None} if ln.file_ref else None,
         } for ln in v.lines],
         "netCentavos": v.net_centavos, "vatCentavos": v.vat_centavos, "withheldCentavos": v.withheld_centavos,
         "entryId": v.entry_id,
+        # Over-budget warning (recording 12): not yet posted only; a posted voucher is already in the books.
+        "overBudget": budget_watch.over_budget(db, v.voucher_date, spent(v)) if v.status in ("draft", "returned", "to_check") else [],
         "createdAt": v.created_at.isoformat(), "submittedAt": v.submitted_at.isoformat() if v.submitted_at else None,
         "checkedBy": v.checked_by, "checkedAt": v.checked_at.isoformat() if v.checked_at else None,
         "voidedBy": v.voided_by, "voidedAt": v.voided_at.isoformat() if v.voided_at else None, "voidReason": v.void_reason,
@@ -146,14 +160,14 @@ def set_totals(v: PettyCashVoucher, w) -> None:
 @router.get("/petty-cash/choices")
 def choices(user: permitted("petty_cash.view"), db: DB) -> dict:
     """What a voucher's fields offer: the funds (with their balance), accounts, tax lists, and earlier PIC/department names."""
-    accounts = db.scalars(select(Account).where(Account.is_active, Account.type.in_(("expense", "asset"))).order_by(Account.code))
+    accounts = db.scalars(select(Account).where(Account.is_active, Account.type.in_(("expense", "asset")), company_scope.usable_clause("account", Account.id)).order_by(Account.code))
     seen = lambda col: sorted({x for (x,) in db.execute(select(col).where(col.is_not(None)).distinct()) if x})  # noqa: E731
     return {
-        "funds": funds_out(db),
+        "funds": [f for f in funds_out(db) if company_scope.scope_for(db, "account", f["id"]) == "2mg"],
         "accounts": [{"id": a.id, "code": a.code, "name": a.name, "type": a.type} for a in accounts],
         "vatKinds": [{"key": k, "label": v} for k, v in VAT_KINDS.items()],
         "purchaseTypes": [{"key": k, "label": v} for k, v in PURCHASE_TYPES.items()],
-        "withholding": withholding_out(),
+        "withholding": withholding_out(), "noWithholding": no_withholding_out(),
         "people": seen(PettyCashVoucher.person_in_charge), "departments": seen(PettyCashVoucher.department),
     }
 
@@ -211,6 +225,9 @@ class LineIn(Api):
     purchase_type: Literal["services", "capital_goods", "other_goods", "importation"]
     vat: Literal["vat", "zero", "exempt", "none"]
     withholding: str | None = Field(None, max_length=10)
+    # No withholding, and why (app/payables.py NO_WITHHOLDING): needed before submitting. A store is local.
+    no_withholding_reason: str | None = Field(None, max_length=20)
+    no_withholding_note: str | None = Field(None, max_length=200)
     amount_centavos: int = Field(gt=0, lt=10**11)
 
 
@@ -244,6 +261,7 @@ def apply(db: DB, settings, v: PettyCashVoucher, body: VoucherIn, user) -> None:
     if body.voucher_date > today(settings):
         raise field_error("voucherDate", "The voucher date can't be in the future.")
     existing = {ln.id: ln for ln in v.lines}
+    company_scope.require_ids(db, 'account', [body.fund_account_id, *[ln.account_id for ln in body.lines]], status_code=422)
     kept: list[PettyCashLine] = []
     for i, line in enumerate(body.lines):
         a = db.get(Account, line.account_id)
@@ -251,6 +269,10 @@ def apply(db: DB, settings, v: PettyCashVoucher, body: VoucherIn, user) -> None:
             raise line_error(i, "accountId", "Pick an active expense or asset account.")
         if line.withholding and line.withholding not in WITHHOLDING:
             raise line_error(i, "withholding", "Pick a withholding code from the list.")
+        try:  # a draft may leave it for later; submitting needs it (submit below)
+            code, reason, note = withholding_decision("local", line.withholding, line.no_withholding_reason, line.no_withholding_note, complete=False)
+        except ValueError as problem:
+            raise line_error(i, "noWithholdingReason", str(problem)) from None
         if line.spent_on > body.voucher_date:
             raise line_error(i, "spentOn", "A receipt can't be dated after its voucher.")
         tin = None
@@ -265,7 +287,8 @@ def apply(db: DB, settings, v: PettyCashVoucher, body: VoucherIn, user) -> None:
         ln = existing.pop(line.id) if line.id else PettyCashLine()
         ln.position, ln.spent_on, ln.store, ln.store_tin = i + 1, line.spent_on, line.store.strip(), tin
         ln.receipt_number, ln.account_id, ln.description = line.receipt_number.strip(), a.id, (line.description or "").strip() or None
-        ln.purchase_type, ln.vat, ln.withholding, ln.amount_centavos = line.purchase_type, line.vat, line.withholding or None, line.amount_centavos
+        ln.purchase_type, ln.vat, ln.withholding, ln.amount_centavos = line.purchase_type, line.vat, code, line.amount_centavos
+        ln.no_withholding_reason, ln.no_withholding_note = reason, note
         kept.append(ln)
     for gone in existing.values():  # removed receipt lines take their files with them
         if gone.file_ref and (stored := db.get(StoredFile, gone.file_ref)):
@@ -401,10 +424,15 @@ def remove_receipt(user: permitted("petty_cash.create"), db: DB, voucher_id: str
 @router.post("/petty-cash/{voucher_id}/submit")
 def submit(user: permitted("petty_cash.create"), db: DB, voucher_id: str) -> dict:
     v = found(db, voucher_id)
+    company_scope.require_ids(db, 'account', [v.fund_account_id, *[ln.account_id for ln in v.lines]])
     editable(v)
     missing = [ln.position for ln in v.lines if not ln.file_ref]
     if missing:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Attach the receipt for line {', '.join(map(str, missing))} first: every receipt is attached before submitting.")
+    # Every receipt says what's withheld, or why nothing is (Batch A, 2026-11-05).
+    undecided = [ln.position for ln in v.lines if not ln.withholding and not ln.no_withholding_reason]
+    if undecided:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Line {', '.join(map(str, undecided))}: pick a withholding code, or say why none is withheld, before submitting.")
     if not v.fund.is_active:
         raise HTTPException(status.HTTP_409_CONFLICT, f"{v.fund.name} is switched off. Pick another fund.")
     set_totals(v, worked(db, v))

@@ -25,7 +25,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from modules.finance.models import Invoice, InvoicePayment
+from modules.finance.models import CreditAllocation, CreditNote, Invoice, InvoicePayment
+from modules.finance.settlements import invoice_settled_map
 
 
 @dataclass(frozen=True)
@@ -55,8 +56,34 @@ def owed_on(db: Session, on: date, zone: ZoneInfo) -> list[Owed]:
         .outerjoin(paid, paid.c.invoice_id == Invoice.id)
         .where(issued_then, Invoice.invoice_date <= on, func.coalesce(paid.c.paid, 0) < Invoice.total_centavos)
     ).all()
-    return [Owed(inv, int(p), inv.total_centavos - int(p)) for inv, p in rows]
+    settled_map = invoice_settled_map(db, [inv.id for inv, _ in rows], on=on, after=after)
+    out: list[Owed] = []
+    for inv, p in rows:
+        settled = int(p) + settled_map.get(inv.id, 0)
+        if settled < inv.total_centavos:
+            out.append(Owed(inv, settled, inv.total_centavos - settled))
+    return out
+
+
+def _unapplied_credit_notes_on(db: Session, on: date, after: datetime) -> int:
+    active_cn = or_(CreditNote.status == "issued", and_(CreditNote.status == "void", CreditNote.voided_at >= after))
+    cns = list(db.scalars(select(CreditNote).where(active_cn, CreditNote.credit_date <= on)))
+    if not cns:
+        return 0
+    allocs = dict(
+        db.execute(
+            select(CreditAllocation.credit_note_id, func.sum(CreditAllocation.amount_centavos))
+            .where(
+                CreditAllocation.credit_note_id.in_([c.id for c in cns]),
+                CreditAllocation.applied_on <= on,
+                or_(CreditAllocation.removed_at.is_(None), CreditAllocation.removed_at >= after),
+            )
+            .group_by(CreditAllocation.credit_note_id)
+        ).all()
+    )
+    return sum(max(0, c.total_centavos - int(allocs.get(c.id, 0) or 0)) for c in cns)
 
 
 def total_owed_on(db: Session, on: date, zone: ZoneInfo) -> int:
-    return sum(o.owed_centavos for o in owed_on(db, on, zone))
+    open_invoices = sum(o.owed_centavos for o in owed_on(db, on, zone))
+    return open_invoices - _unapplied_credit_notes_on(db, on, end_of(on, zone))

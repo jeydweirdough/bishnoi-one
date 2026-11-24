@@ -127,6 +127,24 @@ def test_loading_saves_each_label_once_and_nothing_is_matched_by_guess(client, a
     assert m[("company", "Getmeds")]["records"] == 0 and m[("company", "2MG")]["records"] == 1
 
 
+def test_payment_import_holds_a_bill_after_supplier_company_reclassification(client,ana,app):
+    from modules.finance.models import CompanyScopeReview
+    t,files=matched(client,ana)
+    p=preview(client,t['cristal'],'bills',files)
+    run(client,t['cristal'],'bills',files,p['planKey'])
+    old=preview(client,t['cristal'],'supplier-payments',files)
+    assert old['counts']['ready']==1
+    with app.state.sessions() as db:
+        b=db.scalar(select(Bill).where(Bill.zoho_ref=='b1'))
+        db.get(CompanyScopeReview,('supplier',b.supplier_id)).scope='review'
+        db.commit()
+    held=preview(client,t['cristal'],'supplier-payments',files)
+    assert held['counts']['held']==1 and any('2MG' in reason['reason'] for reason in held['reasons'])
+    run(client,t['cristal'],'supplier-payments',files,old['planKey'],expect=409)
+    with app.state.sessions() as db:
+        assert db.scalar(select(func.count()).select_from(PaymentVoucher))==0
+
+
 def test_one_step_for_whoever_may_confirm_and_a_proposal_for_everyone_else(client, ana, app):
     t = staff(client, ana)
     files = pack(bills=[bill_row("b1", "SI-1", tax_name="No Tax", rate="0.00", tax="0.00", total="50.00")])
@@ -269,7 +287,10 @@ def test_a_label_that_depends_on_the_record_takes_supplier_rules_and_line_choice
     t, files = matched(client, ana, files)  # every label confirmed to 6500 · other goods
     supplier(client, ana, name="Other Agency", tin="987654321")
     with app.state.sessions() as db:
-        db.add(Account(code="6113-T", name="Synthetic ER contribution", type="expense"))
+        from modules.finance.models import CompanyScopeReview
+        synthetic=Account(code="6113-T", name="Synthetic ER contribution", type="expense")
+        db.add(synthetic);db.flush()
+        db.add(CompanyScopeReview(subject_kind="account",subject_id=synthetic.id,scope="2mg",reviewed_by="Fixture review",evidence={"fixture":"explicit fictional company review"}))
         db.commit()
     sss, other = account(client, ana, "6113-T"), account(client, ana, "6500")
     m = matches(client, t["cristal"])[("account", gov)]

@@ -23,7 +23,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 import httpx
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import JSON, DateTime, Integer, String, event, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -83,6 +83,11 @@ def nightly(db) -> None:
         db.rollback()
 
 
+def _purchase_status(db, data: dict, slug: str) -> None:
+    from modules.inventory.purchase_handoff import accept_status
+    accept_status(db, data, slug)
+
+
 def _approval_decided(db, data: dict, slug: str) -> None:
     """An approval slip ended (Step 4C): the sales order it was for is approved or rejected (app/sales.py)."""
     from modules.inventory import sales
@@ -96,7 +101,7 @@ def _approval_decided(db, data: dict, slug: str) -> None:
 
 
 HANDLERS: dict[str, Callable] = {"quote.ordered": _quote_ordered, "invoice.issued": _invoice_issued, "invoice.paid": _invoice_paid,
-                                 "invoice.voided": _invoice_voided, "approval.decided": _approval_decided}
+                                 "invoice.voided": _invoice_voided, "approval.decided": _approval_decided, "purchase.receipt_finance_updated": _purchase_status}
 # --------------------------------------------------------------------------------------------
 
 router = APIRouter(prefix="/platform", tags=["platform"])
@@ -207,6 +212,8 @@ def take_event(body: NoteIn, request: Request) -> Response:
     item = claims.get("event") if claims else None
     if not isinstance(item, dict) or not item.get("id") or not item.get("kind"):
         raise _nowhere()
+    if item["kind"] == "purchase.receipt_finance_updated" and (claims["slug"] != "2mg" or item.get("source") != "finance"):
+        raise HTTPException(409, "Only Finance may acknowledge a 2MG receipt handoff.")
     remember_company(request.app.state.settings, claims["slug"])
     with sessions_for(request, claims["slug"])() as db:
         if db.get(InboxEvent, str(item["id"])) is None:

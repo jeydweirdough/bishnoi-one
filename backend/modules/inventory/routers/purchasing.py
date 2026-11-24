@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from modules.inventory.access import allowed
 from modules.inventory.api import Api, changed, check_email, conflict, field_error, found, iso
 from modules.inventory import business_events, documents, quality
+from modules.inventory.purchase_handoff import projection as finance_projection
 from modules.inventory.audit import audit
 from modules.inventory.deps import DB, CurrentUser, SettingsDep
 from modules.inventory.models import Product, PurchaseOrder, QualityCheck, SalesOrder, PurchaseOrderLine, Receipt, ReceiptLine, Supplier, SupplierProduct, Warehouse
@@ -535,7 +536,11 @@ class ReceiptIn(documents.HeaderIn):
 
 
 def receipt_brief(r: Receipt) -> dict:
+    from sqlalchemy.orm import object_session
+    from modules.inventory.purchase_handoff import existing
+    finance=existing(object_session(r),r)
     return {
+        "financeState":finance.state if finance else 'not_sent',
         "consignment": r.consignment,
         "id": r.id,
         "number": r.number,
@@ -584,6 +589,7 @@ def read_receipt(_: allowed("receiving.view"), db: DB, settings: SettingsDep, re
     check = db.scalar(select(QualityCheck).where(QualityCheck.receipt_id == r.id))
     return {
         **receipt_brief(r),
+        "financeHandoff": finance_projection(db,r,settings,_.can("receiving.send_to_finance")),
         "notes": r.notes,
         # Its quality check, when its warehouse checks what it receives (step 14a).
         "qualityCheck": {"id": check.id, "number": check.number, "status": check.status} if check else None,

@@ -132,3 +132,93 @@ def test_purchases_and_tax_withheld_from_suppliers_come_from_the_finance_bills(c
     assert cert["certificate"]["rows"][0]["months"] == [1_000_000, 0, 0] and cert["certificate"]["payee"]["tin"] == "123-456-789"
     vat = {line["key"]: line for line in client.get(f"/finance/bir/returns/vat?{q}", headers=ana).json()["lines"]}
     assert vat["input"]["amountCentavos"] == 120_000
+
+
+def test_quarterly_income_tax_1702q_draft(client, ana, ben):  # noqa: F811 (fixtures)
+    ready(client, ana)
+    paid_with_withholding(client, ben)  # 200,000 net sales, 4,000 SAWT CWT
+    r25 = client.get(f"/finance/bir/returns/income-tax?year={YEAR}&quarter={QUARTER}", headers=ben)
+    assert r25.status_code == 200, r25.text
+    t25 = r25.json()["totals"]
+    assert (t25["grossSalesCentavos"], t25["taxableIncomeCentavos"], t25["rcitCentavos"], t25["cwtCreditsCentavos"], t25["netPayableCentavos"]) == (200_000, 200_000, 50_000, 4_000, 46_000)
+    r20 = client.get(f"/finance/bir/returns/income-tax?year={YEAR}&quarter={QUARTER}&rateBp=2000", headers=ben).json()["totals"]
+    assert (r20["rcitCentavos"], r20["netPayableCentavos"]) == (40_000, 36_000)
+    csv = client.get(f"/finance/bir/returns/income-tax?year={YEAR}&quarter={QUARTER}&format=csv", headers=ben)
+    assert csv.status_code == 200 and "1702Q" in csv.headers["content-disposition"] and "500.00" in csv.text
+    assert client.get("/finance/bir/returns/income-tax?rateBp=1500", headers=ben).status_code == 422
+
+
+def test_1702q_excludes_vat_withholding_wv010(client, ana, ben):  # noqa: F811 (fixtures)
+    ready(client, ana)
+    inv_cwt = issued(client, ben, customerName="Private Pharmacy", customerTin="111-222-333")
+    inv_wv = issued(client, ben, customerName="Government Hospital", customerTin="444-555-666")
+    assert client.post(
+        f"/finance/invoices/{inv_cwt['id']}/payments",
+        json={"paidOn": TODAY, "amountCentavos": 222_000, "method": "cash", "cwtCentavos": 2_000, "cwtAtc": "WC158", "cwtCertificate": "2307-1"},
+        headers=ben,
+    ).status_code == 201
+    assert client.post(
+        f"/finance/invoices/{inv_wv['id']}/payments",
+        json={"paidOn": TODAY, "amountCentavos": 214_000, "method": "bank", "cwtCentavos": 10_000, "cwtAtc": "WV010", "cwtCertificate": "2307-2"},
+        headers=ben,
+    ).status_code == 201
+    t = client.get(f"/finance/bir/returns/income-tax?year={YEAR}&quarter={QUARTER}", headers=ben).json()["totals"]
+    assert t["cwtCreditsCentavos"] == 2_000
+
+
+def test_per_bill_and_per_voucher_2307_and_1601eq_ten_atcs_continuation(client, ana, ben):  # noqa: F811 (fixtures)
+    from io import BytesIO
+    from pypdf import PdfReader
+    from modules.finance import bir_withholding_pdf
+    from .test_payables import account, bill, cleared, supplier
+
+    ready(client, ana)
+    s = supplier(client, ben, name="Direct Pharma Partner", tin="555-666-777")
+    b1 = cleared(client, ana, ben, bill(client, ben, s["id"], number="SI-101", billDate="2026-10-05"))
+    cleared(client, ana, ben, bill(client, ben, s["id"], number="SI-102", billDate="2026-10-18"))
+    v = client.post(
+        "/finance/vouchers",
+        json={"supplierId": s["id"], "method": "bank", "paidFromId": account(client, ben, "1010"), "lines": [{"billId": b1["id"], "amountCentavos": b1["payableCentavos"]}]},
+        headers=ben,
+    )
+    assert v.status_code == 201, v.text
+    voucher = v.json()
+
+    quarterly = client.get(f"/finance/bir/withholding/2307?year=2026&quarter=4&supplierId={s['id']}", headers=ana).json()
+    assert quarterly["certificate"]["totals"]["taxCentavos"] == 20_000
+
+    per_bill = client.get(f"/finance/bir/withholding/2307?billId={b1['id']}", headers=ana).json()
+    assert per_bill["certificate"]["totals"]["taxCentavos"] == 10_000
+
+    per_voucher = client.get(f"/finance/bir/withholding/2307?voucherId={voucher['id']}", headers=ana).json()
+    assert per_voucher["certificate"]["totals"]["taxCentavos"] == 10_000
+
+    pdf = client.get(f"/finance/bir/withholding/2307/draft.pdf?voucherId={voucher['id']}", headers=ana)
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+    ten_atcs = [
+        {"atc": "WC010", "nature": "Professional fees", "rateBp": 1000, "baseCentavos": 100_000, "taxCentavos": 10_000},
+        {"atc": "WC100", "nature": "Rent", "rateBp": 500, "baseCentavos": 100_000, "taxCentavos": 5_000},
+        {"atc": "WC140", "nature": "Brokerage", "rateBp": 1500, "baseCentavos": 100_000, "taxCentavos": 15_000},
+        {"atc": "WC158", "nature": "Goods", "rateBp": 100, "baseCentavos": 100_000, "taxCentavos": 1_000},
+        {"atc": "WC160", "nature": "Services", "rateBp": 200, "baseCentavos": 100_000, "taxCentavos": 2_000},
+        {"atc": "WC850", "nature": "Direct pharma goods (0.5%)", "rateBp": 50, "baseCentavos": 100_000, "taxCentavos": 500},
+        {"atc": "WI010", "nature": "Prof ind", "rateBp": 500, "baseCentavos": 100_000, "taxCentavos": 5_000},
+        {"atc": "WI100", "nature": "Rent ind", "rateBp": 500, "baseCentavos": 100_000, "taxCentavos": 5_000},
+        {"atc": "WI158", "nature": "Goods ind", "rateBp": 100, "baseCentavos": 100_000, "taxCentavos": 1_000},
+        {"atc": "WI160", "nature": "Services ind", "rateBp": 200, "baseCentavos": 100_000, "taxCentavos": 2_000},
+    ]
+    report_1601 = {
+        "taxpayer": {"tin": "123-456-789", "branchCode": "00000", "rdoCode": "050", "registeredName": "Test Corp", "address": "Makati City"},
+        "period": {"start": "2026-07-01", "end": "2026-09-30", "label": "3rd quarter, calendar year 2026"},
+        "year": 2026,
+        "quarter": 3,
+        "form": "1601EQ",
+        "rows": ten_atcs,
+        "totalCentavos": sum(r["taxCentavos"] for r in ten_atcs),
+    }
+    rendered = bir_withholding_pdf.render(bir_withholding_pdf.prepare(report_1601))
+    reader = PdfReader(BytesIO(rendered))
+    assert len(reader.pages) == 3
+    last_text = reader.pages[-1].extract_text() or ""
+    assert "WC850" in last_text and "WI160" in last_text

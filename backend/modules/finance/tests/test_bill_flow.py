@@ -19,7 +19,7 @@ def act(client, who, b, action, body=None, expect=200) -> dict:
 def test_a_bill_without_tax_withheld_clears_when_malou_approves(client, ana, team):
     aubrey, cristal, malou = team["aubrey"], team["cristal"], team["malou"]
     s = supplier(client, aubrey, withholding=None)
-    plain = {"accountId": account(client, aubrey, "6500"), "amountCentavos": 1_120_000, "vat": "vat", "withholding": None}
+    plain = {"accountId": account(client, aubrey, "6500"), "amountCentavos": 1_120_000, "vat": "vat", "withholding": None, "noWithholdingReason": "not_covered"}
     b = client.post("/finance/bills", json={"taxReviewed": True, "supplierId": s["id"], "billNumber": "SI-0100", "billDate": "2026-10-01", "lines": [plain]}, headers=aubrey).json()
     assert b["needsCheck"] is False and b["canSubmit"] is True
     act(client, aubrey, b, "submit")
@@ -41,7 +41,7 @@ def test_a_bill_with_tax_withheld_is_checked_after_approval(client, ana, team):
     b = bill(client, aubrey, s["id"])  # 1% withheld (WC158)
     act(client, aubrey, b, "submit")
     approved = act(client, malou, b, "approve")
-    assert (approved["status"], approved["state"], approved["stateLabel"]) == ("draft", "to_check", "To check")
+    assert (approved["status"], approved["state"], approved["stateLabel"]) == ("draft", "to_check", "Tax check")
     assert balances(client, ana) == {}  # not in the books until it clears (decision 1)
     assert "bill.to_check" in kinds(client, rommel)
     done = act(client, rommel, b, "check")
@@ -100,6 +100,6 @@ def test_the_bills_list_has_a_tab_for_each_step(client, ana, team):
     listed = client.get("/finance/bills", headers=aubrey).json()
     assert {k: v for k, v in listed["counts"].items() if v} == {"draft": 1, "to_approve": 1, "to_check": 1, "returned": 1, "missing": 4}
     shown = client.get("/finance/bills?show=to_check", headers=aubrey).json()["items"]
-    assert [x["id"] for x in shown] == [drafts[2]["id"]] and shown[0]["stateLabel"] == "To check"
+    assert [x["id"] for x in shown] == [drafts[2]["id"]] and shown[0]["stateLabel"] == "Tax check"
     # Waiting bills aren't owed yet.
     assert next(x for x in client.get("/finance/suppliers", headers=aubrey).json()["items"] if x["id"] == s["id"])["owedCentavos"] == 0

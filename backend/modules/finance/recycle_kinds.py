@@ -35,6 +35,12 @@ def _entry_ids(db: Session, kind: str, row: dict) -> list[str]:
 
 def _guard_for(kind: str):
     def guard(db: Session, row: dict) -> None:
+        from modules.finance.purchase_intake import protect_bill
+        if kind == 'bill':protect_bill(db,row['id'])
+        if kind == 'entry':
+            from modules.finance.models import Bill
+            entry_ids=[id for id in (row['id'],row.get('reverses_id')) if id]
+            for bid in db.scalars(select(Bill.id).where(Bill.entry_id.in_(entry_ids))):protect_bill(db,bid)
         lock = _locked(db)
         days = [row["entry_date"]] if kind == "entry" and row.get("entry_date") else []
         ids = [row['id']] if kind == 'entry' else _entry_ids(db, kind, row)

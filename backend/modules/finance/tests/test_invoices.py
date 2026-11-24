@@ -125,3 +125,22 @@ def test_receivables_age_by_how_late_they_are(client, ana):  # noqa: F811 (a fix
     # The latest first.
     assert [c["name"] for c in got["customers"]] == ["Mercury Drug Makati", "Watsons BGC"]
     assert got["customers"][0]["invoices"][0] == {**got["customers"][0]["invoices"][0], "number": late["number"], "daysLate": 45, "bucket": "d31_60"}
+
+
+def test_per_line_income_account_splits_packaging_from_goods_sales(client, ana, ben):  # noqa: F811
+    ready(client, ana)
+    pkg = client.post("/finance/ledger/accounts", json={"code": "7002", "name": "Packaging Charges", "type": "income"}, headers=ana)
+    assert pkg.status_code == 201, pkg.text
+    pkg_id = pkg.json()["id"]
+    series = client.get("/finance/invoices/series", headers=ben).json()
+    assert any(a["id"] == pkg_id for a in series["incomeAccounts"])
+    inv = draft(client, ben, lines=[
+        {"description": "Exempt medicine", "quantity": 1, "unitPriceCentavos": 100000, "category": "exempt"},
+        {"description": "Cold-chain packaging fee", "quantity": 1, "unitPriceCentavos": 11200, "category": "standard", "accountId": pkg_id},
+    ])
+    assert pkg_id in inv["lineAccounts"]
+    res = client.post(f"/finance/invoices/{inv['id']}/issue", json={}, headers=ben)
+    assert res.status_code == 200, res.text
+    # Receivable = 1112.00; 4000 Sales = 1000.00; 7002 Packaging = 100.00; 2200 Output VAT = 12.00.
+    assert balances(client, ana) == {"1100": 111200, "4000": 100000, "7002": 10000, "2200": 1200}
+

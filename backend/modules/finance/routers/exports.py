@@ -92,7 +92,7 @@ def journal(
     settings: SettingsDep,
     since: date | None = Query(None, alias="from"),
     until: date | None = Query(None, alias="to"),
-    source: Literal["manual", "fund", "invoice", "bill", "voucher"] | None = None,
+    source: Literal["manual", "fund", "invoice", "bill", "voucher", "petty_cash", "expense"] | None = None,
     q: str | None = Query(None, max_length=100),
     state: Literal["waiting", "approved", "rejected"] | None = Query(None, alias="status"),
 ) -> Response:

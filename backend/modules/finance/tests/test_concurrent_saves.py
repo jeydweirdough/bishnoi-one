@@ -34,7 +34,7 @@ from modules.finance.security import hash_password
 from .test_auth import PASSWORD
 from .test_invoices import issued, ready
 from .test_payables import account
-from .test_tax_api import ana, client  # noqa: F401 (fixtures)
+from .test_tax_api import ana, client, review_fixture_accounts  # noqa: F401 (fixtures)
 from .test_vouchers import prepare, ready_bill, team  # noqa: F401 (fixtures)
 
 POSTGRES_ADMIN = os.environ.get("FINANCE_TEST_POSTGRES_ADMIN_URL")
@@ -43,6 +43,7 @@ BACKENDS = ["sqlite", pytest.param("postgresql", marks=pytest.mark.skipif(not PO
 
 def seeded(settings: Settings):
     app = create_app(settings)
+    review_fixture_accounts(app)
     with app.state.sessions() as db:
         db.add(User(email="ana@example.com", full_name="Ana Reyes", password_hash=hash_password(PASSWORD), role="admin"))
         db.add(User(email="ben@example.com", full_name="Ben Cruz", password_hash=hash_password(PASSWORD)))

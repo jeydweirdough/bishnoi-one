@@ -10,6 +10,14 @@ export type InvoiceLine = {
   discountCentavos: number;
   category: string;
   reliefEligible: boolean;
+  accountId?: string | null;
+};
+
+export type IncomeAccountOption = {
+  id: string;
+  code: string;
+  name: string;
+  isDefault?: boolean;
 };
 
 /** The tax engine's answer: the invoice as it prints (app/routers/tax.py work_out). */
@@ -99,6 +107,7 @@ export type Payment = {
 
 export type Invoice = InvoiceSummary & {
   lines: InvoiceLine[];
+  lineAccounts?: Record<string, IncomeAccountOption>;
   entryId: string | null;
   computed: Computed | null;
   /** Why a draft can't be worked out yet, saying where ("Customer's TIN: ..."). */

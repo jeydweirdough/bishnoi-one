@@ -85,12 +85,18 @@ def kept(before, after):
     if not set(before)-set(after)<=DROPPED_LATER:
         return False
     columns={t:{k for row in rows for k,_ in row} for t,rows in after.items()}
+    removed={'nbfi_bills':{'currency','rate_e4','foreign_total','foreign_payable'},'nbfi_payment_vouchers':{'rate_e4','exchange_centavos'},'nbfi_ledger_settings':{'fx_gain_account_id','fx_loss_account_id'}}
     for t,rows in before.items():
         if t in DROPPED_LATER and t not in after:
             continue
-        keep=columns[t] or {k for row in rows for k,_ in row}
-        if sorted((tuple(kv for kv in row if kv[0] in keep) for row in rows),key=repr)!=after[t]:
+        original={k for row in rows for k,_ in row}
+        if not (original-columns[t]) <= removed.get(t,set()):
             return False
+        keep=columns[t]&original
+        project=lambda records:sorted((tuple(kv for kv in row if kv[0] in keep) for row in records),key=repr)
+        if project(rows)!=project(after[t]):
+            return False
+
     return True
 
 
@@ -111,6 +117,16 @@ def test_both_0033_histories_keep_every_row(engine,tmp_path,line):
     start(engine,tmp_path,line)
     seed(engine,line)
     before=snapshot(engine)
+    command.upgrade(_config(engine), '0034')
+    at_convergence=snapshot(engine)
+    # Validate0034 at its own schema version, before later migrations add columns.
+    from alembic.operations import Operations
+    from alembic.migration import MigrationContext
+    with engine.begin() as c:
+        step=runpy.run_path(str(API_DIR/'migrations/versions/0034_reconcile_petty_cash_and_recycle_bin.py'))['upgrade']
+        step.__globals__['op']=Operations(MigrationContext.configure(c))
+        step()
+    assert snapshot(engine)==at_convergence
     upgrade(engine)
     upgrade(engine)
     after=snapshot(engine)
@@ -121,14 +137,6 @@ def test_both_0033_histories_keep_every_row(engine,tmp_path,line):
         if engine.dialect.name=='sqlite':
             assert c.execute(text('PRAGMA integrity_check')).scalar_one()=='ok'
             assert not c.execute(text('PRAGMA foreign_key_check')).all()
-    # A second direct 0034 call validates the state where both sets already exist.
-    from alembic.operations import Operations
-    from alembic.migration import MigrationContext
-    with engine.begin() as c:
-        step=runpy.run_path(str(API_DIR/'migrations/versions/0034_reconcile_petty_cash_and_recycle_bin.py'))['upgrade']
-        step.__globals__['op']=Operations(MigrationContext.configure(c))
-        step()
-    assert snapshot(engine)==after
 
 
 @pytest.mark.parametrize('damage', ['partial','column','index','recycle-column','check','fk'])

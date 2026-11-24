@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { screen } from "@/src/modules/finance/lib/links";
+import { Pager } from "@/src/platform/ui/pager";
+import { pageOf } from "@/src/platform/ui/paging";
 import { buttonClass } from "@/src/modules/finance/platform/ui/button";
 import { Empty, PageHeader, Sheet } from "@/src/modules/finance/platform/ui/sheet";
 import { enc, getCompanyMe, load } from "@/src/modules/finance/platform/lib/api";
@@ -18,8 +21,7 @@ const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "
 const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 const withQuery = (path: string, query: URLSearchParams) => (query.size ? `${path}?${query}` : path);
 
-// The journal shows this many entries; the download has all of them.
-const JOURNAL_LIMIT = 200;
+const JOURNAL_SIZES = [10, 25, 50, 100];
 
 const inputClass = "ml-2 h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm";
 
@@ -28,19 +30,31 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
   const me = await getCompanyMe();
   const fmt = makeFormat(me.org);
   const sp = await searchParams;
+  const size = JOURNAL_SIZES.includes(Number(one(sp.size))) ? Number(one(sp.size)) : 25;
+  let page = Math.min(pageOf(sp.page), 1000000);
   const source = one(sp.source);
   const state = one(sp.status);
   const [from, to, q] = [one(sp.from), one(sp.to), one(sp.q).trim().slice(0, 100)];
   // What the page is showing: kept by the source links, the search form and the download.
   const shown = new URLSearchParams();
-  if (source === "manual" || source === "fund" || source === "invoice" || source === "bill" || source === "voucher") shown.set("source", source);
+  if (["manual", "fund", "invoice", "bill", "voucher", "petty_cash", "expense"].includes(source)) shown.set("source", source);
   if (state === "waiting" || state === "rejected") shown.set("status", state);
   if (isDate(from)) shown.set("from", from);
   if (isDate(to)) shown.set("to", to);
   if (q) shown.set("q", q);
   const query = new URLSearchParams(shown);
-  query.set("limit", String(JOURNAL_LIMIT));
-  const [entries, chart] = await Promise.all([load<{ items: Entry[] }>(`/finance/ledger/entries?${query}`), load<Chart>("/finance/ledger/accounts")]);
+  query.set("limit", String(size));
+  query.set("offset", String((page - 1) * size));
+  let [entries, chart] = await Promise.all([load<{ items: Entry[]; total: number }>(`/finance/ledger/entries?${query}`), load<Chart>("/finance/ledger/accounts")]);
+  const last = Math.max(1, Math.ceil(entries.total / size));
+  if (page > last) {
+    page = last;
+    query.set("offset", String((page - 1) * size));
+    entries = await load<{ items: Entry[]; total: number }>(`/finance/ledger/entries?${query}`);
+  }
+  const paging = new URLSearchParams(shown);
+  paging.set("size", String(size));
+  const pager = <Pager total={entries.total} page={page} size={size} base={withQuery("/finance/ledger", paging)} noun="entries" />;
   // One row of links: where entries came from, or where they stand in approval.
   const filters = [
     { value: "", label: "All" },
@@ -50,11 +64,14 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
     { value: "invoice", label: "Invoices", by: "source" },
     { value: "bill", label: "Bills", by: "source" },
     { value: "voucher", label: "Payment vouchers", by: "source" },
+    { value: "petty_cash", label: "Petty cash", by: "source" },
+    { value: "expense", label: "Zoho expenses", by: "source" },
     { value: "rejected", label: "Rejected", by: "status" },
   ];
   const current = shown.get("status") ?? shown.get("source") ?? "";
   const filterHref = (f: (typeof filters)[number]) => {
     const next = new URLSearchParams(shown);
+    next.set("size", String(size));
     next.delete("source");
     next.delete("status");
     if (f.by) next.set(f.by, f.value);
@@ -68,7 +85,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
       <PageHeader title="Journal entries" actions={<DownloadLink href={withQuery("/finance/ledger/export", shown)} />}>
         All entries, newest first. Marketing requests post their entries automatically at release, liquidation, refund and reimbursement, invoices when issued or voided, and supplier
         bills when recorded or voided: those count at once. An entry typed by hand, or a reversal, waits until someone who may approve entries, not whoever posted it, approves it; only then does it count.
-        Entries are never edited: reverse an entry and post the correction.
+        Entries are never edited: reverse an entry and post the correction. CSV includes every matching entry, across all pages.
       </PageHeader>
       {me.permissions?.includes("journal.post") && (
         <div className="mb-4">
@@ -102,6 +119,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
           Search
           <input suppressHydrationWarning type="search" name="q" defaultValue={q} maxLength={100} placeholder="Entry no., memo or reference" className={`${inputClass} w-64`} />
         </label>
+        <label className="text-meta text-ink-2">Entries per page<select suppressHydrationWarning name="size" defaultValue={size} className={inputClass}>{JOURNAL_SIZES.map(n => <option key={n} value={n}>{n}</option>)}</select></label>
         <button suppressHydrationWarning type="submit" className={buttonClass("default", "sm")}>
           Show
         </button>
@@ -131,8 +149,10 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
           )}
         </Sheet>
       ) : (
-        <div className="space-y-3">
-          {several && <ApproveSeveral />}
+        <div className="min-w-0">
+          <div className="mb-3">{pager}</div>
+          <div key={`${page}:${size}:${source}:${state}:${from}:${to}:${q}`} role="region" aria-label={"Journal entries, page " + page} tabIndex={0} className="max-h-[65vh] min-w-0 space-y-3 overflow-auto overscroll-contain rounded-xl border border-rule bg-bench/30 p-2 focus-visible:outline-2 focus-visible:outline-hema print:max-h-none print:overflow-visible">
+          {several && <><p className="px-2 text-meta text-ink-3">Approval selections apply to this page only.</p><ApproveSeveral /></>}
           {entries.items.map((e) => (
             <Sheet key={e.id} className={`scroll-mt-4 px-5 py-3 ${e.status === "rejected" ? "opacity-75" : ""}`}>
               <span id={e.number} />
@@ -142,7 +162,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                 )}
                 <p className={`font-mono text-meta font-semibold ${e.status === "rejected" ? "line-through" : ""}`}>{e.number}</p>
                 <p className="text-meta text-ink-3">{fmt.dateLabel(e.date)}</p>
-                <p className="min-w-0 flex-1 text-sm">
+                <p className="min-w-[12rem] flex-1 break-words text-sm">
                   {e.memo}
                   {e.reference && <span className="text-ink-3"> · Ref. {e.reference}</span>}
                 </p>
@@ -163,7 +183,9 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                 )}
                 {e.status === "approved" && !e.reversedById && !e.reversesId && me.permissions?.includes("journal.reverse") && <ReverseButton id={e.id} number={e.number} />}
               </div>
-              <table className="mt-2 w-full text-sm">
+              <table className="mt-2 w-full min-w-[36rem] text-sm">
+                <caption className="sr-only">Lines for {e.number}</caption>
+                <thead><tr className="border-t border-rule text-left text-meta text-ink-3"><th scope="col" className="py-1.5 font-medium">Account</th><th scope="col" className="w-36 py-1.5 text-right font-medium">Debit</th><th scope="col" className="w-36 py-1.5 text-right font-medium">Credit</th></tr></thead>
                 <tbody>
                   {e.lines.map((ln, i) => (
                     <tr key={i} className="border-t border-rule">
@@ -196,27 +218,32 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
               )}
             </Sheet>
           ))}
-          {entries.items.length === JOURNAL_LIMIT && (
-            <p className="px-1 text-meta text-ink-3">
-              Showing the newest {JOURNAL_LIMIT} entries. Pick dates or search to find older ones, or download the CSV for all of them.
-            </p>
-          )}
+          </div>
+          {pager}
         </div>
       )}
     </>
   );
 }
 
-export async function ChartPage() {
-  const chart = await load<Chart>("/finance/ledger/accounts");
+export async function ChartPage({ searchParams }: { searchParams: Search }) {
+  const me = await getCompanyMe();
+  const requested = one((await searchParams).company_use);
+  const companyUse = ["history", "review", "legacy", "all"].includes(requested) ? requested : "2mg";
+  const chart = await load<Chart>(`/finance/ledger/accounts?company_use=${companyUse}`);
+  const canApprove2mg = companyUse !== "2mg" && Boolean(me.permissions?.includes("accounts.manage"));
   return (
     <>
       <PageHeader title="Chart of accounts">
         The accounts all journal entries post to. An account with entries keeps its type: deactivate it rather than deleting it. Each expense category posts to
         one of the expense accounts. A chart can be brought in from a CSV (Oojeema&apos;s or Zoho&apos;s export) with Import from a file.
       </PageHeader>
+      <nav aria-label="Account company use" className="mb-3 flex flex-wrap gap-3 text-sm">
+        {[['2mg', '2MG accounts'], ['history', 'Retained history (read only)']].map(([value, label]) => <Link key={value} href={screen(`/ledger/accounts?company_use=${value}`)} aria-current={companyUse === value ? "page" : undefined} className={companyUse === value ? "font-semibold text-hema underline" : "text-ink-2 hover:underline"}>{label}</Link>)}
+      </nav>
+      {companyUse !== '2mg' && <p className="mb-3 text-meta">These accounts are retained outside active 2MG use. Select accounts below to approve them for 2MG, or leave them here as historical links.</p>}
       <Sheet className="px-5 py-4">
-        <ChartEditor accounts={chart.items} canEdit={chart.canEdit} importer={<ChartImport />} />
+        <ChartEditor accounts={chart.items} canEdit={chart.canEdit} canApprove2mg={canApprove2mg} importer={<ChartImport key="import" />} />
       </Sheet>
     </>
   );
@@ -256,47 +283,49 @@ export async function AccountPage({ params, searchParams }: { params: Promise<{ 
           Show
         </button>
       </form>
-      <Sheet className="overflow-x-auto">
-        <table className="w-full min-w-[40rem] text-sm">
-          <thead>
-            <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-              <th className="px-5 py-2.5 font-semibold">Date</th>
-              <th className="px-3 py-2.5 font-semibold">Entry</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Debit</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Credit</th>
-              <th className="px-5 py-2.5 text-right font-semibold">Balance</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-rule">
-            {isDate(from) && (
-              <tr className="text-ink-2">
-                <td className="px-5 py-2" colSpan={4}>
-                  Opening balance
-                </td>
-                <td className="px-5 py-2 text-right tabular-nums">{fmt.peso(ledger.openingCentavos)}</td>
+      <Sheet className="min-w-0 max-w-full">
+        <div role="region" aria-label="Account ledger entries" tabIndex={0} className="max-h-[62vh] max-w-full overflow-auto overscroll-contain rounded-xl focus-visible:outline-2 focus-visible:outline-hema print:max-h-none print:overflow-visible">
+          <table className="w-full min-w-[40rem] text-sm">
+            <thead className="sticky top-0 z-10 bg-sheet shadow-[0_1px_0_0_var(--color-rule)] print:static">
+              <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
+                <th className="px-5 py-2.5 font-semibold">Date</th>
+                <th className="px-3 py-2.5 font-semibold">Entry</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Debit</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Credit</th>
+                <th className="px-5 py-2.5 text-right font-semibold">Balance</th>
               </tr>
-            )}
-            {ledger.lines.map((ln, i) => (
-              <tr key={i}>
-                <td className="px-5 py-2 whitespace-nowrap text-ink-2">{fmt.dateLabel(ln.date)}</td>
-                <td className="px-3 py-2">
-                  <span className="font-mono text-meta">{ln.number}</span> {ln.memo}
-                  {ln.description && <span className="text-ink-3"> · {ln.description}</span>}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">{ln.debitCentavos ? fmt.peso(ln.debitCentavos) : ""}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{ln.creditCentavos ? fmt.peso(ln.creditCentavos) : ""}</td>
-                <td className="px-5 py-2 text-right font-medium tabular-nums">{fmt.peso(ln.balanceCentavos)}</td>
-              </tr>
-            ))}
-            {ledger.lines.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-5 py-6 text-center text-meta text-ink-3">
-                  No entries in this period.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-rule">
+              {isDate(from) && (
+                <tr className="text-ink-2">
+                  <td className="px-5 py-2" colSpan={4}>
+                    Opening balance
+                  </td>
+                  <td className="px-5 py-2 text-right tabular-nums">{fmt.peso(ledger.openingCentavos)}</td>
+                </tr>
+              )}
+              {ledger.lines.map((ln, i) => (
+                <tr key={i} className="hover:bg-bench/30">
+                  <td className="px-5 py-2 whitespace-nowrap text-ink-2">{fmt.dateLabel(ln.date)}</td>
+                  <td className="px-3 py-2">
+                    <span className="font-mono text-meta font-semibold">{ln.number}</span> {ln.memo}
+                    {ln.description && <span className="text-ink-3"> · {ln.description}</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{ln.debitCentavos ? fmt.peso(ln.debitCentavos) : ""}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{ln.creditCentavos ? fmt.peso(ln.creditCentavos) : ""}</td>
+                  <td className="px-5 py-2 text-right font-medium tabular-nums">{fmt.peso(ln.balanceCentavos)}</td>
+                </tr>
+              ))}
+              {ledger.lines.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-6 text-center text-meta text-ink-3">
+                    No entries in this period.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </Sheet>
     </>
   );
@@ -324,48 +353,75 @@ export async function TrialBalancePage({ searchParams }: { searchParams: Search 
           </>
         )}
       </PageHeader>
-      <form className="mb-4 flex items-end gap-3" action="/finance/ledger/trial-balance">
-        <label className="text-meta text-ink-2">
-          As of
-          <input suppressHydrationWarning type="date" name="to" defaultValue={tb.to} className="ml-2 h-8 rounded-lg border border-rule-strong bg-sheet px-2 text-sm" />
-        </label>
-        <button suppressHydrationWarning type="submit" className="h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold hover:border-control">
-          Show
-        </button>
-      </form>
-      <Sheet className="overflow-x-auto">
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <Sheet className="px-4 py-3.5">
+          <p className="text-meta text-ink-3">Total debits</p>
+          <p className="mt-1 text-heading tabular-nums">{fmt.peso(tb.debitCentavos)}</p>
+        </Sheet>
+        <Sheet className="px-4 py-3.5">
+          <p className="text-meta text-ink-3">Total credits</p>
+          <p className="mt-1 text-heading tabular-nums">{fmt.peso(tb.creditCentavos)}</p>
+        </Sheet>
+        <Sheet className="px-4 py-3.5">
+          <p className="text-meta text-ink-3">Trial balance status ({tb.rows.length} accounts)</p>
+          <p className={`mt-1 text-heading font-semibold ${balanced ? "text-sage-deep" : "text-danger"}`}>
+            {balanced ? "Balanced (₱0.00 diff)" : `Out of balance by ${fmt.peso(Math.abs(tb.debitCentavos - tb.creditCentavos))}`}
+          </p>
+        </Sheet>
+      </div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rule bg-sheet px-4 py-3">
+        <form className="flex flex-wrap items-center gap-3" action="/finance/ledger/trial-balance">
+          <label className="flex items-center gap-2 text-meta font-medium text-ink-2">
+            As of
+            <input suppressHydrationWarning type="date" name="to" defaultValue={tb.to} className="h-8 rounded-lg border border-rule-strong bg-sheet px-2.5 text-sm text-ink" />
+          </label>
+          <button suppressHydrationWarning type="submit" className="h-8 rounded-lg border border-rule-strong bg-sheet px-3 text-meta font-semibold text-ink hover:border-control">
+            Show
+          </button>
+        </form>
+        <span className="text-meta text-ink-3">Click any account row to inspect its ledger transactions</span>
+      </div>
+      <Sheet className="min-w-0 max-w-full">
         {tb.rows.length === 0 ? (
           <Empty title="No entries yet" icon="lists" />
         ) : (
-          <table className="w-full min-w-[36rem] text-sm">
-            <thead>
-              <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
-                <th className="px-5 py-2.5 font-semibold">Account</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Debit</th>
-                <th className="px-5 py-2.5 text-right font-semibold">Credit</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-rule">
-              {tb.rows.map((r) => (
-                <tr key={r.account.id}>
-                  <td className="px-5 py-2">
-                    <Link href={`/finance/ledger/accounts/${r.account.id}`} className="hover:text-hema hover:underline">
-                      <span className="font-mono text-meta text-ink-2">{r.account.code}</span> {r.account.name}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.debitCentavos ? fmt.peso(r.debitCentavos) : ""}</td>
-                  <td className="px-5 py-2 text-right tabular-nums">{r.creditCentavos ? fmt.peso(r.creditCentavos) : ""}</td>
+          <div role="region" aria-label="Trial balance table" tabIndex={0} className="max-h-[60vh] max-w-full overflow-auto overscroll-contain rounded-xl focus-visible:outline-2 focus-visible:outline-hema print:max-h-none print:overflow-visible">
+            <table className="w-full min-w-[36rem] text-sm">
+              <thead className="sticky top-0 z-10 bg-sheet shadow-[0_1px_0_0_var(--color-rule)] print:static">
+                <tr className="border-b border-rule text-left text-caps text-ink-3 uppercase">
+                  <th className="w-28 py-2.5 pr-3 pl-5 font-semibold">Code</th>
+                  <th className="px-3 py-2.5 font-semibold">Account</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Debit</th>
+                  <th className="px-5 py-2.5 text-right font-semibold">Credit</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className={`border-t-2 border-ink font-semibold tabular-nums ${balanced ? "" : "text-danger"}`}>
-                <td className="px-5 py-2.5">Total</td>
-                <td className="px-3 py-2.5 text-right">{fmt.peso(tb.debitCentavos)}</td>
-                <td className="px-5 py-2.5 text-right">{fmt.peso(tb.creditCentavos)}</td>
-              </tr>
-            </tfoot>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-rule">
+                {tb.rows.map((r) => (
+                  <tr key={r.account.id} className="transition-colors hover:bg-bench/30">
+                    <td className="py-2.5 pr-3 pl-5 font-mono text-meta font-semibold text-ink-2">
+                      <Link href={`/finance/ledger/accounts/${r.account.id}`} className="hover:text-hema hover:underline">
+                        {r.account.code}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <Link href={`/finance/ledger/accounts/${r.account.id}`} className="font-medium text-ink hover:text-hema hover:underline">
+                        {r.account.name}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{r.debitCentavos ? fmt.peso(r.debitCentavos) : ""}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums">{r.creditCentavos ? fmt.peso(r.creditCentavos) : ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="sticky bottom-0 z-10 bg-sheet shadow-[0_-1px_0_0_var(--color-ink)] print:static">
+                <tr className={`border-t-2 border-ink font-semibold tabular-nums ${balanced ? "" : "text-danger"}`}>
+                  <td className="py-3 pr-3 pl-5" colSpan={2}>Total</td>
+                  <td className="px-3 py-3 text-right">{fmt.peso(tb.debitCentavos)}</td>
+                  <td className="px-5 py-3 text-right">{fmt.peso(tb.creditCentavos)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         )}
       </Sheet>
     </>

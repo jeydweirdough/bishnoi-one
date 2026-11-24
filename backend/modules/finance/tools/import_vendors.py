@@ -83,8 +83,9 @@ def main() -> None:
             if fields:
                 audit(db, WHO, "supplier.updated", target=s.name, target_type="supplier", target_id=s.id, fields=fields)
                 changed += 1
+        account_summary = sorted(accounts) or "none (set supplier accounts explicitly)"
         print(f"{url.split('@')[-1].split('?')[0]}: {added} added, {changed} filled in, {len(rows) - added - changed} unchanged; "
-              f"payables accounts found: {sorted(accounts) or 'none (set each supplier's account by hand)'}")
+              f"payables accounts found: {account_summary}")
         if args.dry_run:
             db.rollback()
             print("Dry run: nothing saved.")
