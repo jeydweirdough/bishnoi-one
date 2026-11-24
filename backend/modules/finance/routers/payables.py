@@ -280,9 +280,7 @@ def add_supplier(user: permitted("suppliers.add"), db: DB, body: SupplierIn) -> 
     apply_supplier(db, s, body)
     db.add(s)
     db.flush()
-    # Explicit manual entry in this 2MG workspace.
-    db.add(CompanyScopeReview(subject_kind='supplier', subject_id=s.id, scope='2mg',
-                             evidence={'source':'manual entry in 2MG Finance'}, reviewed_by=user.full_name))
+    company_scope.mark_new(db, 'supplier', s.id, reviewed_by=user.full_name)
     audit(db, user, "supplier.created", target=s.name, target_type="supplier", target_id=s.id)
     db.commit()
     return supplier_out(db, s, 0)

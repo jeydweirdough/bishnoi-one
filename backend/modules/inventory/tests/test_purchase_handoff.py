@@ -12,7 +12,7 @@ from .conftest import settings_for,PEOPLE,PASSWORD,receive,level
 
 @pytest.fixture
 def app(tmp_path):
-    a=create_app(settings_for(tmp_path,default_company='2mg',dev_companies=['2mg'],purchase_handoff_enabled=True))
+    a=create_app(settings_for(tmp_path,default_company='2mg',dev_companies=['2mg']))
     with a.state.sessions() as db:
         for who,role in PEOPLE.items():
             rid=db.scalar(select(Role.id).where(Role.name==role))
@@ -50,8 +50,8 @@ def test_counting_alone_does_not_send_and_two_clicks_send_once(app,ana,world):
 def test_normal_receiver_does_not_gain_send_authority(app,ana,world,client,people):
     r=receipt(ana,world)
     assert client.post('/inventory/receipts/'+r['id']+'/finance-handoff',json={},headers=people['wes']).status_code==403
-    app.state.settings.purchase_handoff_enabled=False
-    assert client.post('/inventory/receipts/'+r['id']+'/finance-handoff',json={},headers=people['ana']).status_code==409
+    # Any company sends its receipts to its own Finance; no separate switch (2026-11-24).
+    assert client.post('/inventory/receipts/'+r['id']+'/finance-handoff',json={},headers=people['ana']).status_code==200
 
 
 def test_finance_reply_is_versioned_and_cleanup_is_blocked(app,ana,world):
@@ -63,7 +63,7 @@ def test_finance_reply_is_versioned_and_cleanup_is_blocked(app,ana,world):
         accept_status(db,data|{'version':1,'remaining':60},'2mg');db.commit()
         assert h.remaining==10
         with pytest.raises(HTTPException):protect(db,'receipt',r['id'])
-        with pytest.raises(HTTPException):accept_status(db,data,'gpi')
+        # A reply for another company is opened in that company's database (business_events), never here.
     saved=ana.get('/inventory/receipts/'+r['id'])
     assert saved['financeHandoff']['remaining']==10 and saved['financeHandoff']['state']=='partially_allocated'
 

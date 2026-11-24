@@ -239,9 +239,9 @@ export async function ChartPage({ searchParams }: { searchParams: Search }) {
         one of the expense accounts. A chart can be brought in from a CSV (Oojeema&apos;s or Zoho&apos;s export) with Import from a file.
       </PageHeader>
       <nav aria-label="Account company use" className="mb-3 flex flex-wrap gap-3 text-sm">
-        {[['2mg', '2MG accounts'], ['history', 'Retained history (read only)']].map(([value, label]) => <Link key={value} href={screen(`/ledger/accounts?company_use=${value}`)} aria-current={companyUse === value ? "page" : undefined} className={companyUse === value ? "font-semibold text-hema underline" : "text-ink-2 hover:underline"}>{label}</Link>)}
+        {[['2mg', 'Accounts in use'], ['history', 'Retained history (read only)']].map(([value, label]) => <Link key={value} href={screen(`/ledger/accounts?company_use=${value}`)} aria-current={companyUse === value ? "page" : undefined} className={companyUse === value ? "font-semibold text-hema underline" : "text-ink-2 hover:underline"}>{label}</Link>)}
       </nav>
-      {companyUse !== '2mg' && <p className="mb-3 text-meta">These accounts are retained outside active 2MG use. Select accounts below to approve them for 2MG, or leave them here as historical links.</p>}
+      {companyUse !== '2mg' && <p className="mb-3 text-meta">These accounts are kept outside active use. Select accounts below to put them back in use, or leave them here as historical links.</p>}
       <Sheet className="px-5 py-4">
         <ChartEditor accounts={chart.items} canEdit={chart.canEdit} canApprove2mg={canApprove2mg} importer={<ChartImport key="import" />} />
       </Sheet>

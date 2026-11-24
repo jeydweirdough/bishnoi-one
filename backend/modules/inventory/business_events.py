@@ -212,8 +212,8 @@ def take_event(body: NoteIn, request: Request) -> Response:
     item = claims.get("event") if claims else None
     if not isinstance(item, dict) or not item.get("id") or not item.get("kind"):
         raise _nowhere()
-    if item["kind"] == "purchase.receipt_finance_updated" and (claims["slug"] != "2mg" or item.get("source") != "finance"):
-        raise HTTPException(409, "Only Finance may acknowledge a 2MG receipt handoff.")
+    if item["kind"] == "purchase.receipt_finance_updated" and item.get("source") != "finance":
+        raise HTTPException(409, "Only Finance may acknowledge a receipt handoff.")
     remember_company(request.app.state.settings, claims["slug"])
     with sessions_for(request, claims["slug"])() as db:
         if db.get(InboxEvent, str(item["id"])) is None:

@@ -23,11 +23,12 @@ def approved(app):
         db.commit()
 
 
-def test_empty_scope_is_not_verification(app,client,ana):
+def test_books_nobody_reviewed_use_their_accounts(app,client,ana):
+    # The company review is 2MG's; a company starting fresh (Getmeds on the one system) uses its chart as it is (2026-11-24).
     with app.state.sessions() as db:
         db.execute(delete(CompanyScopeReview));db.commit()
-    assert client.get('/finance/bills/choices',headers=ana).json()['accounts']==[]
-    assert client.get('/finance/ledger/accounts',headers=ana).json()['items']==[]
+    assert client.get('/finance/bills/choices',headers=ana).json()['accounts']
+    assert client.get('/finance/ledger/accounts',headers=ana).json()['items']
 
 
 def test_direct_new_bill_refuses_hidden_legacy_account(app,client,ana,approved):
@@ -139,7 +140,7 @@ def test_unknown_consignment_vendor_is_held_without_committing_a_bill(app):
         assert db.scalar(select(Supplier).where(Supplier.name=='TEST unknown source')) is None
 
 
-def test_signed_wrong_company_event_does_not_reach_finance(app,client,monkeypatch):
+def test_finance_takes_its_own_companys_events(app,client,monkeypatch):
     from modules.finance import business_events
     from modules.finance.business_events import InboxEvent
     from .test_platform_roles import note
@@ -148,12 +149,12 @@ def test_signed_wrong_company_event_does_not_reach_finance(app,client,monkeypatc
     called=[]
     monkeypatch.setitem(business_events.HANDLERS,'delivery.done',lambda *args:called.append(True))
     event={'id':'TEST-other-company-event','kind':'delivery.done','source':'inventory','data':{}}
-    for slug, expected in [('gpi',409),('getmeds',409),('',404)]:
-        r=client.post('/platform/events',json={'pass':note('event',event=event,slug=slug)})
-        assert r.status_code==expected
-        if expected==409:assert '2MG' in r.text
-    assert called==[]
-    with app.state.sessions() as db:assert db.get(InboxEvent,event['id']) is None
+    # Finance keeps one company's books and takes that company's events, whichever company it is (2026-11-24).
+    r=client.post('/platform/events',json={'pass':note('event',event=event,slug='')})
+    assert r.status_code==404 and called==[]
+    r=client.post('/platform/events',json={'pass':note('event',event=event,slug='getmeds')})
+    assert r.status_code==204 and called==[True]
+    with app.state.sessions() as db:assert db.get(InboxEvent,event['id']) is not None
 
 
 def test_unverified_account_cannot_be_a_new_parent_or_default(app,client,ana):

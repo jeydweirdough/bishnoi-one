@@ -113,9 +113,7 @@ def add_account(user: permitted("accounts.manage"), db: DB, body: AccountIn) -> 
     a = Account(**body.model_dump())
     db.add(a)
     db.flush()
-    # Explicit manual entry in this 2MG workspace.
-    db.add(CompanyScopeReview(subject_kind='account', subject_id=a.id, scope='2mg',
-                             evidence={'source':'manual entry in 2MG Finance'}, reviewed_by=user.full_name))
+    company_scope.mark_new(db, 'account', a.id, reviewed_by=user.full_name)
     audit(db, user, "account.created", target=f"{a.code} {a.name}", target_type="account", target_id=a.id)
     db.commit()
     return account_out(a)

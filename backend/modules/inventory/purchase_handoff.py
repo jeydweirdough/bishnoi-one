@@ -60,13 +60,11 @@ def existing(db,r):
 
 
 def reason(db,r,settings):
-    if settings.company!='2mg':return 'Only 2MG purchase receipts can be sent to Finance.'
     if not r.order_id or not r.supplier_id:return 'This action is for supplier deliveries against a purchase order.'
     if r.consignment:return 'Consignment is billed through its separate settlement flow.'
     check=db.scalar(select(QualityCheck).where(QualityCheck.receipt_id==r.id))
     if check and check.status!='done':return 'Quality checking is pending. Accepted quantities must be settled before this ordinary bill handoff.'
     if any(not ln.order_line_id for ln in r.lines):return 'Receiving evidence needs a purchase-order line for every received line.'
-    if not settings.purchase_handoff_enabled:return 'The receipt-to-Finance connection has not been enabled for this test installation.'
     return None
 
 
@@ -86,7 +84,6 @@ def protect(db,kind,id):
 
 
 def accept_status(db,data,slug):
-    if slug!='2mg':raise HTTPException(409,'Only 2MG handoff replies are accepted.')
     try:body=Reply.model_validate(data)
     except ValueError:raise HTTPException(422,'Invalid Finance status reply.') from None
     begin(db)
@@ -137,6 +134,6 @@ def send(receipt_id:str,_:allowed('receiving.send_to_finance'),me:CurrentUser,db
     handoff_id=str(uuid.uuid4());data=snapshot(db,r,handoff_id)
     h=ReceiptHandoff(id=handoff_id,receipt_id=r.id,supplier_id=r.supplier_id,order_id=r.order_id,
         digest=fingerprint(data),snapshot=data,sent_by=me.full_name,remaining=sum(ln.quantity for ln in r.lines))
-    db.add(h);emit(db,'2mg','purchase.receipt_submitted',data)
+    db.add(h);emit(db,settings.company,'purchase.receipt_submitted',data)
     audit(db,me,'receipt.sent_to_finance',target=r.number,target_type='receipt',target_id=r.id)
     db.commit();return projection(db,r,settings,True)

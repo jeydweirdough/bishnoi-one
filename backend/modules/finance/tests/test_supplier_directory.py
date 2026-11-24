@@ -20,7 +20,8 @@ def test_directory_import_without_row_reviews_and_repeat_is_idempotent(client,an
     assert response.json()['added']==200
     again=client.post('/finance/suppliers/import',headers=ana,json={'rows':rows,'confirmed':True})
     assert again.json()['added']==0 and again.json()['counts']['here']==200
-    assert client.get('/finance/suppliers',headers=ana).json()['items']==[]
+    # Books nobody reviewed use their suppliers as they are (2026-11-24); a reviewed company's import waits for review.
+    assert len(client.get('/finance/suppliers',headers=ana).json()['items'])==200
     saved=client.get('/finance/suppliers?company_use=all',headers=ana).json()['items']
     assert len(saved)==200 and all(not s['taxDefaultsConfirmed'] for s in saved)
     assert all(s['contacts'][0]['phone']=='09990000000' for s in saved)

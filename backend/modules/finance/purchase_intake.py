@@ -120,7 +120,7 @@ def out(db,item):
         if a.active:used[a.source_line_id]=used.get(a.source_line_id,0)+a.quantity
     s=supplier_for(db,item)
     holds=[]
-    if not s:holds.append('Link this Inventory vendor to a verified active 2MG supplier.')
+    if not s:holds.append('Link this Inventory vendor to an active Finance supplier.')
     if not item.snapshot['qualityReady']:holds.append('Receiving quality/accepted quantities need review.')
     if item.snapshot['currencyEvidence']!='PHP':holds.append('Only PHP bills are supported. Review foreign source evidence separately.')
     if item.reason:holds.append(item.reason)
@@ -144,14 +144,13 @@ def reply(db,item):
     if detail['remaining']==0:done(db,'purchase.received',link)
     elif not db.scalar(select(Notification.id).where(Notification.kind=='purchase.received',Notification.link==link,Notification.read_at.is_(None)).limit(1)):
         tell(db,holders(db,'bills.create'),'purchase.received','A received purchase needs Finance attention; open it to see the next owner.',link=link)
-    emit(db,'2mg','purchase.receipt_finance_updated',{'schemaVersion':1,'handoffId':item.handoff_id,
+    emit(db,None,'purchase.receipt_finance_updated',{'schemaVersion':1,'handoffId':item.handoff_id,
         'receiptId':item.receipt_id,'digest':item.digest,'version':item.version,'state':detail['state'],
         'remaining':detail['remaining'],'reason':item.reason or (detail['holds'][0] if detail['holds'] else None),
         'bills':[{'id':b['id'],'state':b['state']} for b in detail['bills']]})
 
 
 def receive(db,data,slug):
-    if slug!='2mg':raise HTTPException(409,'Only 2MG purchase evidence is accepted.')
     try: body=ReceiptEvidence.model_validate(data)
     except ValueError:raise HTTPException(422,'Invalid purchase receipt contract; no bill was created.') from None
     snapshot=body.model_dump();ids=[ln.id for ln in body.lines]
@@ -238,7 +237,7 @@ def link_supplier(id:str,body:SupplierLinkIn,user:permitted('suppliers.edit'),db
     if item.version!=body.version:raise HTTPException(409,'This receipt changed. Reload before linking its supplier.')
     company_scope.require_ids(db,'supplier',[body.supplierId])
     s=db.get(Supplier,body.supplierId)
-    if not s or not s.is_active:raise HTTPException(422,'Choose an active verified 2MG supplier.')
+    if not s or not s.is_active:raise HTTPException(422,'Choose an active Finance supplier.')
     key=('2mg',item.snapshot['supplierId']);old=db.get(PurchaseSupplierLink,key)
     if old and old.supplier_id!=s.id:raise HTTPException(409,'This source vendor is already linked. A reviewed crosswalk correction is required.')
     if not old:db.add(PurchaseSupplierLink(company='2mg',source_supplier_id=key[1],supplier_id=s.id,reviewed_by=user.full_name,evidence=body.evidence))
@@ -336,7 +335,7 @@ def prepare(body:PrepareIn,user:permitted('bills.create'),db:DB,settings:Setting
     db.add(Preparation(request_id=body.requestId,digest=fingerprint,invoice_key=invoice_key,bill_id=b.id));db.flush()
     for item in items.values():item.version+=1;db.flush();reply(db,item)
     from modules.finance.business_events import link,ref
-    for item in items.values():link(db,'2mg',ref('receipt',item.receipt_id,item.snapshot['receiptNumber'],'inventory'),ref('bill',b.id,b.bill_number))
+    for item in items.values():link(db,None,ref('receipt',item.receipt_id,item.snapshot['receiptNumber'],'inventory'),ref('bill',b.id,b.bill_number))
     audit(db,user,'purchase.bill_prepared',target='Draft bill from received quantities',target_type='bill',target_id=b.id)
     db.commit();return bill_out(db,b,user)
 

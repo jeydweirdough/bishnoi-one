@@ -35,7 +35,7 @@ Pack.model_rebuild()
 def inspect_pack(body,db,settings):
     money=money_account_ids(db);all_accounts=list(db.scalars(select(Account)))
     parents={a.parent_id for a in all_accounts if a.parent_id}
-    eligible=set(db.scalars(company_scope.reviewed_ids('account','2mg')))
+    eligible=set(db.scalars(select(Account.id).where(company_scope.usable_clause('account',Account.id))))
     accounts=[{'id':a.id,'code':a.code,'name':a.name,'type':a.type,'active':a.is_active,'posting':a.id not in parents,'money':a.id in money} for a in all_accounts if a.id in eligible]
     # Do not mix identities across organisations, or call Zoho to enrich an upload.
     from modules.finance.zoho_connection import saved_record

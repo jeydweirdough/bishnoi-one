@@ -181,8 +181,6 @@ def take_event(body: NoteIn, request: Request) -> Response:
     item = claims.get("event") if claims else None
     if not isinstance(item, dict) or not item.get("id") or not item.get("kind"):
         raise _nowhere()
-    if claims.get('slug') != '2mg':
-        raise HTTPException(409, 'Finance accepts events for 2MG only. No Finance record was created.')
     if item["kind"] == "purchase.receipt_submitted" and item.get("source") != "inventory":
         raise HTTPException(409, "Purchase receipt evidence must come from Inventory.")
     remember_company(request.app.state.settings, claims["slug"])

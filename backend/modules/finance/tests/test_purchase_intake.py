@@ -90,7 +90,7 @@ def test_unknown_supplier_quality_and_source_correction_holds(app,client,ana):
 def test_reclassified_supplier_stops_prepared_bill_submission(app,client,ana):
     item,s=linked(app,client,ana,intake(app,client,ana));body=request(client,ana,item,s)
     b=client.post('/finance/purchase-intakes/prepare',headers=ana,json=body).json()
-    with app.state.sessions() as db:db.get(CompanyScopeReview,('supplier',s['id'])).scope='review';db.commit()
+    with app.state.sessions() as db:db.merge(CompanyScopeReview(subject_kind='supplier',subject_id=s['id'],scope='review',evidence={'source':'fictional test'},reviewed_by='TEST'));db.commit()
     assert client.post('/finance/bills/'+b['id']+'/submit',headers=ana).status_code==409
 
 
@@ -100,8 +100,6 @@ def test_missing_invoice_and_forged_line_or_company_cannot_prepare(app,client,an
     assert client.post('/finance/purchase-intakes/prepare',headers=ana,json=body).status_code==422
     body=request(client,ana,item,s);body['allocations'][0]['sourceLineId']='other-receipt-line'
     assert client.post('/finance/purchase-intakes/prepare',headers=ana,json=body).status_code==422
-    with app.state.sessions() as db:
-        with pytest.raises(HTTPException):receive(db,evidence(),'gpi')
 
 
 def test_source_bill_keeps_independent_approval_and_signed_evidence(app,client,ana):

@@ -1,7 +1,12 @@
-"""Company-use evidence is separate from supplier origin and tax treatment."""
+"""Company-use evidence is separate from supplier origin and tax treatment.
+
+Finance keeps one company's books. The company review ("2mg" here = verified for these books) applies only where
+someone has reviewed that kind of record (2MG's Finance, after its reconciliation). Books nobody reviewed, such as
+a company starting fresh, use their accounts and suppliers as they are (2026-11-24, owner: Finance must work for
+every company in the one system, not only 2MG)."""
 from datetime import UTC, datetime
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import exists, or_, select
 from modules.finance.models import Account, CompanyScopeReview, Supplier
 from modules.finance.locks import begin_change
 
@@ -15,19 +20,32 @@ def configured(db, kind):
 
 
 def usable_clause(kind, id_column):
-    # Missing evidence is a hold, including on an unconfigured installation.
-    return id_column.in_(reviewed_ids(kind, '2mg'))
+    # Missing evidence is a hold once this kind is reviewed; books nobody reviewed use everything.
+    return or_(id_column.in_(reviewed_ids(kind, '2mg')), ~exists().where(CompanyScopeReview.subject_kind == kind))
 
 
 def scope_for(db, kind, id):
     review = db.get(CompanyScopeReview, (kind, id))
-    return review.scope if review else 'review'
+    if review:
+        return review.scope
+    return 'review' if configured(db, kind) else '2mg'
+
+
+def mark_new(db, kind, id, *, reviewed_by):
+    """A record made here belongs to these books; recorded only where the company review is in use."""
+    if configured(db, kind):
+        db.add(CompanyScopeReview(subject_kind=kind, subject_id=id, scope='2mg',
+                                  evidence={'source': 'manual entry in Finance'}, reviewed_by=reviewed_by))
 
 
 def require_ids(db, kind, ids, *, status_code=409):
     begin_change(db)
     ids = list(ids)
     wanted = {id for id in ids if id}
+    if not configured(db, kind):
+        if any(not id for id in ids):
+            raise HTTPException(status_code, f'{"An account" if kind == "account" else "A supplier"} is missing. Choose one before recording new work.')
+        return
     approved = set(db.scalars(select(CompanyScopeReview.subject_id).where(
         CompanyScopeReview.subject_kind == kind, CompanyScopeReview.subject_id.in_(wanted),
         CompanyScopeReview.scope == '2mg').order_by(CompanyScopeReview.subject_id).with_for_update(read=True))) if wanted else set()
