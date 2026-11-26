@@ -7,7 +7,7 @@ supplier prices), categories, brands and units of measure.
 
 from datetime import date
 
-from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, Request, Response, UploadFile, status
 from pydantic import Field, field_validator
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -610,8 +610,15 @@ def list_products(
     return rows
 
 
+def product_saved(db: Session, request: Request, product: Product) -> None:
+    """The CRM's product list follows Inventory's at once, not at its next refresh (owner, 2026-11-24)."""
+    from modules.inventory import business_events
+
+    business_events.emit(db, getattr(request.state, "company", None), "product.saved", {"id": product.id, "sku": product.sku, "name": product.name})
+
+
 @router.post("/products", status_code=status.HTTP_201_CREATED)
-def create_product(_: Create, me: CurrentUser, db: DB, body: ProductIn) -> dict:
+def create_product(_: Create, me: CurrentUser, db: DB, body: ProductIn, request: Request) -> dict:
     if sku_taken(db, body.sku):
         raise field_error("sku", "Another product has that SKU.")
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -620,6 +627,7 @@ def create_product(_: Create, me: CurrentUser, db: DB, body: ProductIn) -> dict:
     db.flush()
     check_product(db, product)
     audit(db, me, "product.created", target=f"{product.sku} {product.name}", target_type="product", target_id=product.id)
+    product_saved(db, request, product)
     db.commit()
     return {"id": product.id}
 
@@ -708,7 +716,7 @@ TRACKING = ("track_batches", "track_expiry", "track_serials", "unit_code", "prod
 
 
 @router.patch("/products/{product_id}")
-def update_product(_: Edit, me: CurrentUser, db: DB, product_id: str, body: ProductPatch) -> dict:
+def update_product(_: Edit, me: CurrentUser, db: DB, product_id: str, body: ProductPatch, request: Request) -> dict:
     product = get_product(db, product_id)
     wanted = changed(body)
     required = {"sku", "name", "product_type", "unit_code", "status", "cost_price", "selling_price", "tax_rate_bp", "tax_inclusive",
@@ -727,6 +735,7 @@ def update_product(_: Edit, me: CurrentUser, db: DB, product_id: str, body: Prod
         db.flush()
         check_product(db, product)
         audit(db, me, "product.updated", target=f"{product.sku} {product.name}", target_type="product", target_id=product.id, fields=fields)
+        product_saved(db, request, product)
         db.commit()
     return {"id": product.id}
 

@@ -261,6 +261,8 @@ type ComboboxProps<V> = {
   notFoundContent?: ReactNode;
   optionRender?: (o: { data: AnyOption }) => ReactNode;
   open?: boolean;
+  /** Several picks: what the box says when every option is picked ("All divisions"), in place of the first few. */
+  allLabel?: string;
   status?: string;
   size?: string;
   "aria-invalid"?: boolean;
@@ -289,6 +291,7 @@ export function Combobox<V = string>({
   showSearch,
   notFoundContent,
   optionRender,
+  allLabel,
   ...rest
 }: ComboboxProps<V>) {
   const [open, setOpen] = useState(false);
@@ -299,8 +302,12 @@ export function Combobox<V = string>({
   const picked: unknown[] = multiple ? (Array.isArray(value) ? value : []) : value === undefined || value === null ? [] : [value];
   const labelOf = (v: unknown) => flat.find((o) => keyOf(o.value) === keyOf(v))?.label ?? keyOf(v);
 
+  const pickable = flat.filter((o) => !o.disabled);
+  const everything = multiple && pickable.length > 0 && pickable.every((o) => picked.some((v) => keyOf(v) === keyOf(o.value)));
   const shown = multiple ? (
-    picked.length === 0 ? null : (
+    picked.length === 0 ? null : everything && allLabel ? (
+      `${allLabel} (${picked.length})`
+    ) : (
       <span className="flex min-w-0 flex-wrap gap-1">
         {picked.slice(0, 2).map((v) => (
           <Badge key={keyOf(v)} variant="secondary" className="max-w-40 truncate">
@@ -354,9 +361,17 @@ export function Combobox<V = string>({
           optionRender={optionRender}
           footer={
             <div className="flex items-center justify-between gap-2 border-t p-1.5">
-              <Button type="button" variant="ghost" size="sm" disabled={picked.length === 0} onClick={() => onChange?.([] as unknown as V, [])}>
-                Clear
-              </Button>
+              <span className="flex gap-1">
+                {/* Every option at once (not when a limit allows fewer): then take off the few it isn't for. */}
+                {maxCount === undefined && (
+                  <Button type="button" variant="ghost" size="sm" disabled={everything} onClick={() => onChange?.(pickable.map((o) => o.value) as unknown as V, pickable)}>
+                    Select all
+                  </Button>
+                )}
+                <Button type="button" variant="ghost" size="sm" disabled={picked.length === 0} onClick={() => onChange?.([] as unknown as V, [])}>
+                  Clear
+                </Button>
+              </span>
               <Button type="button" size="sm" onClick={() => setOpen(false)}>
                 {picked.length ? `Done · ${picked.length}` : "Done"}
               </Button>

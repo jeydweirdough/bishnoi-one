@@ -25,7 +25,7 @@ def test_old_receipt_history_converges_without_losing_rows(tmp_path):
     migrate.upgrade(engine);migrate.upgrade(engine)
     with engine.connect() as c:
         assert c.execute(text('SELECT value FROM preservation_probe')).scalar_one()=='fictional saved row'
-        assert c.execute(text('SELECT version_num FROM nbin_alembic_version')).scalar_one()=='0032'
+        assert c.execute(text('SELECT version_num FROM nbin_alembic_version')).scalar_one()=='0033'
         assert c.execute(text('PRAGMA integrity_check')).scalar_one()=='ok'
         assert not c.execute(text('PRAGMA foreign_key_check')).all()
 

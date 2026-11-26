@@ -14,7 +14,7 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import Field
 from sqlalchemy import func, or_, select
 
@@ -44,7 +44,10 @@ def brief(o: SalesOrder) -> dict:
         "id": o.id, "number": o.number, "status": o.status, "statusLabel": sales.status_label(o),
         # Once invoiced, the invoice's state and total (Step 4D): the invoice is the order's source of truth.
         "invoiceState": o.invoice_state, "amountsFrom": sales.figures(o)["source"],
-        "customer": {"id": o.customer_id, "name": o.customer_name, "address": o.customer_address, "tin": o.customer_tin},
+        "customer": {"id": o.customer_id, "name": o.customer_name, "address": o.customer_address, "tin": o.customer_tin,
+                     "email": o.customer_email, "phone": o.customer_phone},
+        # quote (raised from a CRM quote), direct (made with the quote form) or typed (at Inventory's selling prices).
+        "source": o.source or ("quote" if o.quote_id else "typed"),
         "quote": {"id": o.quote_id, "number": o.quote_number} if o.quote_id else None,
         "salesperson": {"id": o.salesperson_id, "name": o.salesperson_name} if o.salesperson_name else None,
         "division": o.division_name, "team": o.team_name,
@@ -59,13 +62,19 @@ def out(db: DB, o: SalesOrder) -> dict:
     return {
         **brief(o),
         "payer": o.payer, "notes": o.notes, "tax": o.tax,
+        # As quoted (migration 0032): the price type, the prescription, why it needs approval, the letter.
+        "priceType": {"code": o.price_type, "name": o.price_type_name} if o.price_type_name else None, "rx": o.rx,
+        "promoDiscountCentavos": o.promo_discount_centavos, "approvalReasons": o.approval_reasons or [], "warnings": o.warnings or [],
+        "terms": o.terms, "letter": {**o.letter, "hasFile": o.letter_file_type is not None} if o.letter else None,
         "grossCentavos": (shown := sales.figures(o))["grossCentavos"], "discountCentavos": shown["discountCentavos"], "taxCentavos": shown["taxCentavos"],
         # The order's own amounts, as ordered: the invoice's take their place once invoiced.
         "ordered": {"grossCentavos": o.gross_centavos, "discountCentavos": o.discount_centavos, "totalCentavos": o.total_centavos},
         "decidedBy": person(o.decided_by), "decidedAt": iso(o.decided_at), "decisionNote": o.decision_note, "deliveredAt": iso(o.delivered_at),
         "lines": [{"id": line.id, "product": product_ref(line.product), "quantity": line.quantity, "freeQuantity": line.free_quantity,
                    "unitPrice": line.unit_price, "discount": line.discount, "total": line.total, "delivered": line.delivered,
-                   "unit": line_unit(line)} for line in o.lines],
+                   "unit": line_unit(line), "promoName": line.promo_name, "promoDiscount": line.promo_discount,
+                   "extraDiscount": line.extra_discount, "discountKind": line.discount_kind, "discountValue": line.discount_value,
+                   "bundle": line.bundle_name} for line in o.lines],
         "purchaseOrders": purchase_orders_of(db, o),
         "deliveries": [{"id": d.id, "number": d.number, "status": d.status, "issuedAt": iso(d.issued_at), "shipping": shipping.shipping_out(d)} for d in deliveries],
         # Invoiced from its delivery, and paid (step 13).
@@ -91,6 +100,17 @@ def list_orders(_: View, db: DB, status_: str | None = Query(None, alias="status
 @router.get("/sales-orders/{order_id}")
 def read_order(_: View, db: DB, order_id: str) -> dict:
     return out(db, found(db, SalesOrder, order_id, "sales order"))
+
+
+@router.get("/sales-orders/{order_id}/letter")
+def read_letter(_: View, db: DB, order_id: str) -> Response:
+    """A direct order's guarantee letter, as attached (a quote's letter stays with the quote, in the CRM)."""
+    o = found(db, SalesOrder, order_id, "sales order")
+    if o.letter_file is None:
+        raise HTTPException(404, "This order has no letter attached here.")
+    name = str((o.letter or {}).get("fileName") or "letter").replace('"', "")
+    return Response(o.letter_file, media_type=o.letter_file_type or "application/octet-stream",
+                    headers={"Content-Disposition": f'inline; filename="{name}"', "Cache-Control": "no-store"})
 
 
 class LineIn(Api):
@@ -156,7 +176,7 @@ def line_unit(line: SalesOrderLine) -> dict:
 
 @router.post("/sales-orders", status_code=201)
 def create_order(_: allowed("sales.create"), me: CurrentUser, db: DB, body: OrderIn) -> dict:
-    o = SalesOrder(number=next_number(db, "SO"), status="draft", created_by_id=me.id, created_by_name=me.full_name, warehouse_id="")
+    o = SalesOrder(number=next_number(db, "SO"), status="draft", source="typed", created_by_id=me.id, created_by_name=me.full_name, warehouse_id="")
     fill(db, o, body)
     db.add(o)
     db.flush()

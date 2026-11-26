@@ -13,7 +13,16 @@ export const MENU_ROW = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 t
 
 export function MoreMenu({ label = "More actions", children }: { label?: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  // Opens toward the side with room: leftward from a button at the right, rightward when the
+  // actions have wrapped to the left (else the panel would be cut off by the page's edge).
+  const [toLeft, setToLeft] = useState(true);
   const box = useRef<HTMLDivElement>(null);
+  const toggle = () => {
+    const r = box.current?.getBoundingClientRect();
+    const page = box.current?.closest("[data-slot=sidebar-inset]")?.getBoundingClientRect();
+    if (r) setToLeft(r.right - 240 >= (page?.left ?? 0) + 8);
+    setOpen((o) => !o);
+  };
   useEffect(() => {
     if (!open) return;
     const away = (e: MouseEvent) => box.current && !box.current.contains(e.target as Node) && setOpen(false);
@@ -31,7 +40,7 @@ export function MoreMenu({ label = "More actions", children }: { label?: string;
       <button
         suppressHydrationWarning
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
@@ -44,7 +53,7 @@ export function MoreMenu({ label = "More actions", children }: { label?: string;
         role="menu"
         hidden={!open}
         onClick={() => setOpen(false)}
-        className="absolute top-11 right-0 z-50 w-60 rounded-xl border border-rule bg-card p-1.5 shadow-[0_12px_32px_rgba(20,20,20,0.12)]"
+        className={`absolute top-11 ${toLeft ? "right-0" : "left-0"} z-50 w-60 rounded-xl border border-rule bg-card p-1.5 shadow-[0_12px_32px_rgba(20,20,20,0.12)]`}
       >
         {children}
       </div>

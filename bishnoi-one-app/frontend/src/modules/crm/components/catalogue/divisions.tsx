@@ -1,6 +1,7 @@
 "use client";
 
 import { Flag } from "@/src/platform/ui/marks";
+import { Combobox } from "@/src/platform/ui/pickers";
 import type { DivisionOption } from "@/src/platform/lib/types";
 
 /**
@@ -45,22 +46,20 @@ export function DivisionPicker({
       {options.length === 1 && value.length === 1 && value[0] === options[0].id ? (
         <p className="text-sm">{options[0].name}</p>
       ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {options.map((o) => (
-            <label
-              key={o.id}
-              className="relative inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-rule-strong px-3 py-1.5 text-meta text-ink-2 has-checked:border-hema has-checked:bg-hema-tint has-checked:font-semibold has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-hema"
-            >
-              <input suppressHydrationWarning
-                type="checkbox"
-                className="sr-only"
-                checked={value.includes(o.id)}
-                onChange={(e) => onChange(e.target.checked ? [...value, o.id] : value.filter((id) => id !== o.id))}
-              />
-              {o.name}
-            </label>
-          ))}
-          {kept.length > 0 && <span className="self-center text-meta text-ink-3">and {kept.length} switched-off division(s)</span>}
+        // A dropdown with every division ticked or not, Select all and Clear (2026-11-23, owner: the row of chips was too
+        // much with 60 divisions): for every division, Select all; for all but a few, Select all and untick those.
+        <div className="max-w-xl">
+          <Combobox<string[]>
+            mode="multiple"
+            options={options.map((o) => ({ value: o.id, label: o.name }))}
+            value={value.filter((id) => options.some((o) => o.id === id))}
+            onChange={(ids) => onChange([...kept, ...ids])}
+            placeholder="Pick the divisions"
+            allLabel="All divisions"
+            aria-invalid={Boolean(error)}
+            aria-label="Divisions"
+          />
+          {kept.length > 0 && <p className="mt-1 text-meta text-ink-3">And {kept.length} switched-off division(s), kept.</p>}
         </div>
       )}
       {error && <p className="mt-1 text-meta text-danger">{error}</p>}

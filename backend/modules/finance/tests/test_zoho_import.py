@@ -136,7 +136,7 @@ def test_payment_import_holds_a_bill_after_supplier_company_reclassification(cli
     assert old['counts']['ready']==1
     with app.state.sessions() as db:
         b=db.scalar(select(Bill).where(Bill.zoho_ref=='b1'))
-        db.get(CompanyScopeReview,('supplier',b.supplier_id)).scope='review'
+        db.merge(CompanyScopeReview(subject_kind='supplier',subject_id=b.supplier_id,scope='review',evidence={'source':'fictional test'},reviewed_by='TEST'))
         db.commit()
     held=preview(client,t['cristal'],'supplier-payments',files)
     assert held['counts']['held']==1 and any('2MG' in reason['reason'] for reason in held['reasons'])

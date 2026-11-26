@@ -37,7 +37,7 @@ def me_out(user: User, settings: Settings) -> dict:
         "canManageSettings": bool(access.permissions & ADMIN_PERMISSIONS),
         "canRecover": False,
         "viewedBy": None,
-        "isOwner": False,
+        "isOwner": user.role.is_system,  # Administrator: adds and changes warehouses (settings_change)
         "isDeveloperAdmin": False,
         "modules": [
             {

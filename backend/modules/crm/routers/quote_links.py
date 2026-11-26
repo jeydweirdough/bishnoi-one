@@ -94,7 +94,7 @@ def book_of(db, link_or_company, rep: User | None, on: str):
     company = link_or_company.company if isinstance(link_or_company, QuoteLink) else link_or_company
     contact = link_or_company.contact if isinstance(link_or_company, QuoteLink) else None
     if company is not None:
-        return book_for(db, company, contact, on)
+        return book_for(db, company, contact, on, rep.team_id if rep else None)
     return price_book(db, rep.team_id if rep else None, on, None)
 
 

@@ -7,7 +7,7 @@ import Link from "next/link";
 import { LinkButton } from "@/src/modules/inventory/platform/ui/button";
 import { Empty, PageHeader, Particulars, SectionTitle, Sheet } from "@/src/modules/inventory/platform/ui/sheet";
 import { loadQuery } from "@/src/modules/inventory/platform/lib/api";
-import { bulkDeleteSuppliers, deleteSupplier, saveSupplier } from "@/src/modules/inventory/actions/inventory";
+import { bulkDeleteSuppliers, deleteSupplier, saveSupplier, sendVendorsToFinance } from "@/src/modules/inventory/actions/inventory";
 import { POStamp } from "@/src/modules/inventory/components/stamps";
 import { RecordTools } from "@/src/modules/inventory/components/record-tools";
 import { StepButton } from "@/src/modules/inventory/components/step-button";
@@ -41,7 +41,12 @@ export async function SuppliersPage({ searchParams }: { searchParams: Search }) 
     <>
       <PageHeader
         title="Vendors"
-        actions={may("suppliers.create") && <LinkButton href="/inventory/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Add vendor</LinkButton>}
+        actions={
+          <>
+            {may("suppliers.edit") && <StepButton run={sendVendorsToFinance} label="Send all to Finance" done="Vendors sent to Finance: its suppliers follow them" confirm={{ title: "Send every vendor to Finance?", body: "Finance links each vendor to its supplier with the same TIN or name, or adds it. Vendors you add or change later are sent on their own.", label: "Send all" }} />}
+            {may("suppliers.create") && <LinkButton href="/inventory/suppliers/new" variant="primary" icon={<Plus className="size-4" aria-hidden />}>Add vendor</LinkButton>}
+          </>
+        }
       >
         Vendors you buy from, with contact details, payment terms and delivery performance.
       </PageHeader>

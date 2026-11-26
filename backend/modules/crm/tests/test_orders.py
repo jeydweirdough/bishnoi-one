@@ -116,3 +116,58 @@ def test_send_posts_the_payload_with_the_key(monkeypatch):
         server.shutdown()
     assert made == {"id": "o1", "number": "SO-1"}
     assert seen == {"path": "/orders", "key": "k1", "idem": "quote-1", "body": {"source": "bishnoi-crm"}}
+
+
+def test_a_sales_order_made_directly_is_priced_as_a_quote(app, client, crew, ids, monkeypatch):
+    """2026-11-23 (owner): the quote form makes a sales order without a quote; Inventory gets the same payload a quote's
+    order carries, with the promo and extra discount apart, the price type and why it needs approval."""
+    import json
+
+    from modules.crm.routers import quotes
+
+    acme = company(client, crew["ria"])
+    body = {"priceType": "PATIENT", "rx": False, "lines": [line(ids["AMX-500"], 2, discount={"kind": "percent", "value": 1500})],
+            "warehouseId": "w-1", "scheduledOn": "2026-11-25", "notes": "Rush"}
+    # Inventory not linked: refused, nothing made.
+    r = client.post(f"/companies/{acme['id']}/sales-orders", data={"order": json.dumps(body)}, headers=crew["ria"])
+    assert r.status_code == 409 and "Inventory" in r.json()["detail"]
+
+    got = []
+    monkeypatch.setattr(type(app.state.settings), "inventory_linked", property(lambda self: True))
+    monkeypatch.setattr(quotes, "place_direct", lambda settings, payload: got.append(payload) or {"id": "so-9", "number": "SO-2026-00009", "status": "pending"})
+    r = client.post(f"/companies/{acme['id']}/sales-orders", data={"order": json.dumps(body)}, headers=crew["ria"])
+    assert r.status_code == 201, r.text
+    assert r.json()["number"] == "SO-2026-00009"
+    sent_ = got[0]
+    assert sent_["quote"] is None and sent_["customer"]["name"] == acme["name"] and sent_["salesperson"]["email"]
+    assert sent_["pricing"]["priceType"] == "PATIENT" and sent_["pricing"]["notes"] == "Rush" and "discount" in sent_["pricing"]["approvalReasons"]
+    first = sent_["lines"][0]
+    assert first["code"] == "AMX-500" and first["discountKind"] == "percent" and first["discountValue"] == 1500
+    assert first["extraDiscountCentavos"] > 0 and first["discountCentavos"] == first["promoDiscountCentavos"] + first["extraDiscountCentavos"]
+    assert sent_["warehouseId"] == "w-1" and sent_["scheduledOn"] == "2026-11-25"
+    # The same checks as a quote: a price type off the list is refused before anything is sent.
+    bad = client.post(f"/companies/{acme['id']}/sales-orders", data={"order": json.dumps(body | {"priceType": "NOPE"})}, headers=crew["ria"])
+    assert bad.status_code == 422 and len(got) == 1
+
+
+def test_a_quote_order_carries_its_pricing(app, client, crew, ids):
+    acme = company(client, crew["ria"])
+    q = save(client, crew["ria"], acme, [line(ids["AMX-500"], 2)]).json()
+    payload = client.get(f"/quotes/{q['id']}/order-payload", headers=crew["ria"]).json()
+    assert payload["pricing"]["priceType"] == "PATIENT" and payload["pricing"]["rx"] is False
+    assert {"promoDiscountCentavos", "extraDiscountCentavos", "discountKind", "promoName"} <= set(payload["lines"][0])
+
+
+def test_a_customer_no_team_looks_after_is_priced_with_the_makers_team(app, client, crew, ids):
+    """2026-11-23: promos and bundles are per division; a customer with no team takes the division of whoever quotes."""
+    from modules.crm.models import Company
+
+    acme = company(client, crew["ria"])
+    mine = client.get(f"/companies/{acme['id']}/price-list", headers=crew["ria"]).json()
+    with app.state.sessions() as db:
+        db.get(Company, acme["id"]).team_id = None
+        db.commit()
+    unowned = client.get(f"/companies/{acme['id']}/price-list", headers=crew["ria"]).json()
+    assert [p["id"] for p in unowned["promos"]] == [p["id"] for p in mine["promos"]]
+    assert [b["id"] for b in unowned["bundles"]] == [b["id"] for b in mine["bundles"]]
+    assert mine["promos"] or mine["bundles"]  # the demo catalogue gives the rep's team some

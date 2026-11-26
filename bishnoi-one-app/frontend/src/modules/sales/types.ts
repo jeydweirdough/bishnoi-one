@@ -10,7 +10,9 @@ export type SalesOrderBrief = {
   /** Once invoiced, the invoice is the order's source of truth (Step 4D): its state, and where the amounts come from. */
   invoiceState?: "issued" | "paid" | "voided" | null;
   amountsFrom?: "invoice" | "order";
-  customer: { id: string | null; name: string; address: string | null; tin: string | null };
+  customer: { id: string | null; name: string; address: string | null; tin: string | null; email?: string | null; phone?: string | null };
+  /** quote (raised from a CRM quote), direct (made with the quote form) or typed (at Inventory's selling prices). */
+  source?: "quote" | "direct" | "typed";
   quote: { id: string; number: string | null } | null;
   salesperson: { id: string | null; name: string } | null;
   division: string | null;
@@ -42,6 +44,15 @@ export type SalesOrder = SalesOrderBrief & {
   ordered?: { grossCentavos: number; discountCentavos: number; totalCentavos: number };
   payer: { kind: string; issuer?: string; letterNumber?: string; amountCentavos?: number } | null;
   notes: string | null;
+  /** As quoted (2026-11-23): what the CRM priced it with, why it needs approval, the VAT and the guarantee letter. */
+  priceType?: { code: string | null; name: string } | null;
+  rx?: boolean;
+  promoDiscountCentavos?: number;
+  approvalReasons?: string[];
+  warnings?: string[];
+  terms?: string | null;
+  tax?: import("@/src/platform/lib/types").QuoteTax | null;
+  letter?: { number?: string; issuedOn?: string; amountCentavos?: number; fileName?: string; hasFile?: boolean } | null;
   grossCentavos: number;
   discountCentavos: number;
   decidedBy: { id: string; name: string } | null;
@@ -50,7 +61,10 @@ export type SalesOrder = SalesOrderBrief & {
   deliveredAt: string | null;
   lines: { id: string; product: { id: string; sku: string; name: string; unit: string }; quantity: number; freeQuantity: number; unitPrice: number; discount: number; total: number; delivered: number;
     /** The unit sold (step 4A): a pack, or the base unit (per 1); quantity stays in the base unit. */
-    unit?: { packagingId: string | null; name: string; per: number; soldAs: string | null } }[];
+    unit?: { packagingId: string | null; name: string; per: number; soldAs: string | null };
+    /** As quoted: the promo and the extra discount that make up `discount`, and the set it came in. */
+    promoName?: string | null; promoDiscount?: number; extraDiscount?: number; discountKind?: "percent" | "amount" | null; discountValue?: number | null;
+    bundle?: string | null }[];
   deliveries: { id: string; number: string; status: string; issuedAt: string | null; shipping?: import("@/src/modules/inventory/lib/types").Shipping | null }[];
 };
 

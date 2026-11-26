@@ -4,7 +4,7 @@ import { getCompanyMe, load } from "@/src/platform/lib/api";
 import type { BundleRow, CatalogueProduct, DivisionOption, Paged, SalesRules } from "@/src/platform/lib/types";
 import { NoAccess } from "@/src/modules/crm/components/admin/words";
 import { BundlesEditor } from "@/src/modules/crm/components/catalogue/bundles-editor";
-import { DivisionFilter, inDivision } from "@/src/modules/crm/components/catalogue/division-filter";
+import { DivisionFilter, NoDivisionNotice, inDivision } from "@/src/modules/crm/components/catalogue/division-filter";
 
 export const metadata = { title: "Bundles" };
 
@@ -25,6 +25,7 @@ export default async function BundlesPage({ searchParams }: { searchParams: Prom
         Sets of products sold together at one price. Each is for its own divisions: nobody else sees or quotes it.
       </PageHeader>
       <DivisionFilter base="/crm/bundles" teams={bundles.teams} current={current} />
+      {bundles.can.edit && <NoDivisionNotice rows={bundles.items} what="bundle" />}
       <BundlesEditor
         bundles={inDivision(bundles.items, current)}
         products={products.items.map((p) => ({ id: p.id, name: p.name, code: p.code, unit: p.unit, prices: p.prices }))}

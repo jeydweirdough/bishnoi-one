@@ -17,8 +17,16 @@ def evidence(**changes):
         'lines':[{'id':'TEST-line-1','orderLineId':'TEST-order-line','productId':'TEST-product','unitCode':'box','product':'TEST medicine','unit':'box','quantity':60,'unitCost':100}],**changes}
 
 
-def intake(app,client,ana,data=None):
+def reviewed_books(app):
+    # 2MG's books: suppliers are reviewed, so a person confirms each Inventory vendor's link.
+    with app.state.sessions() as db:
+        db.merge(CompanyScopeReview(subject_kind='supplier',subject_id='TEST-reviewed-supplier',scope='2mg',evidence={'source':'fictional test'},reviewed_by='TEST'))
+        db.commit()
+
+
+def intake(app,client,ana,data=None,reviewed=True):
     data=data or evidence()
+    if reviewed:reviewed_books(app)
     with app.state.sessions() as db:receive(db,data,'2mg');db.commit()
     rows=client.get('/finance/purchase-intakes',headers=ana).json()['items']
     return next(x for x in rows if x['snapshot']['receiptId']==data['receiptId'])
@@ -90,7 +98,7 @@ def test_unknown_supplier_quality_and_source_correction_holds(app,client,ana):
 def test_reclassified_supplier_stops_prepared_bill_submission(app,client,ana):
     item,s=linked(app,client,ana,intake(app,client,ana));body=request(client,ana,item,s)
     b=client.post('/finance/purchase-intakes/prepare',headers=ana,json=body).json()
-    with app.state.sessions() as db:db.get(CompanyScopeReview,('supplier',s['id'])).scope='review';db.commit()
+    with app.state.sessions() as db:db.merge(CompanyScopeReview(subject_kind='supplier',subject_id=s['id'],scope='review',evidence={'source':'fictional test'},reviewed_by='TEST'));db.commit()
     assert client.post('/finance/bills/'+b['id']+'/submit',headers=ana).status_code==409
 
 
@@ -100,8 +108,6 @@ def test_missing_invoice_and_forged_line_or_company_cannot_prepare(app,client,an
     assert client.post('/finance/purchase-intakes/prepare',headers=ana,json=body).status_code==422
     body=request(client,ana,item,s);body['allocations'][0]['sourceLineId']='other-receipt-line'
     assert client.post('/finance/purchase-intakes/prepare',headers=ana,json=body).status_code==422
-    with app.state.sessions() as db:
-        with pytest.raises(HTTPException):receive(db,evidence(),'gpi')
 
 
 def test_source_bill_keeps_independent_approval_and_signed_evidence(app,client,ana):
@@ -208,3 +214,13 @@ def test_foreign_receipt_is_held_under_unified_php_only_bill_contract(app,client
     response=client.post('/finance/purchase-intakes/prepare',headers=ana,json=request(client,ana,item,s))
     assert response.status_code==409
     with app.state.sessions() as db:assert db.scalar(select(func.count()).select_from(Bill))==0
+
+
+def test_books_without_review_take_the_inventory_vendor_as_their_supplier(app,client,ana):
+    # One vendor list (owner, 2026-11-24): Finance finds the vendor by TIN or name, or adds it once, never typed again.
+    first=intake(app,client,ana,evidence(supplierName='TEST Gloria Diaz Branch',supplierTin='123456789000'),reviewed=False)
+    assert first['supplier'] and first['supplier']['name']=='TEST Gloria Diaz Branch' and first['state']=='received'
+    again=intake(app,client,ana,evidence(supplierName='TEST Gloria Diaz Branch',supplierTin='123456789000'),reviewed=False)
+    assert again['supplier']['id']==first['supplier']['id']
+    names=[x['name'] for x in client.get('/finance/suppliers?company_use=all',headers=ana).json()['items']]
+    assert names.count('TEST Gloria Diaz Branch')==1

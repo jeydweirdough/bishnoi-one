@@ -214,20 +214,48 @@ def from_quote(db: Session, data: dict, slug: str | None) -> SalesOrder | None:
     found = db.scalar(select(SalesOrder).where(SalesOrder.quote_id == str(quote["id"])))
     if found is not None:
         return found
-    warehouse = default_warehouse(db)
+    return from_crm(db, data, slug)
+
+
+def _text(value, size: int) -> str | None:
+    return str(value)[:size] if value not in (None, "") else None
+
+
+def _int(value) -> int:
+    return int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
+
+
+def from_crm(db: Session, data: dict, slug: str | None, *, warehouse: Warehouse | None = None, scheduled_on=None,
+             letter_file: bytes | None = None, letter_file_type: str | None = None) -> SalesOrder:
+    """A sales order as the CRM priced it (2026-11-23, owner: the quotation is the order's basis): raised from a quote
+    (quote.ordered), or made directly with the quote form (POST /integration/sales-orders). Either way it carries the
+    price type, the prescription, each line's promo and extra discount, the payer and letter, the VAT and why it needs
+    approval, and goes for approval at once."""
+    quote = data.get("quote") or {}
+    pricing = data.get("pricing") or {}
+    warehouse = warehouse or default_warehouse(db)
     if warehouse is None:
         raise ValueError("This company has no warehouse switched on to ship from.")
     customer, salesperson = data.get("customer") or {}, data.get("salesperson") or {}
     team, division = data.get("team") or {}, data.get("division") or {}
+    letter = data.get("letter") if isinstance(data.get("letter"), dict) else None
     order = SalesOrder(
-        number=next_number(db, "SO"), status="pending",
+        number=next_number(db, "SO"), status="pending", source="quote" if quote.get("id") else "direct",
         customer_id=customer.get("id"), customer_name=str(customer.get("name") or "Customer")[:200],
-        customer_address=(customer.get("address") or None) and str(customer["address"])[:400], customer_tin=(customer.get("tin") or None),
-        quote_id=str(quote["id"]), quote_number=str(quote.get("number") or "")[:30] or None,
+        customer_address=_text(customer.get("address"), 400), customer_tin=_text(customer.get("tin"), 30),
+        customer_email=_text(customer.get("email"), 254), customer_phone=_text(customer.get("phone"), 60),
+        quote_id=_text(quote.get("id"), 36), quote_number=_text(quote.get("number"), 30),
         salesperson_id=salesperson.get("id"), salesperson_name=salesperson.get("name"),
         team_id=team.get("id"), team_name=team.get("name"), division_id=division.get("id"), division_name=division.get("name"),
-        payer=data.get("payer"), warehouse_id=warehouse.id, notes=quote.get("notes"),
+        payer=data.get("payer"), warehouse_id=warehouse.id, scheduled_on=scheduled_on,
+        notes=quote.get("notes") if quote.get("id") else _text(pricing.get("notes"), 4000),
         tax=data.get("tax"), currency=str(data.get("currency") or "PHP")[:3], created_by_name=(data.get("raisedBy") or {}).get("name"),
+        price_type=_text(pricing.get("priceType"), 40), price_type_name=_text(pricing.get("priceTypeName") or quote.get("priceType"), 120),
+        rx=bool(pricing.get("rx", quote.get("rx"))), terms=_text(pricing.get("terms") or quote.get("terms"), 4000),
+        approval_reasons=[str(r)[:40] for r in pricing.get("approvalReasons") or []][:20] or None,
+        warnings=[str(w)[:500] for w in pricing.get("warnings") or []][:20] or None,
+        letter={k: letter.get(k) for k in ("number", "issuedOn", "amountCentavos", "fileName")} if letter else None,
+        letter_file=letter_file, letter_file_type=letter_file_type,
     )
     missing = []
     for i, line in enumerate(data.get("lines") or []):
@@ -237,18 +265,29 @@ def from_quote(db: Session, data: dict, slug: str | None) -> SalesOrder | None:
         if product is None:
             missing.append(str(line.get("name") or line.get("code") or "a line"))
             continue
-        order.lines.append(SalesOrderLine(position=i, product_id=product.id, quantity=max(1, int(line.get("quantity") or 0)),
-                                          free_quantity=int(line.get("freeQuantity") or 0), unit_price=int(line.get("unitPriceCentavos") or 0),
-                                          discount=int(line.get("discountCentavos") or 0), total=int(line.get("totalCentavos") or 0),
-                                          vat_category=str(line.get("vatCategory") or "standard")[:20]))
+        promo, extra = _int(line.get("promoDiscountCentavos")), _int(line.get("extraDiscountCentavos"))
+        whole = _int(line.get("discountCentavos"))
+        if not promo and not extra:  # an older CRM sends the discount whole
+            extra = whole
+        order.lines.append(SalesOrderLine(position=i, product_id=product.id, quantity=max(1, _int(line.get("quantity"))),
+                                          free_quantity=_int(line.get("freeQuantity")), unit_price=_int(line.get("unitPriceCentavos")),
+                                          discount=whole or promo + extra, total=_int(line.get("totalCentavos")),
+                                          vat_category=str(line.get("vatCategory") or "standard")[:20],
+                                          promo_name=_text(line.get("promoName"), 160), promo_discount=promo, extra_discount=extra,
+                                          discount_kind=_text(line.get("discountKind"), 10),
+                                          discount_value=_int(line.get("discountValue")) or None, bundle_name=_text(line.get("bundle"), 160)))
+    if not order.lines and not order.quote_id:  # a quote's order is still made (its notes say what was left out)
+        raise ValueError("None of its products are in Inventory" + (f" ({', '.join(missing)})." if missing else "."))
     if missing:
         order.notes = ((order.notes + "\n") if order.notes else "") + "Not found in Inventory, left out: " + ", ".join(missing) + "."
     totals(order)
+    order.promo_discount_centavos = sum(line.promo_discount for line in order.lines)
     db.add(order)
     db.flush()
-    business_events.link(db, slug, business_events.ref("quote", order.quote_id, order.quote_number, app="crm"), business_events.ref("sales_order", order.id, order.number))
+    if order.quote_id:
+        business_events.link(db, slug, business_events.ref("quote", order.quote_id, order.quote_number, app="crm"), business_events.ref("sales_order", order.id, order.number))
     raised = data.get("raisedBy") or {}
-    ask_for_approval(db, slug, order, {"email": raised.get("email"), "name": raised.get("name")}, quote=quote, payer=data.get("payer"))
+    ask_for_approval(db, slug, order, {"email": raised.get("email"), "name": raised.get("name")}, quote=quote or None, payer=data.get("payer"))
     told(db, slug, order)
     return order
 
@@ -278,11 +317,18 @@ def ask_for_approval(db: Session, slug: str | None, order: SalesOrder, requester
                                 "number": quote.get("number"), "url": f"/crm/quotes/{quote['id']}"})
         if quote.get("priceType"):
             attachments.append({"label": f"Price type {quote['priceType']}, approved by Finance", "app": "crm", "kind": "price_type"})
+    if not (quote and quote.get("id")):
+        # Made directly with the quote form: what the CRM's pricing would have had the team lead or Pharmacy check.
+        if order.rx:
+            attachments.append({"label": "Prescription price: no Pharmacy check on a direct order", "app": "inventory", "kind": "sales_order",
+                                "id": order.id, "number": order.number, "url": f"/crm/sales/orders/{order.id}"})
+        if order.price_type_name:
+            attachments.append({"label": f"Price type {order.price_type_name}", "app": "crm", "kind": "price_type"})
     if isinstance(payer, dict) and payer.get("kind") == "guarantee_letter":
         number = payer.get("letterNumber")
         attachments.append({"label": f"Guarantee letter{' ' + str(number) if number else ''} from {payer.get('issuer') or 'the issuer'}",
                             "app": "crm", "kind": "guarantee_letter", "id": quote.get("id") if quote else None,
-                            "url": f"/crm/quotes/{quote['id']}" if quote and quote.get("id") else None})
+                            "url": f"/crm/quotes/{quote['id']}" if quote and quote.get("id") else f"/crm/sales/orders/{order.id}/letter"})
     db.flush()
     lines = [{"name": line.product.name if line.product else "", "quantity": line.quantity, "freeQuantity": line.free_quantity or 0,
               "soldAs": sold_as(line.quantity, line.unit_name, line.per), "totalCentavos": line.total or 0} for line in order.lines[:30]]
@@ -294,7 +340,9 @@ def ask_for_approval(db: Session, slug: str | None, order: SalesOrder, requester
                     "discountCentavos": order.discount_centavos, "currency": order.currency, "units": sum(line.quantity for line in order.lines),
                     "lines": lines, "moreLines": max(0, len(order.lines) - len(lines)), "warehouse": warehouse.name if warehouse else None,
                     "scheduledOn": order.scheduled_on.isoformat() if order.scheduled_on else None, "notes": order.notes,
-                    "salesperson": order.salesperson_name, "quote": quote.get("number") if quote else None},
+                    "salesperson": order.salesperson_name, "quote": quote.get("number") if quote else None,
+                    "priceType": order.price_type_name, "rx": order.rx, "promoDiscountCentavos": order.promo_discount_centavos,
+                    "approvalReasons": order.approval_reasons or [], "warnings": order.warnings or []},
         "attachments": attachments,
     })
 

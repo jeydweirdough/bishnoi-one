@@ -65,8 +65,11 @@ def test_bulk_approve_accounts_and_suppliers_for_2mg(app, client, ana):
     active_codes_after = {a["code"] for a in client.get("/finance/ledger/accounts", headers=ana).json()["items"]}
     assert "6991-000" in active_codes_after
 
-    # Create a supplier without 2mg review (like bulk import) and approve it
+    # Create a supplier without 2mg review (like bulk import) on books that review suppliers, and approve it
     with app.state.sessions() as db:
+        reviewed = Supplier(name="Reviewed 2MG Vendor", created_by="TEST", is_active=True)
+        db.add(reviewed); db.flush()
+        db.add(CompanyScopeReview(subject_kind="supplier", subject_id=reviewed.id, scope="2mg", evidence={"source": "fictional test"}, reviewed_by="TEST"))
         s = Supplier(name="Imported 2MG Vendor", created_by="TEST", is_active=True)
         db.add(s)
         db.commit()
