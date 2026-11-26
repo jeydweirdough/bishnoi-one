@@ -1,3 +1,4 @@
+import { AutoSubmitForm } from "@/src/modules/finance/bir/auto-submit-form";
 import { ContainedTable } from "@/src/modules/finance/bir/contained-table";
 import { Select } from "@/src/platform/ui/pickers";
 import { ReviewExports } from "@/src/modules/finance/exports/review-controls";
@@ -85,13 +86,13 @@ function DatesForm({ action, start, end, keep }: { action: string; start: string
 function QuarterForm({ action, year, quarter, keep, children }: { action: string; year: number; quarter: number; keep?: Record<string, string>; children?: ReactNode }) {
   const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
   return (
-    <form className="flex flex-wrap items-end gap-3" action={action}>
+    <AutoSubmitForm action={action}>
       {Object.entries(keep ?? {}).map(([k, v]) => (
         <input suppressHydrationWarning key={k} type="hidden" name={k} value={v} />
       ))}
       <label className="text-meta text-ink-2">
         Year
-        <Select name="year" defaultValue={year} className={inputClass}>
+        <Select key={`y-${year}`} name="year" defaultValue={year} className={inputClass}>
           {years.map((y) => (
             <option key={y} value={y}>
               {y}
@@ -101,7 +102,7 @@ function QuarterForm({ action, year, quarter, keep, children }: { action: string
       </label>
       <label className="text-meta text-ink-2">
         Quarter
-        <Select name="quarter" defaultValue={quarter} className={inputClass}>
+        <Select key={`q-${quarter}`} name="quarter" defaultValue={quarter} className={inputClass}>
           {[1, 2, 3, 4].map((q) => (
             <option key={q} value={q}>
               {["1st", "2nd", "3rd", "4th"][q - 1]}
@@ -113,7 +114,7 @@ function QuarterForm({ action, year, quarter, keep, children }: { action: string
       <button suppressHydrationWarning type="submit" className={buttonClass}>
         Show
       </button>
-    </form>
+    </AutoSubmitForm>
   );
 }
 
@@ -559,7 +560,7 @@ export async function BirIncomeTaxPage({ searchParams }: { searchParams: Search 
       </PageHeader>
       <TaxpayerLine who={data.taxpayer} />
       <Sheet className="mb-4 flex flex-wrap items-end justify-between gap-4 px-4 py-3 print:hidden">
-        <form className="flex flex-wrap items-end gap-3" action="/finance/bir/income-tax">
+        <AutoSubmitForm action="/finance/bir/income-tax">
           <label className="text-meta text-ink-2">
             Year
             <select suppressHydrationWarning name="year" defaultValue={data.year} className={inputClass}>
@@ -580,10 +581,19 @@ export async function BirIncomeTaxPage({ searchParams }: { searchParams: Search 
             </select>
           </label>
           <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
-        </form>
-        <a href={download(apiPath)} className={secondaryCsvBtn}>
-          Download 1702Q working CSV
-        </a>
+        </AutoSubmitForm>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <a href={download(apiPath)} className={secondaryCsvBtn}>
+            Download 1702Q working CSV
+          </a>
+          {data.quarter <= 3 ? (
+            <Link href={`/finance/bir/income-tax/draft?year=${data.year}&quarter=${data.quarter}&rateBp=${rateBp}`} className={primaryPdfBtn}>
+              Download 1702Q official draft PDF
+            </Link>
+          ) : (
+            <span className="text-meta text-ink-3">1702Q PDF is Q1–Q3 only (Q4 uses annual 1702-RT)</span>
+          )}
+        </div>
       </Sheet>
       <div className="space-y-5">
         <Table wide="min-w-[32rem]" head={[{ label: "1702Q working item" }, { label: "Amount", right: true }]}>
@@ -874,22 +884,22 @@ function MonthForm({ year, month }: { year: number; month: number }) {
   const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
   const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   return (
-    <form className="flex flex-wrap items-center gap-3" action="/finance/bir/withholding">
+    <AutoSubmitForm action="/finance/bir/withholding">
       <input suppressHydrationWarning type="hidden" name="form" value="0619e" />
-      <label className="flex items-center gap-1.5 text-meta font-medium text-ink-2">
+      <label className="text-meta text-ink-2">
         Year
-        <Select name="year" defaultValue={year} className={inputClass}>
+        <Select key={`y-${year}`} name="year" defaultValue={year} className={inputClass}>
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </Select>
       </label>
-      <label className="flex items-center gap-1.5 text-meta font-medium text-ink-2">
+      <label className="text-meta text-ink-2">
         Month
-        <Select name="month" defaultValue={month} className={inputClass}>
+        <Select key={`m-${month}`} name="month" defaultValue={month} className={inputClass}>
           {names.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
         </Select>
       </label>
       <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
-    </form>
+    </AutoSubmitForm>
   );
 }
 
@@ -994,16 +1004,16 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
       <>
         {header("Withholding tax", <>Annual information return of expanded withholding (BIR Form 1604E) for {d.year}, with its alphalist of payees.</>, d.taxpayer)}
         <Sheet className="mb-4 flex flex-wrap items-center justify-between gap-4 px-4 py-3 print:hidden">
-          <form className="flex flex-wrap items-center gap-3" action="/finance/bir/withholding">
+          <AutoSubmitForm action="/finance/bir/withholding">
             <input suppressHydrationWarning type="hidden" name="form" value="1604e" />
-            <label className="flex items-center gap-1.5 text-meta font-medium text-ink-2">
+            <label className="text-meta text-ink-2">
               Year
-              <Select name="year" defaultValue={d.year} className={inputClass}>
+              <Select key={`y-${d.year}`} name="year" defaultValue={d.year} className={inputClass}>
                 {years.map((y) => <option key={y} value={y}>{y}</option>)}
               </Select>
             </label>
             <button suppressHydrationWarning type="submit" className={buttonClass}>Show</button>
-          </form>
+          </AutoSubmitForm>
           <div className="flex flex-wrap items-center gap-2.5">
             <a href={download(`/finance/bir/withholding/1604e?year=${d.year}`)} className={secondaryCsvBtn}>
               Download Alphalist CSV
@@ -1041,8 +1051,13 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
     );
   }
 
-  // 2307: the suppliers withheld from in the quarter, and the certificate for the one picked.
+  // 2307: the suppliers withheld from in the quarter (or a single month), and the certificate for the one picked.
   const q = new URLSearchParams(quarterQuery(sp).slice(1));
+  const rawMonth = Number(one(sp.month));
+  const rawQuarter = Number(one(sp.quarter));
+  if (rawMonth >= 1 && rawMonth <= 12) {
+    if (!rawQuarter || Math.ceil(rawMonth / 3) === rawQuarter) q.set("month", String(rawMonth));
+  }
   if (one(sp.supplierId)) q.set("supplierId", one(sp.supplierId));
   let d = await load<Withholding2307>(`/finance/bir/withholding/2307${q.size ? `?${q}` : ""}`);
   if (!d.certificate && d.suppliers.length > 0 && !one(sp.supplierId)) {
@@ -1050,23 +1065,36 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
     autoQ.set("supplierId", d.suppliers[0].id);
     d = await load<Withholding2307>(`/finance/bir/withholding/2307?${autoQ}`);
   }
-  const keep = `form=2307&year=${d.year}&quarter=${d.quarter}`;
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const qStartMonth = (d.quarter - 1) * 3 + 1;
+  const quarterMonths = [qStartMonth, qStartMonth + 1, qStartMonth + 2];
+  const keep = `form=2307&year=${d.year}&quarter=${d.quarter}${d.month ? `&month=${d.month}` : ""}`;
   const c = d.certificate;
   const totalQuarterWithheld = d.suppliers.reduce((sum, s) => sum + s.taxCentavos, 0);
   return (
     <>
       {header("Withholding tax", <>Certificates of creditable tax withheld at source (BIR Form 2307), {d.period.label}: one for each supplier you withheld from, to give them.</>, d.taxpayer)}
       <Sheet className="mb-4 flex flex-wrap items-center justify-between gap-4 px-4 py-3 print:hidden">
-        <QuarterForm action="/finance/bir/withholding" year={d.year} quarter={d.quarter} keep={{ form: "2307" }} />
+        <QuarterForm action="/finance/bir/withholding" year={d.year} quarter={d.quarter} keep={{ form: "2307" }}>
+          <label className="text-meta text-ink-2">
+            Month
+            <Select key={`m-${d.quarter}-${d.month ?? ""}`} name="month" defaultValue={d.month ?? ""} className={inputClass}>
+              <option value="">Full quarter</option>
+              {quarterMonths.map((m) => (
+                <option key={m} value={m}>{monthNames[m - 1]}</option>
+              ))}
+            </Select>
+          </label>
+        </QuarterForm>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-meta text-ink-2">
             <strong>{d.suppliers.length}</strong> suppliers · Total withheld: <strong className="text-ink tabular-nums">{fmt.peso(totalQuarterWithheld)}</strong>
           </span>
-          {c && <WithholdingPdfButton form="2307" year={d.year} quarter={d.quarter} supplierId={c.payee.id} label={`Download 2307 PDF (${(c.payee.name ?? "Supplier").slice(0, 22)}${(c.payee.name ?? "").length > 22 ? "…" : ""})`} />}
+          {c && <WithholdingPdfButton form="2307" year={d.year} quarter={d.quarter} month={d.month ?? undefined} supplierId={c.payee.id} label={`Download 2307 PDF (${(c.payee.name ?? "Supplier").slice(0, 22)}${(c.payee.name ?? "").length > 22 ? "…" : ""})`} />}
         </div>
       </Sheet>
       {d.suppliers.length === 0 ? (
-        <Sheet><Empty title="No tax withheld from suppliers this quarter" icon="lists">Bills with an ATC (expanded withholding) appear here.</Empty></Sheet>
+        <Sheet><Empty title={d.month ? "No tax withheld from suppliers this month" : "No tax withheld from suppliers this quarter"} icon="lists">Bills with an ATC (expanded withholding) appear here.</Empty></Sheet>
       ) : (
         <div className="space-y-4">
           <div className="grid min-w-0 gap-5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
@@ -1105,7 +1133,7 @@ export async function BirWithholdingPage({ searchParams }: { searchParams: Searc
                     <p className="mt-0.5 text-meta text-ink-2">Certificate of Creditable Tax Withheld at Source · {d.period.label} ({fmt.dateLabel(d.period.start)} to {fmt.dateLabel(d.period.end)})</p>
                   </div>
                   <div className="print:hidden">
-                    <WithholdingPdfButton form="2307" year={d.year} quarter={d.quarter} supplierId={c.payee.id} label="Download Form 2307 PDF" />
+                    <WithholdingPdfButton form="2307" year={d.year} quarter={d.quarter} month={d.month ?? undefined} supplierId={c.payee.id} label="Download Form 2307 PDF" />
                   </div>
                 </div>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">

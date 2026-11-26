@@ -242,6 +242,32 @@ def income_tax(
     return {"taxpayer": bir.taxpayer(db), "period": period_out(p.start, p.end, p.label), "year": year, "quarter": quarter, **data}
 
 
+@router.get("/returns/income-tax/draft.pdf")
+def income_tax_draft_pdf(
+    _: Viewer,
+    db: DB,
+    settings: SettingsDep,
+    year: int | None = None,
+    quarter: int | None = None,
+    rate_bp: int = Query(2500, alias="rateBp"),
+) -> Response:
+    from modules.finance.bir_form_1702q import prepare, render
+
+    report = income_tax(_, db, settings, year, quarter, rate_bp, "json")
+    try:
+        document = render(prepare(report))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    return Response(
+        document,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="1702Q-review-draft-{report["year"]}-Q{report["quarter"]}.pdf"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 
 # --- expanded withholding: what the company withheld from its suppliers -----------------------
 
@@ -274,7 +300,16 @@ def withholding_1604e(_: Viewer, db: DB, settings: SettingsDep, year: int | None
     return {"taxpayer": who, "year": year, **data}
 
 
-def _resolve_2307_scope(db: DB, settings: SettingsDep, year: int | None, quarter: int | None, supplier_id: str | None, bill_id: str | None, voucher_id: str | None):
+def _resolve_2307_scope(
+    db: DB,
+    settings: SettingsDep,
+    year: int | None,
+    quarter: int | None,
+    month: int | None,
+    supplier_id: str | None,
+    bill_id: str | None,
+    voucher_id: str | None,
+):
     from modules.finance.models import Bill, PaymentVoucher
 
     if bill_id and voucher_id:
@@ -300,8 +335,19 @@ def _resolve_2307_scope(db: DB, settings: SettingsDep, year: int | None, quarter
     dy, dq = default_quarter(settings)
     if anchor_date is not None:
         dy, dq = anchor_date.year, (anchor_date.month - 1) // 3 + 1
-    y, q = year or dy, quarter or dq
-    return y, q, calendar_quarter(y, q), supplier_id
+    y = year or dy
+    if month is not None:
+        if not 1 <= month <= 12:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A month is 1 to 12.")
+        derived_q = (month - 1) // 3 + 1
+        if quarter is not None and quarter != derived_q:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Selected month does not belong to that quarter.")
+        q = derived_q
+        scope_p = bir.Period(date(y, month, 1), bir.month_end(y, month), date(y, month, 1).strftime("%B %Y"))
+    else:
+        q = quarter or dq
+        scope_p = calendar_quarter(y, q)
+    return y, q, month, calendar_quarter(y, q), scope_p, supplier_id
 
 
 @router.get("/withholding/2307")
@@ -310,16 +356,24 @@ def withholding_2307(
     db: DB,
     settings: SettingsDep,
     year: int | None = None,
-    quarter: int | None = None,
+    quarter: int | None = Query(None, ge=1, le=4),
+    month: int | None = Query(None, ge=1, le=12),
     supplier_id: str | None = Query(None, alias="supplierId"),
     bill_id: str | None = Query(None, alias="billId"),
     voucher_id: str | None = Query(None, alias="voucherId"),
 ) -> dict:
-    """With a supplier (or billId/voucherId): its certificate for the quarter. Without: the suppliers withheld from, each due one."""
-    year, quarter, p, supplier_id = _resolve_2307_scope(db, settings, year, quarter, supplier_id, bill_id, voucher_id)
-    out = {"taxpayer": bir.taxpayer(db), "period": period_out(p.start, p.end, p.label), "year": year, "quarter": quarter, "suppliers": bir.withheld_suppliers(db, p)}
+    """With a supplier (or billId/voucherId): its certificate for the quarter (or single month). Without: the suppliers withheld from, each due one."""
+    year, quarter, month, quarter_p, scope_p, supplier_id = _resolve_2307_scope(db, settings, year, quarter, month, supplier_id, bill_id, voucher_id)
+    out = {
+        "taxpayer": bir.taxpayer(db),
+        "period": period_out(scope_p.start, scope_p.end, scope_p.label),
+        "year": year,
+        "quarter": quarter,
+        "month": month,
+        "suppliers": bir.withheld_suppliers(db, scope_p),
+    }
     if supplier_id:
-        out["certificate"] = bir.form_2307(db, p, supplier_id, bill_id=bill_id, voucher_id=voucher_id)
+        out["certificate"] = bir.form_2307(db, quarter_p, supplier_id, bill_id=bill_id, voucher_id=voucher_id, month=month)
     return out
 
 
@@ -362,13 +416,14 @@ def certificate_draft_pdf(
     bill_id: str | None = Query(None, alias="billId"),
     voucher_id: str | None = Query(None, alias="voucherId"),
     year: int | None = None,
-    quarter: int | None = None,
+    quarter: int | None = Query(None, ge=1, le=4),
+    month: int | None = Query(None, ge=1, le=12),
 ) -> Response:
     from modules.finance.bir_form_2307 import prepare, render
     if not (supplier_id or bill_id or voucher_id):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Choose a supplier, bill, or payment voucher first.")
     try:
-        report=withholding_2307(user,db,settings,year,quarter,supplier_id,bill_id,voucher_id)
+        report=withholding_2307(user,db,settings,year,quarter,month,supplier_id,bill_id,voucher_id)
         if not report.get('certificate',{}).get('rows'):
             raise HTTPException(404,'No withholding certificate records for this payee and period.')
         document=render(prepare(report))

@@ -222,3 +222,42 @@ def test_per_bill_and_per_voucher_2307_and_1601eq_ten_atcs_continuation(client, 
     assert len(reader.pages) == 3
     last_text = reader.pages[-1].extract_text() or ""
     assert "WC850" in last_text and "WI160" in last_text
+
+
+def test_monthly_2307_filters_to_single_month_and_renders_pdf(client, ana, ben):
+    from .test_payables import bill, cleared, supplier
+
+    ready(client, ana)
+    s = supplier(client, ben, name="Monthly Cert Vendor", tin="777-888-999")
+    cleared(client, ana, ben, bill(client, ben, s["id"], number="SI-OCT", billDate="2026-10-08"))
+    cleared(client, ana, ben, bill(client, ben, s["id"], number="SI-NOV", billDate="2026-11-12"))
+
+    oct_resp = client.get(f"/finance/bir/withholding/2307?year=2026&quarter=4&month=10&supplierId={s['id']}", headers=ana)
+    assert oct_resp.status_code == 200, oct_resp.text
+    oct_data = oct_resp.json()
+    assert oct_data["month"] == 10
+    assert oct_data["period"]["start"] == "2026-10-01"
+    assert oct_data["period"]["end"] == "2026-10-31"
+    assert oct_data["certificate"]["totals"]["taxCentavos"] == 10_000
+    assert oct_data["certificate"]["rows"][0]["months"] == [1_000_000, 0, 0]
+
+    nov_pdf = client.get(f"/finance/bir/withholding/2307/draft.pdf?year=2026&quarter=4&month=11&supplierId={s['id']}", headers=ana)
+    assert nov_pdf.status_code == 200 and nov_pdf.content.startswith(b"%PDF")
+
+    bad = client.get(f"/finance/bir/withholding/2307?year=2026&quarter=1&month=10&supplierId={s['id']}", headers=ana)
+    assert bad.status_code == 422
+
+
+def test_1702q_official_draft_pdf(client, ana):
+    from io import BytesIO
+    from pypdf import PdfReader
+
+    ready(client, ana)
+    pdf = client.get("/finance/bir/returns/income-tax/draft.pdf?year=2026&quarter=1&rateBp=2500", headers=ana)
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.content.startswith(b"%PDF")
+    reader = PdfReader(BytesIO(pdf.content))
+    assert len(reader.pages) == 3
+
+    q4 = client.get("/finance/bir/returns/income-tax/draft.pdf?year=2026&quarter=4&rateBp=2500", headers=ana)
+    assert q4.status_code == 422

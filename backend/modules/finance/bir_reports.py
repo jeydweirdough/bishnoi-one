@@ -697,17 +697,29 @@ def form_1604e(db: Session, year: int, fiscal_month_end: int = 12) -> dict:
     }
 
 
-def form_2307(db: Session, p: Period, supplier_id: str, *, bill_id: str | None = None, voucher_id: str | None = None) -> dict:
-    """Certificate of creditable tax withheld at source, for one supplier and quarter (or filtered to one bill or payment voucher)."""
+def form_2307(
+    db: Session,
+    p: Period,
+    supplier_id: str,
+    *,
+    bill_id: str | None = None,
+    voucher_id: str | None = None,
+    month: int | None = None,
+) -> dict:
+    """Certificate of creditable tax withheld at source, for one supplier and quarter (or filtered to one month, bill, or payment voucher)."""
+    start, end = p.start, p.end
+    if month is not None:
+        start = date(p.start.year, month, 1)
+        end = month_end(p.start.year, month)
     if bill_id or voucher_id:
-        q = select(Bill).where(Bill.status == "recorded", Bill.supplier_id == supplier_id, Bill.bill_date >= p.start, Bill.bill_date <= p.end)
+        q = select(Bill).where(Bill.status == "recorded", Bill.supplier_id == supplier_id, Bill.bill_date >= start, Bill.bill_date <= end)
         if bill_id:
             q = q.where(Bill.id == bill_id)
         if voucher_id:
             q = q.join(VoucherLine, VoucherLine.bill_id == Bill.id).where(VoucherLine.voucher_id == voucher_id)
         bills = [pu for b in db.scalars(q.order_by(Bill.bill_date, Bill.no)) if (pu := purchase(db, b)).held]
     else:
-        bills = withheld_bills(db, p.start, p.end, supplier_id)
+        bills = withheld_bills(db, start, end, supplier_id)
     months = months_of(p)
     rows: dict[tuple, dict] = {}
     for pu in bills:

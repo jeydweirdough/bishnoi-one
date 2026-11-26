@@ -416,10 +416,10 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {letterhead?.logo && <img src={letterhead.logo} alt="" className="h-14 max-w-40 object-contain" />}
             <div>
-            <p className="text-heading">{c?.seller.registeredName ?? me.org.name}</p>
-            {c?.seller.tradeName && <p className="text-meta text-ink-2">{c.seller.tradeName}</p>}
-            {c?.seller.address && <p className="text-meta text-ink-2">{c.seller.address}</p>}
-            {c?.seller.tin && <p className="text-meta text-ink-2">{c.seller.regimeName} TIN {c.seller.tin}</p>}
+            <p className="text-heading">{c?.seller?.registeredName ?? me.org.name}</p>
+            {c?.seller?.tradeName && <p className="text-meta text-ink-2">{c.seller.tradeName}</p>}
+            {c?.seller?.address && <p className="text-meta text-ink-2">{c.seller.address}</p>}
+            {c?.seller?.tin && <p className="text-meta text-ink-2">{c.seller.regimeName} TIN {c.seller.tin}</p>}
             </div>
           </div>
           <div className="text-right">
@@ -435,7 +435,7 @@ export async function InvoicePage({ params, searchParams }: { params: Promise<{ 
               ["TIN", inv.customer.tin],
               ["Address", inv.customer.address],
               ["Salesperson", inv.salesperson?.name ?? null],
-              ...(inv.buyerIdNumber ? ([[c?.treatment.name ?? "ID number", inv.buyerIdNumber]] as [string, string][]) : []),
+              ...(inv.buyerIdNumber ? ([[c?.treatment?.name ?? "ID number", inv.buyerIdNumber]] as [string, string][]) : []),
             ]}
           />
           <Particulars

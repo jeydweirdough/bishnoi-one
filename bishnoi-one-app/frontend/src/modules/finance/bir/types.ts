@@ -105,7 +105,7 @@ export type AtcRow = { atc: string | null; nature: string | null; rateBp: number
 export type PayeeRow = AtcRow & { supplierId: string; tin: string | null; payee: string; address: string | null };
 
 export type Withholding2307 = {
-  taxpayer: Taxpayer; period: PeriodOut; year: number; quarter: number;
+  taxpayer: Taxpayer; period: PeriodOut; year: number; quarter: number; month?: number | null;
   suppliers: { id: string; name: string; tin: string | null; taxCentavos: number }[];
   certificate?: {
     form: "2307"; title: string;
